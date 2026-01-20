@@ -19,7 +19,7 @@ preview = ["pixi-build"]
 
 [tool.pixi.package.build.backend]
 name = "pixi-build-python"
-version = "==0.4.3"
+version = "==0.4.4"
 channels = ["https://prefix.dev/conda-forge"]
 
 #[tool.pixi.package.build.config]
