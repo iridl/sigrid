@@ -1,4 +1,5 @@
 from collections import OrderedDict
+import importlib.util
 from pathlib import Path
 import icechunk
 import os
@@ -114,6 +115,21 @@ class IcechunkHandler(XarrayHandler):
         session = repo.readonly_session("main")
         ds = xr.open_zarr(session.store, zarr_format=3, decode_cf=False)
         return ds
+
+
+class OnTheFlyHandler(XarrayHandler):
+    """Handler for python files that export an open() function."""
+    extensions = re.compile(r"^.*\.py$")
+
+    def open(self) -> xr.Dataset:
+        dir, var_name = self.filepath.rsplit('/', maxsplit=1)
+        index_path = catalog_root / dir / 'index.py'
+        spec = importlib.util.spec_from_file_location('catalog', index_path)
+        assert spec  # TODO
+        assert spec.loader  # TODO
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module.open()
 
 
 # Initialy defined this to provide a .view method to satisfy

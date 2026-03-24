@@ -1,0 +1,29 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../pydap"
+		}
+	],
+	"settings": {
+		"python.defaultInterpreterPath": "${workspaceFolder:pydap-icechunk}/.pixi/envs/default/bin/python"
+	},
+	"launch": {
+		"version": "0.2.0",
+		"configurations": [
+			{
+				"name": "pydap server",
+				"type": "debugpy",
+				"request": "launch",
+				"console": "integratedTerminal",
+				"program": "-m",
+				"args": [
+					"pydap.wsgi.app" 
+				],
+				"envFile": "${workspaceFolder:pydap-icechunk}/.env"
+			}
+		]
+	}
+}
