@@ -29,6 +29,16 @@ class XarrayHandler(BaseHandler):
         self.filepath = filepath
         try:
             with self.open() as source:
+                # Try to read one element from the dataset. If we're going to fail,
+                # it's better to fail here, before the response headers have been sent,
+                # than to fail after sending a 200 response. Success here doesn't
+                # guarantee success for the rest of the dataset, but it catches simple
+                # configuration errors like misconfigured icechunk virtual chunk directory.
+                # TODO maybe instead of doing an extra read here, we can find a way to defer
+                # sending the headers until the first chunk has been read successfully?
+                da = next(iter(source.data_vars.values()))
+                da.isel({dim: 0 for dim in da.dims}).data
+
                 # TODO populate last-modified
                 # self.additional_headers.append(
                 #     (
