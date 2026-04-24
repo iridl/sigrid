@@ -1,17 +1,14 @@
 import abc
-from collections import OrderedDict
 import importlib.util
 from pathlib import Path
 from typing import override
 import icechunk
 import os
-import re
 import webob
 from webob.dec import wsgify
 from webob.exc import HTTPNotFound
 import xarray as xr
 
-from pydap.exceptions import OpenFileError
 from pydap.handlers.lib import BaseHandler
 from pydap.model import BaseType, DatasetType
 
@@ -53,22 +50,10 @@ class XarrayHandler(BaseHandler, abc.ABC):
             vars = source.variables
             dims = source.dims
 
-            # Add dimensions when creating the DatasetType
-            Dims = {}
-            fqn_dims = OrderedDict()  # keep track of fully qualifying names of dims
-            for dim in dims:
-                fqn_dims.update({"/" + str(dim): dim})
-                if source.sizes[dim] is None: # TODO is this how xarray represents unlimited dimension?
-                    # TODO we haven't set self.dataset yet?!
-                    self.dataset.attributes["DODS_EXTRA"] = {
-                        "Unlimited_Dimension": dim,
-                    }
-                else:
-                    Dims.update({dim: source.sizes[dim]})
             # build dataset
 
             self.dataset = DatasetType(
-                self.name, dimensions=Dims, attributes=dict(source.attrs)
+                self.name, attributes=dict(source.attrs)
             )
 
             # add grids
