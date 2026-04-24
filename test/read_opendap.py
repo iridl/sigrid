@@ -1,6 +1,6 @@
 import xarray as xr
 
-ds = xr.open_dataset('http://localhost:8001/NMME/CCSM4.0/prec.icechunk', engine='netcdf4')
+ds = xr.open_dataset('http://localhost:8001/NMME/COLA-RSMAS/CCSM4/prec', engine='netcdf4')
 p = ds['prec']
 print(p)
 # May starts for JJA season over Ethiopia from 1990 to 2009

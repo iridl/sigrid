@@ -18,10 +18,21 @@
 				"type": "debugpy",
 				"request": "launch",
 				"console": "integratedTerminal",
-				"program": "-m",
+				"program": "${workspaceFolder:pydap-icechunk}/test/server_for_test.py",
 				"args": [
-					"pydap.wsgi.app" 
 				],
+				"cwd": "${workspaceFolder:pydap-icechunk}",
+				"envFile": "${workspaceFolder:pydap-icechunk}/.env"
+			},
+			{
+				"name": "temp",
+				"type": "debugpy",
+				"request": "launch",
+				"console": "integratedTerminal",
+				"program": "${workspaceFolder:pydap-icechunk}/catalog/NMME/COLA-RSMAS/CCSM4/index.py",
+				"args": [
+				],
+				"cwd": "${workspaceFolder:pydap-icechunk}",
 				"envFile": "${workspaceFolder:pydap-icechunk}/.env"
 			}
 		]

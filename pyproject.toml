@@ -6,9 +6,6 @@ version = "0"
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
-[project.entry-points."pydap.handler"]
-icechunk = "pydap_icechunk:IcechunkHandler"
-
 
 ##### pixi
 
@@ -40,6 +37,7 @@ pydap-icechunk = { path = ".", editable = true }
 pydap = { path = "../pydap", editable = true}
 docopt = '*'
 jinja2 = '*'
+types-webob = '*'
 
 [tool.pixi.package.host-dependencies]
 setuptools = ">=80,<90"
@@ -47,3 +45,4 @@ setuptools = ">=80,<90"
 [tool.pixi.environments]
 default = {features = ["dev"], solve-group = "prod"}
 prod = {features = [], solve-group = "prod"}
+
