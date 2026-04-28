@@ -14,6 +14,16 @@
 		"version": "0.2.0",
 		"configurations": [
 			{
+				"name": "current file",
+				"type": "debugpy",
+				"request": "launch",
+				"console": "integratedTerminal",
+				"program": "${file}",
+				"args": [
+				],
+				"envFile": "${workspaceFolder:pydap-icechunk}/.env"
+			},
+			{
 				"name": "pydap server",
 				"type": "debugpy",
 				"request": "launch",
