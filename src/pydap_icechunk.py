@@ -168,5 +168,5 @@ class CatalogFileHandler(XarrayHandler):
         # could happen.
         assert spec.loader  
         spec.loader.exec_module(module)
-        ds: xr.Dataset = module.vars[self.varname]()
+        ds: xr.Dataset = module.open(self.varname)
         return ds

@@ -1,7 +1,8 @@
 import xarray as xr
 
 import pydap_icechunk
-    
+
+
 def open(varname) -> xr.Dataset:
     ds = pydap_icechunk.open_icechunk(f'NMME/COLA-RSMAS/CCSM4/{varname}')
     ds = ds.rename({
@@ -18,14 +19,3 @@ def open(varname) -> xr.Dataset:
     del ds[varname].attrs['lat']
     ds[varname] = ds[varname].assign_coords(L=('L', range(len(ds['L']))))
     return ds
-
-vars = {
-    varname: lambda varname=varname: open(varname)
-    for varname in ('prec', 'sst')
-}
-
-if __name__ == '__main__':
-    varname = 'prec'
-    ds = vars[varname]()
-    print(ds)
-    print(ds[varname])
