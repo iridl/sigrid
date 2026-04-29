@@ -16,7 +16,6 @@ from pydap.model import BaseType, DatasetType
 orig_root = os.environ['PYDAP_ICECHUNK_ORIGINAL_ROOT']
 icechunk_root = os.environ['PYDAP_ICECHUNK_PROCESSED_ROOT']
 # TODO this must be available from the pydap config already?
-catalog_root = os.environ['PYDAP_CATALOG_ROOT']
 
 
 class XarrayHandler(BaseHandler, abc.ABC):
