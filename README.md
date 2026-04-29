@@ -31,7 +31,7 @@ Attributes:
     Generator:    NCL v.5.0                                                        
     References:   Ben P. Kirtman, Dughong Min. (2009) Multimodel Ensemble ENS...
     Title:        CCSM4.0 National Multi-Model Ensembles(NMME) project
->>> ds['sst]
+>>> ds['sst']
 <xarray.DataArray 'sst' (S: 533, M: 10, L: 12, Y: 181, X: 360)> Size: 17GB
 [4167633600 values with dtype=float32] 
 Coordinates:                                                                       
