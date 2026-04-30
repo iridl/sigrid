@@ -11,7 +11,9 @@ if __name__ == "__main__":
     assert catalog_path
     app = pydap_icechunk.Server(catalog_path)
     werkzeug.serving.run_simple(
-        "localhost", 8001, app,
+        "localhost",
+        int(os.environ['PYDAP_PORT']),
+        app,
         use_reloader=True,
         passthrough_errors=True,
     )

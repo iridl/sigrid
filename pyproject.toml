@@ -23,7 +23,7 @@ channels = ["https://prefix.dev/conda-forge"]
 #ignore-pypi-mapping = false
 
 [tool.pixi.dependencies]
-#pydap = ">=3.5.8,<4"
+pydap = ">=3.5.8,<4"
 xarray = ">=2026.4.0,<2027"
 icechunk = ">=2.0.3,<3"
 gunicorn = ">=25.3.0,<26"  # TODO shouldn't be required. This is a mistake/judgment error in pydap.wsgi.app.
@@ -34,10 +34,10 @@ netcdf4 = ">=1.7.4,<2"
 
 [tool.pixi.feature.dev.pypi-dependencies]
 pydap-icechunk = { path = ".", editable = true }
-pydap = { path = "../pydap", editable = true}
-docopt = ">=0.6.2, <0.7"
-jinja2 = ">=3.1.6, <4"
-types-webob = ">=1.8.0.20260408, <2"
+#pydap = { path = "../pydap", editable = true}
+#docopt = ">=0.6.2, <0.7"
+#jinja2 = ">=3.1.6, <4"
+#types-webob = ">=1.8.0.20260408, <2"
 
 [tool.pixi.package.host-dependencies]
 setuptools = ">=80,<90"
