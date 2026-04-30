@@ -6,9 +6,40 @@ icechunk data with xarray before sending it to the user.
 ```cp dot-env-example .env```
 Change PYDAP_PORT so you don't collide with other developers.
 
+## Inspecting an icechunk store
+```
+> pixi run python
+>>> import pydap_icechunk
+>>> ds = pydap_icechunk.open_icechunk('NMME/ECCC/CanSIPS-IC4/hindcast/prec')
+>>> ds
+<xarray.Dataset> Size: 52GB
+Dimensions:        (IRIDL_time: 414, number: 40, step: 12, latitude: 181,
+                    longitude: 360)
+Coordinates:
+  * IRIDL_time     (IRIDL_time) datetime64[ns] 3kB 1990-01-01 ... 2024-06-01
+    time           (IRIDL_time) datetime64[ns] 3kB ...
+  * number         (number) int64 320B 1 2 3 4 5 6 7 8 ... 34 35 36 37 38 39 40
+    step_expanded  (IRIDL_time, step) timedelta64[ns] 40kB ...
+    valid_time     (step) datetime64[ns] 96B ...
+  * latitude       (latitude) float64 1kB -90.0 -89.0 -88.0 ... 88.0 89.0 90.0
+  * longitude      (longitude) float64 3kB 0.0 1.0 2.0 3.0 ... 357.0 358.0 359.0
+    surface        float64 8B ...
+Dimensions without coordinates: step
+Data variables:
+    prate          (IRIDL_time, number, step, latitude, longitude) float32 52GB ...
+Attributes:
+    GRIB_edition:            2
+    GRIB_centre:             cwao
+    GRIB_centreDescription:  Canadian Meteorological Service - Montreal
+    GRIB_subCentre:          0
+    Conventions:             CF-1.7
+    institution:             Canadian Meteorological Service - Montreal
+    history:                 2026-04-28T18:33 GRIB to CDM+CF via cfgrib-0.9.1...
+>>>
+
 ## Testing
 ```
-env `cat .env` pixi run python test/server_for_test.py
+pixi run python test/server_for_test.py
 ```
 then in another terminal, in python:
 ```

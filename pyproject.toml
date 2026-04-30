@@ -46,3 +46,6 @@ setuptools = ">=80,<90"
 default = {features = ["dev"], solve-group = "prod"}
 prod = {features = [], solve-group = "prod"}
 
+[tool.pixi.tasks]
+#server = "env $(cat .env) python test/server_for_test.py"
+python = "env $(cat .env) python"

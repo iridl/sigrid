@@ -89,14 +89,17 @@ class XarrayHandler(BaseHandler, abc.ABC):
     def open(self) -> xr.Dataset: ...
 
 
-def open_icechunk(rel_path):
+def open_icechunk(rel_path, decode_times=True):
     storage = icechunk.local_filesystem_storage(Path(icechunk_root) / rel_path)
+    # Workaround for https://github.com/earth-mover/icechunk/issues/2105
+    if not icechunk.Repository.exists(storage):
+        raise Exception(f'No repository exists at {storage}')
     repo = icechunk.Repository.open(
         storage,
         authorize_virtual_chunk_access={f'file://{orig_root}/': None}
     )
     session = repo.readonly_session("main")
-    ds = xr.open_zarr(session.store, zarr_format=3, decode_times=False)
+    ds = xr.open_zarr(session.store, zarr_format=3, decode_times=decode_times)
     return ds
 
 
