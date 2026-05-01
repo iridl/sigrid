@@ -4,7 +4,9 @@ import pydap_icechunk
 
 
 def open(varname) -> xr.Dataset:
-    ds = pydap_icechunk.open_icechunk(f'NMME/COLA-RSMAS/CESM1/{varname}')
+    ds = pydap_icechunk.open_icechunk(
+        f'NMME/COLA-RSMAS/CESM1/{varname}', decode_times=False
+    )
     ds = ds.rename({
         'IRIDL_time':  'S',
         'TIME': 'L',

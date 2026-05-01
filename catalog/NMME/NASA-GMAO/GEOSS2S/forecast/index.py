@@ -4,7 +4,9 @@ import pydap_icechunk
 
 
 def open(varname) -> xr.Dataset:
-    ds = pydap_icechunk.open_icechunk(f'NMME/NASA-GMAO/GEOSS2S/forecast/{varname}')
+    ds = pydap_icechunk.open_icechunk(
+        f'NMME/NASA-GMAO/GEOSS2S/forecast/{varname}', decode_times=False
+    )
     ds = ds.squeeze(dim="level", drop=True)
     ds = ds.rename({
         'IRIDL_time':  'S',

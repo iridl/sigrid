@@ -6,7 +6,9 @@ import pydap_icechunk
 
 
 def open(varname) -> xr.Dataset:
-    ds = pydap_icechunk.open_icechunk(f'NMME/ECCC/CanSIPS-IC4/forecast/{varname}')
+    ds = pydap_icechunk.open_icechunk(
+        f'NMME/ECCC/CanSIPS-IC4/forecast/{varname}', decode_times=False
+    )
     ds = ds.rename({
         'IRIDL_time': 'S',
         'step': 'L',
@@ -14,7 +16,6 @@ def open(varname) -> xr.Dataset:
         'longitude': 'X',
         'number': "M",
     })
-    # Need to create target
     original_names = {
         'prec': 'prate',
         'tref': 'avg_2t',
@@ -35,7 +36,6 @@ def open(varname) -> xr.Dataset:
         ],
         coords=dict(S=ds["S"], L=ds["L"]),
     )
-    print(target)
     ds = ds.assign(target=target)
     print(ds)
     return ds
