@@ -15,8 +15,6 @@ def open(varname) -> xr.Dataset:
     ds = ds.rename({
         'IRIDL_time':  'S',
         'TIME': 'L',
-        # sst's spatial grids have same value but names LAT and LON
-        # so these work only for prec / tref
         original_coords_names[varname]['Y']: 'Y',
         original_coords_names[varname]['X']: 'X',
         'TIME_expanded': 'target',  # TODO convert target from noleap, or just drop and recreate it
