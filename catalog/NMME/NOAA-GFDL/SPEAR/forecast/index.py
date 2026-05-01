@@ -7,13 +7,18 @@ def open(varname) -> xr.Dataset:
     ds = pydap_icechunk.open_icechunk(
         f'NMME/NOAA-GFDL/SPEAR/forecast/{varname}', decode_times=False
     )
+    original_coords_names = {
+        'prec': {'Y': 'LAT1', 'X': 'LON1'}, 
+        'tref': {'Y': 'LAT1', 'X': 'LON1'},
+        'sst': {'Y': 'LAT', 'X': 'LON'},
+    }
     ds = ds.rename({
         'IRIDL_time':  'S',
         'TIME': 'L',
         # sst's spatial grids have same value but names LAT and LON
         # so these work only for prec / tref
-        'LAT1': 'Y',
-        'LON1': 'X',
+        original_coords_names[varname]['Y']: 'Y',
+        original_coords_names[varname]['X']: 'X',
         'TIME_expanded': 'target',  # TODO convert target from noleap, or just drop and recreate it
     })
     original_names = {
