@@ -18,9 +18,12 @@ def open(varname) -> xr.Dataset:
     # var in the ds: there is also a TIME_bnds one.
     # I am unsure how next/iter work but it sometimes a hit, sometimes an error, 
     # sometimes TIME_bnds that is renamed (not leading to an error)
-    orig_name = next(iter(ds.data_vars))
-    print(orig_name)
-    ds = ds.rename({orig_name: varname})
+    original_names = {
+        'prec': 'PRECIP_1X1',
+        'tref': 'T_REF_1X1',
+        'sst': 'SST_1X1',
+    }
+    ds = ds.rename({original_names[varname]: varname})
     # TODO overwrite the attrs wholesale rather than passing through what was saved in the zarr.
     # units attribute is missing, however, 
     # how do we want to write things that depend on varname?

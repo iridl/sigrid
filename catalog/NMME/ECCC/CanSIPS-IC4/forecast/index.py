@@ -13,8 +13,12 @@ def open(varname) -> xr.Dataset:
         'number': "M",
     })
     # Need to create target but need to agree on L first
-    orig_name = next(iter(ds.data_vars))
-    ds = ds.rename({orig_name: varname})
+    original_names = {
+        'prec': 'prate',
+        'tref': 'avg_2t',
+        'sst': 'avg_sst',
+    }
+    ds = ds.rename({original_names[varname]: varname})
     # TODO overwrite the attrs wholesale rather than passing through what was saved in the zarr.
     ds[varname] = ds[varname].assign_coords(L=('L', range(len(ds['L']))))
     return ds
