@@ -1,4 +1,6 @@
 import xarray as xr
+import datetime
+from dateutil.relativedelta import relativedelta
 
 import pydap_icechunk
 
@@ -22,4 +24,18 @@ def open(varname) -> xr.Dataset:
     # TODO overwrite the attrs wholesale rather than passing through what was saved in the zarr.
     del ds.attrs['history'] # temporary until a pydap fix
     ds = ds.assign_coords(L=('L', range(len(ds['L']))))
+    target = xr.DataArray(
+        data=[
+            [
+                datetime.datetime(
+                    s.dt.year.item(), s.dt.month.item(), s.dt.day.item()
+                ) + relativedelta(months=l)
+                for l in ds["L"]
+            ] for s in ds["S"]
+        ],
+        coords=dict(S=ds["S"], L=ds["L"]),
+    )
+    print(target)
+    ds = ds.assign(target=target)
+    print(ds)
     return ds
