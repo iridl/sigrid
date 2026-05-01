@@ -23,7 +23,11 @@ def open(varname) -> xr.Dataset:
     }
     ds = ds.rename({original_names[varname]: varname})
     # TODO overwrite the attrs wholesale rather than passing through what was saved in the zarr.
-    # units attribute is missing, however, 
-    # how do we want to write things that depend on varname?
     ds = ds.assign_coords(L=('L', range(len(ds['L']))))
+    units = {
+        'prec': 'mm/s',
+        'tref': 'K',
+        'sst': 'degree_Celsius',
+    }
+    ds[varname].attrs['units'] = units[varname]
     return ds
