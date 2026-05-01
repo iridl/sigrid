@@ -27,5 +27,5 @@ def open(varname) -> xr.Dataset:
     # TODO overwrite the attrs wholesale rather than passing through what was saved in the zarr.
     # units attribute is missing, however, 
     # how do we want to write things that depend on varname?
-    ds[varname] = ds[varname].assign_coords(L=('L', range(len(ds['L']))))
+    ds = ds.assign_coords(L=('L', range(len(ds['L']))))
     return ds
