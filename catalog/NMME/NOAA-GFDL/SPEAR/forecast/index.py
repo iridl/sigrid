@@ -14,10 +14,6 @@ def open(varname) -> xr.Dataset:
         'LON1': 'X',
         'TIME_expanded': 'target',  # TODO convert target from noleap, or just drop and recreate it
     })
-    # This returns random results very most likely because varname is not the only 
-    # var in the ds: there is also a TIME_bnds one.
-    # I am unsure how next/iter work but it sometimes a hit, sometimes an error, 
-    # sometimes TIME_bnds that is renamed (not leading to an error)
     original_names = {
         'prec': 'PRECIP_1X1',
         'tref': 'T_REF_1X1',

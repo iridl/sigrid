@@ -5,7 +5,7 @@ import pydap_icechunk
 
 def open(varname) -> xr.Dataset:
     ds = pydap_icechunk.open_icechunk(f'NMME/NASA-GMAO/GEOSS2S/forecast/{varname}')
-    #ds = ds.squeeze(dim="level", drop=True)
+    ds = ds.squeeze(dim="level", drop=True)
     ds = ds.rename({
         'IRIDL_time':  'S',
         'time': 'L',
@@ -13,8 +13,6 @@ def open(varname) -> xr.Dataset:
         'longitude': 'X',
         'time_expanded': 'target',  # TODO convert target from noleap, or just drop and recreate it
     })
-    # has singleton dim level
-    # is not incorrect but could be removed for homogenization with other NMME
     original_names = {
         'prec': 'precip',
         'tref': 'tref',

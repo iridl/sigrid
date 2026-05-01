@@ -12,7 +12,7 @@ def open(varname) -> xr.Dataset:
         'longitude': 'X',
         'number': "M",
     })
-    # Need to create target but need to agree on L first
+    # Need to create target
     original_names = {
         'prec': 'prate',
         'tref': 'avg_2t',
