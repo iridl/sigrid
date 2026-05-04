@@ -23,7 +23,8 @@ def open(varname) -> xr.Dataset:
         'tref': 'avg_2t',
         'sst': 'avg_sst',
     }
-    ds = ds.rename({original_names[varname]: varname})
+    if varname in original_names:
+        ds = ds.rename({original_names[varname]: varname})
     # TODO overwrite the attrs wholesale rather than passing through what was saved in the zarr.
     del ds.attrs['history'] # temporary until a pydap fix
     ds = ds.assign_coords(L=('L', range(len(ds['L']))))

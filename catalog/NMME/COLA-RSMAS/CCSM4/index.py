@@ -19,7 +19,8 @@ def open(varname) -> xr.Dataset:
         'tref': 'T_REF_1X1',
         'sst': 'SST_1X1',
     }
-    ds = ds.rename({original_names[varname]: varname})
+    if varname in original_names:
+        ds = ds.rename({original_names[varname]: varname})
     # TODO overwrite the attrs wholesale rather than passing through what was saved in the zarr.
     del ds[varname].attrs['lon']
     del ds[varname].attrs['lat']
