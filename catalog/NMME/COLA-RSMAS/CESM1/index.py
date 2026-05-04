@@ -24,5 +24,5 @@ def open(varname) -> xr.Dataset:
     # TODO overwrite the attrs wholesale rather than passing through what was saved in the zarr.
     del ds[varname].attrs['lon']
     del ds[varname].attrs['lat']
-    ds = ds.assign_coords(L=('L', range(len(ds['L']))))
+    ds = ds.assign_coords(L=('L', range(ds.sizes['L'])))
     return ds
