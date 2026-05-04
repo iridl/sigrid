@@ -15,9 +15,17 @@ def open(varname) -> xr.Dataset:
         'valid_time': 'target',
     }
     ds = ds.rename({k: v for k, v in rename_map.items() if k in ds})
-
-    orig_name = next(iter(ds.data_vars))
-    ds = ds.rename({orig_name: varname})
+    original_names = {
+        't2m': '2t',
+        'u10': '10u',
+        'v10': '10v',
+        'd2m': '2dt',
+        }
+    # setdefault is used as a check for the value of varname. 
+    # If it does not exist in the dictionary, it means that both 
+    # in the original file and in the DL index they have the same name, 
+    # so it use the value of varname.
+    ds = ds.rename({original_names.setdefault(varname, varname): varname})
     # Remove scalar values to avoid errors that cause
     #   the DataArrayProxy class -> __getitem__ in pydap_icechunk to fail,
     #   due to combinations of tuples and scalars being interpreted as variables;
