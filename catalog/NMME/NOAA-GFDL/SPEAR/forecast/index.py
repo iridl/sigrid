@@ -5,13 +5,18 @@ import pydap_icechunk
 
 def open(varname) -> xr.Dataset:
     ds = pydap_icechunk.open_icechunk(
-        f'NMME/COLA-RSMAS/CCSM4/{varname}', decode_times=False
+        f'NMME/NOAA-GFDL/SPEAR/forecast/{varname}', decode_times=False
     )
+    original_coords_names = {
+        'prec': {'Y': 'LAT1', 'X': 'LON1'}, 
+        'tref': {'Y': 'LAT1', 'X': 'LON1'},
+        'sst': {'Y': 'LAT', 'X': 'LON'},
+    }
     ds = ds.rename({
         'IRIDL_time':  'S',
         'TIME': 'L',
-        'LAT': 'Y',
-        'LON': 'X',
+        original_coords_names[varname]['Y']: 'Y',
+        original_coords_names[varname]['X']: 'X',
         'TIME_expanded': 'target',  # TODO convert target from noleap, or just drop and recreate it
     })
     original_names = {
@@ -22,7 +27,11 @@ def open(varname) -> xr.Dataset:
     if varname in original_names:
         ds = ds.rename({original_names[varname]: varname})
     # TODO overwrite the attrs wholesale rather than passing through what was saved in the zarr.
-    del ds[varname].attrs['lon']
-    del ds[varname].attrs['lat']
     ds = ds.assign_coords(L=('L', range(len(ds['L']))))
+    units = {
+        'prec': 'mm/s',
+        'tref': 'K',
+        'sst': 'degree_Celsius',
+    }
+    ds[varname].attrs['units'] = units[varname]
     return ds
