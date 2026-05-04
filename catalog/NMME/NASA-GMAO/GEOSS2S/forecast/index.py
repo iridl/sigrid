@@ -17,10 +17,9 @@ def open(varname) -> xr.Dataset:
     })
     original_names = {
         'prec': 'precip',
-        'tref': 'tref',
-        'sst': 'sst',
     }
-    ds = ds.rename({original_names[varname]: varname})
+    if varname in original_names:
+        ds = ds.rename({original_names[varname]: varname})
     # TODO overwrite the attrs wholesale rather than passing through what was saved in the zarr.
     ds = ds.assign_coords(L=('L', range(len(ds['L']))))
     return ds
