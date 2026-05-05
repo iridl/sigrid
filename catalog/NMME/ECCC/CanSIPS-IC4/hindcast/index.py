@@ -5,7 +5,7 @@ import pydap_icechunk
 
 def open(varname) -> xr.Dataset:
     ds = pydap_icechunk.open_icechunk(
-        f'NMME/ECCC/CanSIPS-IC4/forecast/{varname}', decode_times=False
+        f'NMME/ECCC/CanSIPS-IC4/hindcast/{varname}', decode_times=False
     )
     # Some varnames have scalar coordinates
     ds = ds.drop_vars(["surface", "heightAboveGround"], errors="ignore")
@@ -15,6 +15,7 @@ def open(varname) -> xr.Dataset:
         'latitude': 'Y',
         'longitude': 'X',
         'number': "M",
+        'valid_time_expanded': 'target',
     })
     original_names = {
         'prec': 'prate',
@@ -28,6 +29,3 @@ def open(varname) -> xr.Dataset:
     ds = ds.assign_coords(L=('L', range(ds.sizes['L'])))
     # Need to assign target
     return ds
-
-def list_vars():
-    return ['prec', 'tref', 'sst']
