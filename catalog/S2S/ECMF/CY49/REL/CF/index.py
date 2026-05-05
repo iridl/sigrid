@@ -35,4 +35,10 @@ def open(varname) -> xr.Dataset:
     # TODO overwrite the attrs wholesale rather than passing through what was saved in the zarr.
     ds.attrs.pop('history', None) #There are too many history messages, and they cause exceptions and warnings when the data is served.
     ds[varname] = ds[varname].assign_coords(L=('L', range(len(ds['L']))))
+    #Grid order 
+    base_dims = ['S', 'L', 'X', 'Y']
+    if 'P' in ds[varname].dims:
+        base_dims.insert(2, 'P') 
+    ds[varname] = ds[varname].transpose(*base_dims)
+
     return ds
