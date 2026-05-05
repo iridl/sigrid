@@ -27,5 +27,5 @@ def open(varname) -> xr.Dataset:
     # TODO overwrite the attrs wholesale rather than passing through what was saved in the zarr.
     del ds.attrs['history'] # temporary until a pydap fix
     ds = ds.assign_coords(L=('L', range(ds.sizes['L'])))
-    # Need to assign target
+    # Need to adjust or rewrite target
     return ds

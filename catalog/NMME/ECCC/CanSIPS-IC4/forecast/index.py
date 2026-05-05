@@ -15,6 +15,7 @@ def open(varname) -> xr.Dataset:
         'latitude': 'Y',
         'longitude': 'X',
         'number': "M",
+        'valid_time_expanded': 'target',
     })
     original_names = {
         'prec': 'prate',
@@ -26,7 +27,7 @@ def open(varname) -> xr.Dataset:
     # TODO overwrite the attrs wholesale rather than passing through what was saved in the zarr.
     del ds.attrs['history'] # temporary until a pydap fix
     ds = ds.assign_coords(L=('L', range(ds.sizes['L'])))
-    # Need to assign target
+    # Need to transform or rewrite target
     return ds
 
 def list_vars():
