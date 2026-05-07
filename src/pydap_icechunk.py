@@ -4,13 +4,15 @@ from pathlib import Path
 from typing import override
 import icechunk
 import os
+import jinja2
 import webob
 from webob.dec import wsgify
-from webob.exc import HTTPNotFound
+from webob.exc import HTTPForbidden, HTTPNotFound
 import xarray as xr
 
 from pydap.handlers.lib import BaseHandler
 from pydap.model import BaseType, DatasetType
+from pydap.wsgi.app import alphanum_key
 
 
 orig_root = os.environ['PYDAP_ICECHUNK_ORIGINAL_ROOT']
@@ -83,8 +85,7 @@ class XarrayHandler(BaseHandler, abc.ABC):
                 # TODO deal with the type error when I deal with groups and
                 # understand what's intended.
                 self.dataset[dim].dims = ["/" + str(dim)] # type: ignore
-
-
+    
     @abc.abstractmethod
     def open(self) -> xr.Dataset: ...
 
@@ -133,26 +134,91 @@ def ensure_trailing(s: str) -> str:
 
 
 class Server:
-    def __init__(self, catalog_path: str):
-        self.catalog_path = Path(catalog_path)
+    def __init__(self, catalog_path: Path):
+        self.catalog_path = catalog_path.resolve()
 
     @wsgify
     def __call__(self, req: webob.Request):
-        # Path() strips trailing slashes, so extract that info first
-        dir_requested = req.path_info[-1] == '/'
         # path_info looks like an absolute path. Strip the leading / to
         # make it relative.
-        relpath = Path(req.path_info).relative_to('/')
+        assert req.path_info[0] == '/'
+        relpath = req.path_info[1:]
+
+        # Check for trailing slash before Path() strips it
+        is_dir = req.path_info[-1] == '/'
+
         abspath = self.catalog_path / relpath
-        if dir_requested:
-            # TODO directory listing
+
+        # Don't allow an attacker to escape from the catalog root
+        # by using paths containing ".."
+        try:
+            abspath.resolve().relative_to(self.catalog_path)
+        except ValueError:
+            return HTTPForbidden()
+
+        if is_dir:
+            if abspath.exists():
+                return self.dir(abspath)
             return HTTPNotFound()
+
         file_path = abspath.parent / 'index.py'
-        if file_path.is_file:
+        if file_path.is_file():
             varname = abspath.stem
             extension = abspath.suffix
             return CatalogFileHandler(file_path, varname, extension)
+
         return HTTPNotFound()
+
+    def dir(self, dir_path: Path):
+        """Return a directory listing."""
+
+        dirs = [
+            d.name
+            for d in dir_path.iterdir()
+            if d.is_dir() and d.name != '__pycache__'
+        ]
+        dirs = sorted(dirs, key=alphanum_key)
+
+        index_path = dir_path / "index.py"
+        if index_path.exists():
+            module = load_index(index_path)
+            vars = module.list_vars()
+            vars = sorted(vars, key=alphanum_key)
+        else:
+            vars = []
+        
+
+        context = {
+            "dirs": dirs,
+            "vars": vars,
+        }
+
+        return webob.Response(
+            body=self.dir_template.render(context),
+        )
+
+    dir_template = jinja2.Template("""
+        {% if dirs %}
+        <h1>Datasets</h1>
+        <table>
+            <tbody>
+                {% for x in dirs %}
+                <tr><td><a href="{{ x }}/">{{ x }}</a></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+        {% if vars %}
+        <h1>Variables</h1>
+        <table>
+            <tbody>
+                {% for x in vars %}
+                <tr><td><a href="{{ x }}">{{ x }}</a></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    """)
 
 
 class CatalogFileHandler(XarrayHandler):
@@ -163,13 +229,55 @@ class CatalogFileHandler(XarrayHandler):
         super().__init__(varname)
 
     @override
+    def __call__(self, environ, start_response):
+        if self.extension:
+            return super().__call__(environ, start_response)
+        request = webob.Request(environ)
+        ds = self.open()
+        assert len(ds.data_vars) == 1
+        context = {
+            'ds': ds, 'da': next(iter(ds.data_vars.values())),
+            'url': request.url,
+        }
+        with xr.set_options(display_style='html'):
+            response = webob.Response(body=self.var_template.render(context))
+        return response(environ, start_response)
+
+    
+    var_template = jinja2.Template(
+        """
+        <html><body> 
+            <script>
+                function copyURL() {
+                    const pageUrl = window.location.href;
+                    navigator.clipboard.writeText(pageUrl).then(() => {
+                        const btn = document.getElementById('copyButton');
+                        btn.innerText = "URL Copied";
+                        setTimeout(() => btn.innerText = "Copy OPeNDAP URL", 2000);
+                    }).catch(err => {
+                        console.error('Failed to copy opendap URL: ', err);
+                    });
+                }
+            </script>
+        <button onclick="copyURL()" id="copyButton">Copy OPeNDAP URL</button>
+        {{ds._repr_html_()}}
+        </body><html>
+        """
+    )
+
+    @override
     def open(self):
-        spec = importlib.util.spec_from_file_location('catalog', self.file_path)
-        assert spec is not None  # we already checked that it exists
-        module = importlib.util.module_from_spec(spec)
-        # Pyright says the loader could be None, but I don't see how that
-        # could happen.
-        assert spec.loader  
-        spec.loader.exec_module(module)
+        module = load_index(self.file_path)
         ds: xr.Dataset = module.open(self.varname)
         return ds
+
+
+def load_index(file_path):
+    spec = importlib.util.spec_from_file_location('catalog', file_path)
+    assert spec is not None  # we already checked that it exists
+    module = importlib.util.module_from_spec(spec)
+    # Pyright says the loader could be None, but I don't see how that
+    # could happen.
+    assert spec.loader  
+    spec.loader.exec_module(module)
+    return module

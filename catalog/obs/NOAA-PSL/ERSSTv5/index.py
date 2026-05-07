@@ -8,3 +8,6 @@ def open(varname):
         .squeeze('lev', drop=True)
     )
     return ds
+
+def list_vars():
+    return ['prec', 'tref', 'sst']

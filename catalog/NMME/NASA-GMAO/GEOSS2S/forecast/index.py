@@ -23,3 +23,6 @@ def open(varname) -> xr.Dataset:
     # TODO overwrite the attrs wholesale rather than passing through what was saved in the zarr.
     ds = ds.assign_coords(L=('L', range(ds.sizes['L'])))
     return ds
+
+def list_vars():
+    return ['prec', 'tref', 'sst']

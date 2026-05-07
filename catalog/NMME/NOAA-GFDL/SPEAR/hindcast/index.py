@@ -35,3 +35,6 @@ def open(varname) -> xr.Dataset:
     }
     ds[varname].attrs['units'] = units[varname]
     return ds
+
+def list_vars():
+    return ['prec', 'tref', 'sst']
