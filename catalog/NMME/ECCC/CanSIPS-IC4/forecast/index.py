@@ -1,5 +1,5 @@
 import xarray as xr
-import datetime
+import numpy as np
 import pandas as pd
 
 import pydap_icechunk
