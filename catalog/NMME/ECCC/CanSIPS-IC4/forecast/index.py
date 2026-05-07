@@ -30,8 +30,6 @@ def open(varname) -> xr.Dataset:
     # TODO overwrite the attrs wholesale rather than passing through what was saved in the zarr.
     del ds.attrs['history'] # temporary until a pydap fix
     ds = ds.assign_coords(L=('L', range(ds.sizes['L'])))
-    freq_ref = ds['S'].attrs['units'].split(' since ')
-    ref = freq_ref[1].split(' ')[0]
     ds['target'] = S_L_to_target(ds['S'], ds['L'])
     return ds
 
