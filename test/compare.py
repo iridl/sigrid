@@ -1,3 +1,4 @@
+import argparse
 import time
 
 import numpy as np
@@ -93,7 +94,11 @@ def fetch(url):
         return e
 
 if __name__ == '__main__':
-    url1 = 'https://iridl.ldeo.columbia.edu/SOURCES/.Models/.NMME/.CanSIPS-IC4/.FORECAST/.MONTHLY/.prec/dods'
-    url2 = 'http://localhost:8081/NMME/ECCC/CanSIPS-IC4/forecast/prec'
-    compare(url1, url2, 'prec', 'prec')
-    
+    parser = argparse.ArgumentParser()
+    parser.add_argument("url1")
+    parser.add_argument("url2")
+    parser.add_argument("--var1")
+    parser.add_argument("--var2")
+    args = parser.parse_args()
+
+    compare(args.url1, args.url2, args.var1, args.var2)
