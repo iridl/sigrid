@@ -3,7 +3,7 @@ import time
 import numpy as np
 import xarray as xr
 
-def compare(url1, url2, varname=None, check_data=False):
+def compare(url1, url2, var1=None, var2=None, check_data=False):
     ds1 = fetch(url1)
     ds2 = fetch(url2)
 
@@ -14,18 +14,20 @@ def compare(url1, url2, varname=None, check_data=False):
         print('second failed', ds2)
         return
     
-    # AFAIK Ingrid never puts multiple data vars in a single response
-    assert len(ds1.data_vars) == 1
-    # but in icechunk sometimes we do
-    if varname is None:
-        assert len(ds2.data_vars) == 1, ds2
-        varname = next(iter(ds2.data_vars))
+    if var1 is None:
+        names = list(ds1.data_vars)
+        assert len(names) == 1, f"Specify var1 as one of {names}"
+        var1 = names[0]
     
-    da1 = ds1[varname]
-    da2 = ds2[varname]
+    if var2 is None:
+        names = list(ds2.data_vars)
+        assert len(names) == 1, f"Specify var2 as one of {names}"
+        var2 = names[0]
+    
+    da1 = ds1[var1]
+    da2 = ds2[var2]
 
     compare_shape(da1, da2)
-    print(varname)
     compare_attrs(da1, da2)
     compare_coords(da1, da2)
     if check_data:
@@ -93,4 +95,5 @@ def fetch(url):
 if __name__ == '__main__':
     url1 = 'https://iridl.ldeo.columbia.edu/SOURCES/.Models/.NMME/.CanSIPS-IC4/.FORECAST/.MONTHLY/.prec/dods'
     url2 = 'http://localhost:8081/NMME/ECCC/CanSIPS-IC4/forecast/prec'
-    compare(url1, url2, 'prec')
+    compare(url1, url2, 'prec', 'prec')
+    
