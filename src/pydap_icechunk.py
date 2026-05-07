@@ -239,8 +239,7 @@ class CatalogFileHandler(XarrayHandler):
             'ds': ds, 'da': next(iter(ds.data_vars.values())),
             'url': request.url,
         }
-        with xr.set_options(display_style='html'):
-            response = webob.Response(body=self.var_template.render(context))
+        response = webob.Response(body=self.var_template.render(context))
         return response(environ, start_response)
 
     
