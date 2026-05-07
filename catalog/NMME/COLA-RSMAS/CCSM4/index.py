@@ -26,3 +26,6 @@ def open(varname) -> xr.Dataset:
     del ds[varname].attrs['lat']
     ds = ds.assign_coords(L=('L', range(ds.sizes['L'])))
     return ds
+
+def list_vars():
+    return ['prec', 'tref', 'sst']

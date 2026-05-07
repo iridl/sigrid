@@ -30,3 +30,6 @@ def open(varname) -> xr.Dataset:
     ds = ds.assign_coords(L=('L', range(ds.sizes['L'])))
     # Need to assign target
     return ds
+
+def list_vars():
+    return ['prec', 'tref', 'sst']
