@@ -236,11 +236,11 @@ class CatalogFileHandler(XarrayHandler):
         ds = self.open()
         assert len(ds.data_vars) == 1
         context = {
-            'ds': ds, 'da': next(iter(ds.data_vars.values())),
+            'ds': xr.decode_cf(ds),
+            'da': next(iter(ds.data_vars.values())),
             'url': request.url,
         }
-        with xr.set_options(display_style='html'):
-            response = webob.Response(body=self.var_template.render(context))
+        response = webob.Response(body=self.var_template.render(context))
         return response(environ, start_response)
 
     
