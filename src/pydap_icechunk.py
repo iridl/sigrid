@@ -9,6 +9,7 @@ import webob
 from webob.dec import wsgify
 from webob.exc import HTTPForbidden, HTTPNotFound
 import xarray as xr
+import numpy as np
 
 from pydap.handlers.lib import BaseHandler
 from pydap.model import BaseType, DatasetType
@@ -281,3 +282,39 @@ def load_index(file_path):
     assert spec.loader  
     spec.loader.exec_module(module)
     return module
+
+    
+def encode_time(ds, cf_units='hours', ref='1960-01-01'):
+    cf_to_np_units = {
+        'hours': 'h',
+        'days': 'D',
+    }
+    assert cf_units in cf_to_np_units, f'conversion to {cf_units} since not covered'
+    time_coords = [
+        coord for coord in ds.coords
+        if ds[coord].dtype in ['datetime64[ns]', 'timedelta64[ns]']
+    ]
+    for tc in time_coords:
+        data, units, calendar = xr.coding.times.encode_cf_datetime(
+            ds[tc], f'{cf_units} since {ref}', 'standard'
+        )
+        ds = ds.assign_coords({tc: (ds[tc].dims, data)})
+        ds[tc].attrs['units'] = units
+        ds[tc].attrs['calendar'] = calendar
+    return ds
+
+
+def S_L_to_target(S, L):
+    return xr.DataArray(
+        data=[
+            xr.date_range(
+                start=s.item(),
+                # TODO may not be wise to simply rely on len(L)
+                periods=len(L),
+                freq='MS',
+            )
+            for s in S
+        ],
+        coords=dict(S=S, L=L),
+        attrs={'long_name': 'target date'},
+    )
