@@ -1,10 +1,12 @@
 import xarray as xr
 
 import pydap_icechunk
-
+import numpy as np
 
 def open(varname) -> xr.Dataset:
     ds = pydap_icechunk.open_icechunk(f'S2S/ECMF/CY49/REL/CF/{varname}', decode_times=False)
+    #ds[varname].attrs['coordinates'] = "valid_time"
+    
     rename_map = {
         'time': 'S',
         'longitude': 'X',
@@ -34,11 +36,15 @@ def open(varname) -> xr.Dataset:
     ds = ds.drop_vars(scalar_coords)
     # TODO overwrite the attrs wholesale rather than passing through what was saved in the zarr.
     ds.attrs.pop('history', None) #There are too many history messages, and they cause exceptions and warnings when the data is served.
-    ds[varname] = ds[varname].assign_coords(L=('L', range(len(ds['L']))))
+    ds = ds.assign_coords(L=('L', range(ds.sizes['L'])))
     #Grid order 
     base_dims = ['S', 'L', 'X', 'Y']
     if 'P' in ds[varname].dims:
         base_dims.insert(2, 'P') 
     ds[varname] = ds[varname].transpose(*base_dims)
+    #Invert Y from 90 -90 to -90 90
+    ds = ds.isel(Y=slice(None, None, -1))
+    ds = ds.set_coords('target') 
+    print(ds)
 
     return ds
