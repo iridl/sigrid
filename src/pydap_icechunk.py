@@ -285,11 +285,6 @@ def load_index(file_path):
 
     
 def encode_time(ds, cf_units='hours', ref='1960-01-01'):
-    cf_to_np_units = {
-        'hours': 'h',
-        'days': 'D',
-    }
-    assert cf_units in cf_to_np_units, f'conversion to {cf_units} since not covered'
     time_coords = [
         coord for coord in ds.coords
         if ds[coord].dtype in ['datetime64[ns]', 'timedelta64[ns]']
