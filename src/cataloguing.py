@@ -63,7 +63,6 @@ def catalogue(
     original_names,
     drop_variables=None,
     del_ds_attrs=None,
-    type=None,
     lead_is_month=False,
     ):
     ds = pydap_icechunk.open_icechunk(
