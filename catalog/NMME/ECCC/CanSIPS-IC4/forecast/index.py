@@ -12,6 +12,7 @@ def open(varname) -> xr.Dataset:
     )
     # Some varnames have scalar coordinates
     ds = ds.drop_vars([name for name, coord in ds.coords.items() if coord.dims == ()])
+    ds = ds.drop_vars(["valid_time_expanded", "time"])
     ds = ds.rename({
         'IRIDL_time': 'S',
         'step': 'L',
@@ -32,7 +33,7 @@ def open(varname) -> xr.Dataset:
     ds = ds.assign_coords(target=pydap_icechunk.S_L_to_target(ds['S'], ds['L']))
     ds = pydap_icechunk.encode_time(ds)
     # Force into coords
-    ds[varname].attrs['coordinates'] = "valid_time_expanded time target"
+    ds[varname].attrs['coordinates'] = "target"
     return ds
 
 def list_vars():
