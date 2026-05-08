@@ -82,11 +82,11 @@ def catalogue(
     # Deleting buggy attributes
     for attr in del_ds_attrs:
         del ds.attrs[attr]
-    # Set lead times
-    ds = ds.assign_coords({
-        COORDS_NAMES['lead']: range(ds.sizes[COORDS_NAMES['lead']])
-    })
     if lead_is_month:
+        # Set lead times
+        ds = ds.assign_coords({
+            COORDS_NAMES['lead']: range(ds.sizes[COORDS_NAMES['lead']])
+        })
         # Set target
         ds = ds.assign_coords({
             COORDS_NAMES["forecast_time"]: S_L_to_target(
