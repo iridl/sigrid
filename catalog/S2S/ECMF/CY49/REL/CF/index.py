@@ -44,7 +44,6 @@ def open(varname) -> xr.Dataset:
     ds[varname] = ds[varname].transpose(*base_dims)
     #Invert Y from 90 -90 to -90 90
     ds = ds.isel(Y=slice(None, None, -1))
-    ds = ds.set_coords('target') 
-    print(ds)
-
+    #Force target as coordinate
+    ds[varname].attrs['coordinates'] = "target"
     return ds
