@@ -8,7 +8,7 @@ def open(varname) -> xr.Dataset:
         f'NMME/ECCC/CanSIPS-IC4/hindcast/{varname}', decode_times=False
     )
     # Some varnames have scalar coordinates
-    ds = ds.drop_vars(["surface", "heightAboveGround"], errors="ignore")
+    ds = ds.drop_vars([name for name, coord in ds.coords.items() if coord.dims == ()])
     ds = ds.rename({
         'IRIDL_time': 'S',
         'step': 'L',
