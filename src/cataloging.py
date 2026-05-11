@@ -36,7 +36,7 @@ def encode_time(
     ]
     for tc in time_coords:
         data, units, calendar = xr.coding.times.encode_cf_datetime(
-            ds[tc], cf_units, cf_catalog
+            ds[tc], cf_units, cf_catalog, dtype=np.dtype("int64")
         )
         ds = ds.assign_coords({tc: (ds[tc].dims, data)})
         ds[tc].attrs['units'] = units
