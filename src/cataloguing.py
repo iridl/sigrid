@@ -69,7 +69,7 @@ def catalogue(
         f'{varpath}/{varname}',
         drop_variables=drop_variables,
     )
-    # Some varnames have scalar coordinates that break
+    # Some varnames have scalar coordinates that break pydap
     ds = ds.drop_vars(
         [name for name, coord in ds.coords.items() if coord.dims == ()]
     )
