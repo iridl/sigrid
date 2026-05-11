@@ -25,6 +25,8 @@ def open(varname) -> xr.Dataset:
     del ds[varname].attrs['lon']
     del ds[varname].attrs['lat']
     ds = ds.assign_coords(L=('L', range(ds.sizes['L'])))
+    ds[varname] = ds[varname] * 60 * 60 * 24
+    ds[varname].attrs['units'] = 'mm/day'
     return ds
 
 def list_vars():
