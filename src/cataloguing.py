@@ -3,19 +3,22 @@ import xarray as xr
 import pydap_icechunk
 
 
+# Change the dictionary values should you want different names throughout your system
 COORDS_NAMES = {
-    'start': 'S',
-    'lead': 'L',
-    'latitude': 'Y',
-    'longitude': 'X',
-    'member': 'M',
-    'forecast_time': 'target',
+    'S': 'S',
+    'L': 'L',
+    'Y': 'Y',
+    'X': 'X',
+    'M': 'M',
+    'target': 'target',
 }
 VARS_NAMES = {
-    'precipitation': 'prec',
-    'temperature': 'tref',
-    'sea_surface_temperature': 'sst',
+    'prec': 'prec',
+    'tref': 'tref',
+    'sst': 'sst',
 }
+# Change the dictionary values 
+# should you different time encoding throughout your system
 ENCODING = {
     'cf_units': 'hours since 1960-01-01',
     'calendar': 'standard',
