@@ -64,13 +64,13 @@ def catalogue(
     varname,
     varpath,
     original_names,
-    drop_variables=None,
+    #drop_variables=None,
     del_ds_attrs=None,
     lead_is_month=False,
     ):
     ds = pydap_icechunk.open_icechunk(
         f'{varpath}/{varname}',
-        drop_variables=drop_variables,
+        #drop_variables=drop_variables,
     )
     # Some varnames have scalar coordinates that break pydap
     ds = ds.drop_vars(
@@ -82,22 +82,30 @@ def catalogue(
             ds = ds.rename({original_names[var]: COORDS_NAMES[var]})
         if var in VARS_NAMES and VARS_NAMES[var] == varname:
             ds = ds.rename({original_names[var]: varname})
+    # Drop coords not standard
+    ds = ds.drop_vars(
+        [
+            name
+            for name, coord in ds.coords.items()
+            if name not in COORDS_NAMES.values()
+        ]
+    )
     # Deleting buggy attributes
     for attr in del_ds_attrs:
         del ds.attrs[attr]
     if lead_is_month:
         # Set lead times
         ds = ds.assign_coords({
-            COORDS_NAMES['lead']: range(ds.sizes[COORDS_NAMES['lead']])
+            COORDS_NAMES['L']: range(ds.sizes[COORDS_NAMES['L']])
         })
         # Set target
         ds = ds.assign_coords({
-            COORDS_NAMES["forecast_time"]: S_L_to_target(
-                ds[COORDS_NAMES['start']], ds[COORDS_NAMES['lead']]
+            COORDS_NAMES["target"]: S_L_to_target(
+                ds[COORDS_NAMES['S']], ds[COORDS_NAMES['L']]
             )
         })
     # Encode time
     ds = encode_time(ds)
     # Force into coords
-    ds[varname].attrs['coordinates'] = COORDS_NAMES["forecast_time"]
+    ds[varname].attrs['coordinates'] = COORDS_NAMES["target"]
     return ds
