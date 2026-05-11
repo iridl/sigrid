@@ -1,10 +1,10 @@
 import xarray as xr
 
-import cataloguing
+import cataloging
 
 
 def open(varname) -> xr.Dataset:
-    return cataloguing.catalogue(
+    return cataloging.catalog(
         varname,
         varpath='NMME/ECCC/CanSIPS-IC4/forecast',
         original_names={

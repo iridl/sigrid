@@ -27,7 +27,7 @@ ENCODING = {
 
 def encode_time(
     ds,
-    cf_catalogue=ENCODING['calendar'],
+    cf_catalog=ENCODING['calendar'],
     cf_units=ENCODING['cf_units'],
 ):
     time_coords = [
@@ -36,7 +36,7 @@ def encode_time(
     ]
     for tc in time_coords:
         data, units, calendar = xr.coding.times.encode_cf_datetime(
-            ds[tc], cf_units, cf_catalogue
+            ds[tc], cf_units, cf_catalog
         )
         ds = ds.assign_coords({tc: (ds[tc].dims, data)})
         ds[tc].attrs['units'] = units
@@ -60,7 +60,7 @@ def S_L_to_target(S, L):
     )
 
 
-def catalogue(
+def catalog(
     varname,
     varpath,
     original_names,
