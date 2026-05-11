@@ -2,6 +2,7 @@ import abc
 import importlib.util
 from pathlib import Path
 from typing import override
+import dask.array
 import icechunk
 import os
 import jinja2
@@ -65,7 +66,7 @@ class XarrayHandler(BaseHandler, abc.ABC):
                 dimensions = ["/" + str(dim) for dim in vars[grid].dims]
                 self.dataset[grid] = BaseType(
                     str(grid),
-                    DataArrayProxy(source[grid]),
+                    DaskArrayProxy(source[grid].data),
                     dims=dimensions,
                     **vars[grid].attrs,
                 )
@@ -105,27 +106,27 @@ def open_icechunk(rel_path, decode_times=True):
     return ds
 
 
-# Initialy defined this to provide a .view method to satisfy
-# tostring_with_byteorder. I think that function's use of view is
-# pointless and unnecessary, so I just made a dummy method that
-# returns its argument unchanged. But then it turns out that method
-# never gets called. The mere fact of being an instance of an
-# unknown class is sufficient to make it follow a different code
-# path that works, and is fast, and doesn't even attempt to call .view.
-# One difference is that pydap.handlers.lib.wrap_arrayterator has
-# an isinstance check. But that's not the whole story. Just wrapping
-# the DataArray in Arrayterator instead of DataArrayProxy makes the
-# code work, but slow. There's probably another relevant isinstance check
-# somewhere else too. TODO
-class DataArrayProxy:
-    def __init__(self, da: xr.DataArray):
-        self._da = da
+class DaskArrayProxy:
+    """Adds a tobytes method to dask Array so that pydap can serialize it"""
+    def __init__(self, arr: dask.array.Array):
+        self._arr = arr
 
     def __getattr__(self, name: str):
-        return getattr(self._da, name)
+        return getattr(self._arr, name)
 
     def __getitem__(self, index):
-        return self._da[index].data
+        return self.__class__(self._arr[index])
+
+    def astype(self, t):
+        return self.__class__(self._arr.astype(t))
+
+    def view(self, x):
+        return self.__class__(self._arr.view(x)) # pyright: ignore[reportAttributeAccessIssue] Missing from type defs?
+
+    def tobytes(self):
+        arr = self._arr.compute()
+        bytes = arr.tobytes()
+        return bytes
 
 
 def ensure_trailing(s: str) -> str:
