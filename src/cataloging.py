@@ -65,13 +65,11 @@ def catalog(
     varname,
     varpath,
     original_names,
-    #drop_variables=None,
     del_ds_attrs=None,
     lead_is_month=False,
     ):
     ds = pydap_icechunk.open_icechunk(
         f'{varpath}/{varname}',
-        #drop_variables=drop_variables,
     )
     # Some varnames have scalar coordinates that break pydap
     ds = ds.drop_vars(
@@ -92,8 +90,9 @@ def catalog(
         ]
     )
     # Deleting buggy attributes
-    for attr in del_ds_attrs:
-        del ds.attrs[attr]
+    for attr in list(ds.attrs):
+        if str(ds.attrs[attr]).find('"') != -1 :
+            del ds.attrs[attr]
     if lead_is_month:
         # Set lead times
         ds = ds.assign_coords({
