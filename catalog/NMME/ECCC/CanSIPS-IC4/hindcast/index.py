@@ -1,31 +1,32 @@
 import xarray as xr
 
-import pydap_icechunk
+import cataloging
 
 
 def open(varname) -> xr.Dataset:
-    ds = pydap_icechunk.open_icechunk(
-        f'NMME/ECCC/CanSIPS-IC4/hindcast/{varname}', decode_times=False
+    return cataloging.catalog(
+        varname,
+        varpath='NMME/ECCC/CanSIPS-IC4/hindcast',
+        # maps icechunk names to pydap-icechunk conventional names
+        # Keys can not be changed,
+        # Values must correspond to icechunk names
+        original_names={
+            'S': 'IRIDL_time',
+            'L': 'step',
+            'Y': 'latitude',
+            'X': 'longitude',
+            'M': 'number',
+            'prec': 'prate',
+            'tref': 'avg_2t',
+            'sst': 'avg_sst',
+        },
+        lead_is_month=True,
     )
-    # Some varnames have scalar coordinates
-    ds = ds.drop_vars([name for name, coord in ds.coords.items() if coord.dims == ()])
-    ds = ds.rename({
-        'IRIDL_time': 'S',
-        'step': 'L',
-        'latitude': 'Y',
-        'longitude': 'X',
-        'number': "M",
-        'valid_time_expanded': 'target',
-    })
-    original_names = {
-        'prec': 'prate',
-        'tref': 'avg_2t',
-        'sst': 'avg_sst',
-    }
-    if varname in original_names:
-        ds = ds.rename({original_names[varname]: varname})
-    # TODO overwrite the attrs wholesale rather than passing through what was saved in the zarr.
-    del ds.attrs['history'] # temporary until a pydap fix
-    ds = ds.assign_coords(L=('L', range(ds.sizes['L'])))
-    # Need to adjust or rewrite target
-    return ds
+
+def list_vars():
+    return [
+        cataloging.VARS_NAMES['prec'],
+        cataloging.VARS_NAMES['tref'],
+        cataloging.VARS_NAMES['sst'],
+    ]
+    

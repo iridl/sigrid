@@ -1,8 +1,20 @@
 import xarray as xr
 import numpy as np
+from collections import namedtuple
 
 import pydap_icechunk
 
+
+UNITS_CONVERTER = namedtuple('UNITS_CONVERTER', 'offset scale name')
+UNITS_CONVERSIONS = {
+    'degree_Celsius': UNITS_CONVERTER(0, 1, 'degree_Celsius'),
+    'degreeC': UNITS_CONVERTER(0, 1, 'degree_Celsius'),
+    'K': UNITS_CONVERTER(-272.15, 1, 'degree_Celsius'),
+    'Kelvin': UNITS_CONVERTER(-272.15, 1, 'degree_Celsius'),
+    'kg m**-2 s**-1': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24 / 1000, 'mm/day'),
+    'mm/day': UNITS_CONVERTER(0, 1, 'mm/day'),
+    'm/s': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24, 'mm/day'),
+}
 
 # Keys are the conventional names used by pydap-icechunk.
 # They can not be changed and serve as well as identifiers for the different objects.
@@ -28,6 +40,28 @@ ENCODING = {
     'cf_units': 'hours since 1960-01-01',
     'calendar': 'standard',
 }
+
+
+def convert_units(dsvar, missing_units=None):
+    if missing_units is not None:
+        dsvar.attrs['units'] = missing_units[dsvar.name]
+    #original_units = [
+    #    name
+    #    for name, conv in UNITS_CONVERSIONS.items()
+    #    if name == dsvar.attrs['units']
+    #][0]
+    original_units = dsvar.attrs['units']
+    if not (
+        UNITS_CONVERSIONS[original_units].scale == 1
+        and UNITS_CONVERSIONS[original_units].offset == 0
+    ):
+        dsvar = (
+            dsvar
+            * UNITS_CONVERSIONS[original_units].scale
+            + UNITS_CONVERSIONS[original_units].offset
+        )
+    dsvar.attrs['units'] = UNITS_CONVERSIONS[original_units].name
+    return dsvar
 
 
 def encode_time(
@@ -69,7 +103,7 @@ def catalog(
     varname,
     varpath,
     original_names,
-    del_ds_attrs=None,
+    missing_units=None,
     lead_is_month=False,
     ):
     icechunk_var = [key for key, value in VARS_NAMES.items() if value == varname][0]
@@ -80,16 +114,25 @@ def catalog(
     ds = ds.drop_vars(
         [name for name, coord in ds.coords.items() if coord.dims == ()]
     )
+    # Squeeze coords of size 1
+    for coord in ds.dims:
+        if ds.sizes[coord] == 1 :
+            ds.squeeze(coord, drop=True)
     # Renaming
     for var in original_names:
-        if var in COORDS_NAMES and original_names[var] != COORDS_NAMES[var] :
-            ds = ds.rename({original_names[var]: COORDS_NAMES[var]})
-        if (
-            var in VARS_NAMES
-            and VARS_NAMES[var] == varname
-            and original_names[var] != VARS_NAMES[var]
-        ):
-            ds = ds.rename({original_names[var]: varname})
+        if not isinstance(original_names[var], list):
+            orig_names = [original_names[var]]
+        else :
+            orig_names = original_names[var]
+        for orig_name in orig_names:
+            if var in COORDS_NAMES and orig_name != COORDS_NAMES[var] :
+                ds = ds.rename({orig_name: COORDS_NAMES[var]})
+            if (
+                var in VARS_NAMES
+                and VARS_NAMES[var] == varname
+                and orig_name != VARS_NAMES[var]
+            ):
+                ds = ds.rename({original_names[var]: varname})
     # Drop coords not standard
     ds = ds.drop_vars(
         [
@@ -102,6 +145,11 @@ def catalog(
     for attr in list(ds.attrs):
         if str(ds.attrs[attr]).find('"') != -1 :
             del ds.attrs[attr]
+    # Deleting dummy attributes
+    dummy_attrs = ['lon', 'lat']
+    for attr in dummy_attrs:
+        if attr in ds.attrs:
+            del ds.attrs[attr]
     if lead_is_month:
         # Set lead times
         ds = ds.assign_coords({
@@ -113,6 +161,8 @@ def catalog(
                 ds[COORDS_NAMES['S']], ds[COORDS_NAMES['L']]
             )
         })
+    # Convert varname units
+    ds[varname] = convert_units(ds[varname], missing_units=missing_units)
     # Encode time
     ds = encode_time(ds)
     # Force into coords
