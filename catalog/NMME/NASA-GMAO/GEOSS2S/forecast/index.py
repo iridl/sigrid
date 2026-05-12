@@ -38,11 +38,12 @@ def open(varname) -> xr.Dataset:
     for orig_unit, valid_unit in ORIGINAL_UNITS.items():
         ureg.define(f'{orig_unit} = {valid_unit}')
     ds[varname].attrs['units'] = parse_units(ds[varname].attrs['units'])
-    ureg.define('water_density = 1 * kilogram / m ** 3')
+    ureg.define('water_density = 1000 * kilogram / m ** 3')
     ds = ds.pint.quantify(unit_registry=ureg)
     if ds[varname].data.check('[mass] / [length] ** 2 / [time]'):
         ds[varname] = ds[varname] / ureg.water_density
     ds[varname] = ds[varname].pint.to('mm/day')
+    print(ds)
     ds = ds.pint.dequantify()
     return ds
 
