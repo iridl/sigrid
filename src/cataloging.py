@@ -4,7 +4,10 @@ import numpy as np
 import pydap_icechunk
 
 
-# Change the dictionary values should you want different names throughout your system
+# Keys are the conventional names used by pydap-icechunk.
+# They can not be changed and serve as well as identifiers for the different objects.
+# Values are what are going to be shown on, and served, by the pydap server
+# They can be changed to the taste of the Catalog administrator
 COORDS_NAMES = {
     'S': 'S',
     'L': 'L',
@@ -13,6 +16,7 @@ COORDS_NAMES = {
     'M': 'M',
     'target': 'target',
 }
+# Same as above, additionally, keys are the icechunk variables names.
 VARS_NAMES = {
     'prec': 'prec',
     'tref': 'tref',
