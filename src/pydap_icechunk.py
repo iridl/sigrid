@@ -64,9 +64,12 @@ class XarrayHandler(BaseHandler, abc.ABC):
             for grid in grids:
                 # make dimension a fully qualifying name
                 dimensions = ["/" + str(dim) for dim in vars[grid].dims]
+                data = source[grid].data
+                if isinstance(data, dask.array.Array):
+                    data = DaskArrayProxy(data)
                 self.dataset[grid] = BaseType(
                     str(grid),
-                    DaskArrayProxy(source[grid].data),
+                    data,
                     dims=dimensions,
                     **vars[grid].attrs,
                 )
@@ -288,3 +291,4 @@ def load_index(file_path):
     assert spec.loader  
     spec.loader.exec_module(module)
     return module
+

@@ -15,6 +15,6 @@ if __name__ == "__main__":
         "localhost",
         int(os.environ['PYDAP_PORT']),
         app,
-        use_reloader=True,
+        #use_reloader=True,
         passthrough_errors=True,
     )
