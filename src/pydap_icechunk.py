@@ -144,8 +144,8 @@ def ensure_trailing(s: str) -> str:
 
 
 class Server:
-    def __init__(self, catalog_path: Path):
-        self.catalog_path = catalog_path.resolve()
+    def __init__(self, catalog_path: Path | str):
+        self.catalog_path = Path(catalog_path).resolve()
 
     @wsgify
     def __call__(self, req: webob.Request):

@@ -1,6 +1,5 @@
 import logging
 import os
-from pathlib import Path
 import werkzeug
 
 import pydap_icechunk
@@ -8,7 +7,7 @@ import pydap_icechunk
 if __name__ == "__main__":
     logger = logging.getLogger("werkzeug")
     logger.setLevel(logging.DEBUG)
-    catalog_path = Path(os.environ['PYDAP_CATALOG_ROOT'])
+    catalog_path = os.environ['PYDAP_CATALOG_ROOT']
     assert catalog_path
     app = pydap_icechunk.Server(catalog_path)
     werkzeug.serving.run_simple(
