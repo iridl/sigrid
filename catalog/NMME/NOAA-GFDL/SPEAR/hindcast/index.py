@@ -12,7 +12,7 @@ def open(varname) -> xr.Dataset:
         # Values must correspond to icechunk names
         original_names={
             'S': 'IRIDL_time',
-            'L': ['TIME'. 'TIME1'],
+            'L': ['TIME', 'TIME1'],
             'Y': ['LAT', 'LAT1'],
             'X': ['LON', 'LON1'],
             'prec': 'PRECIP_1X1',
@@ -23,7 +23,7 @@ def open(varname) -> xr.Dataset:
             'prec': 'mm/s',
             'tref': 'K',
             'sst': 'degree_Celsius'
-        }
+        },
         lead_is_month=True,
     )
 

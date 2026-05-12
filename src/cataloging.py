@@ -7,12 +7,16 @@ import pydap_icechunk
 
 UNITS_CONVERTER = namedtuple('UNITS_CONVERTER', 'offset scale name')
 UNITS_CONVERSIONS = {
+    # This may sound silly but is needed as things are written now
+    # it does nothing other than redefining units attr to the same value
     'degree_Celsius': UNITS_CONVERTER(0, 1, 'degree_Celsius'),
     'degreeC': UNITS_CONVERTER(0, 1, 'degree_Celsius'),
     'K': UNITS_CONVERTER(-272.15, 1, 'degree_Celsius'),
     'Kelvin': UNITS_CONVERTER(-272.15, 1, 'degree_Celsius'),
     'kg m**-2 s**-1': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24 / 1000, 'mm/day'),
+    'kg m-2 s-1': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24 / 1000, 'mm/day'),
     'mm/day': UNITS_CONVERTER(0, 1, 'mm/day'),
+    'mm/s': UNITS_CONVERTER(0, 60 * 60 * 24, 'mm/day'),
     'm/s': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24, 'mm/day'),
 }
 
@@ -44,12 +48,8 @@ ENCODING = {
 
 def convert_units(dsvar, missing_units=None):
     if missing_units is not None:
+        # GFDL data has simply no units attribute
         dsvar.attrs['units'] = missing_units[dsvar.name]
-    #original_units = [
-    #    name
-    #    for name, conv in UNITS_CONVERSIONS.items()
-    #    if name == dsvar.attrs['units']
-    #][0]
     original_units = dsvar.attrs['units']
     if not (
         UNITS_CONVERSIONS[original_units].scale == 1
@@ -114,22 +114,35 @@ def catalog(
     ds = ds.drop_vars(
         [name for name, coord in ds.coords.items() if coord.dims == ()]
     )
-    # Squeeze coords of size 1
-    for coord in ds.dims:
-        if ds.sizes[coord] == 1 :
-            ds.squeeze(coord, drop=True)
+    # Squeeze dims of size 1
+    for dim in ds.dims:
+        if ds.sizes[dim] == 1 :
+            ds = ds.squeeze(dim, drop=True)
     # Renaming
+    # TODO This lot has become wild. Revisit
     for var in original_names:
+        # Need to cover list of original names 
+        # when different vars have different coords names, see e.g. SPEAR
         if not isinstance(original_names[var], list):
             orig_names = [original_names[var]]
         else :
             orig_names = original_names[var]
         for orig_name in orig_names:
-            if var in COORDS_NAMES and orig_name != COORDS_NAMES[var] :
+            if (
+                # accomodates when different vars have diffrent coord names
+                orig_name in ds.dims
+                # only conventional coords
+                and var in COORDS_NAMES
+                # rename can't rename with same name
+                and orig_name != COORDS_NAMES[var]
+            ):
                 ds = ds.rename({orig_name: COORDS_NAMES[var]})
             if (
+                # only conventional vars
                 var in VARS_NAMES
+                # accommodates same catalog catalogs all variables
                 and VARS_NAMES[var] == varname
+                # rename can't rename with same name
                 and orig_name != VARS_NAMES[var]
             ):
                 ds = ds.rename({original_names[var]: varname})
@@ -141,6 +154,16 @@ def catalog(
             if name not in COORDS_NAMES.values()
         ]
     )
+    # Drop vars not standard
+    # This is for SPEAR TIME_bnds
+    # TODO all bounds
+    ds = ds.drop_vars(
+        [
+            name
+            for name in ds.keys()
+            if name not in VARS_NAMES.values()
+        ]
+    )
     # Deleting buggy attributes
     for attr in list(ds.attrs):
         if str(ds.attrs[attr]).find('"') != -1 :
@@ -148,8 +171,8 @@ def catalog(
     # Deleting dummy attributes
     dummy_attrs = ['lon', 'lat']
     for attr in dummy_attrs:
-        if attr in ds.attrs:
-            del ds.attrs[attr]
+        if attr in ds[varname].attrs:
+            del ds[varname].attrs[attr]
     if lead_is_month:
         # Set lead times
         ds = ds.assign_coords({

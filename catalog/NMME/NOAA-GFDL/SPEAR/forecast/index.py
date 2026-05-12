@@ -23,7 +23,7 @@ def open(varname) -> xr.Dataset:
             'prec': 'mm/s',
             'tref': 'K',
             'sst': 'degree_Celsius'
-        }
+        },
         lead_is_month=True,
     )
 
