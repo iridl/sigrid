@@ -1,40 +1,36 @@
 import xarray as xr
 
-import pydap_icechunk
+import cataloging
 
 
 def open(varname) -> xr.Dataset:
-    ds = pydap_icechunk.open_icechunk(
-        f'NMME/NOAA-GFDL/SPEAR/forecast/{varname}', decode_times=False
+    return cataloging.catalog(
+        varname,
+        varpath='NMME/NOAA-GFDL/SPEAR/forecast',
+        # maps icechunk names to pydap-icechunk conventional names
+        # Keys can not be changed,
+        # Values must correspond to icechunk names
+        original_names={
+            'S': 'IRIDL_time',
+            'L': 'TIME',
+            'Y': ['LAT', 'LAT1'],
+            'X': ['LON', 'LON1'],
+            'prec': 'PRECIP_1X1',
+            'tref': 'T_REF_1X1',
+            'sst': 'SST_1X1',
+        },
+        missing_units={
+            'prec': 'mm/s',
+            'tref': 'K',
+            'sst': 'degree_Celsius'
+        },
+        lead_is_month=True,
     )
-    original_coords_names = {
-        'prec': {'Y': 'LAT1', 'X': 'LON1'}, 
-        'tref': {'Y': 'LAT1', 'X': 'LON1'},
-        'sst': {'Y': 'LAT', 'X': 'LON'},
-    }
-    ds = ds.rename({
-        'IRIDL_time':  'S',
-        'TIME': 'L',
-        original_coords_names[varname]['Y']: 'Y',
-        original_coords_names[varname]['X']: 'X',
-        'TIME_expanded': 'target',  # TODO convert target from noleap, or just drop and recreate it
-    })
-    original_names = {
-        'prec': 'PRECIP_1X1',
-        'tref': 'T_REF_1X1',
-        'sst': 'SST_1X1',
-    }
-    if varname in original_names:
-        ds = ds.rename({original_names[varname]: varname})
-    # TODO overwrite the attrs wholesale rather than passing through what was saved in the zarr.
-    ds = ds.assign_coords(L=('L', range(ds.sizes['L'])))
-    units = {
-        'prec': 'mm/s',
-        'tref': 'K',
-        'sst': 'degree_Celsius',
-    }
-    ds[varname].attrs['units'] = units[varname]
-    return ds
 
 def list_vars():
-    return ['prec', 'tref', 'sst']
+    return [
+        cataloging.VARS_NAMES['prec'],
+        cataloging.VARS_NAMES['tref'],
+        cataloging.VARS_NAMES['sst'],
+    ]
+    

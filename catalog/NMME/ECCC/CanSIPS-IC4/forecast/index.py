@@ -20,7 +20,6 @@ def open(varname) -> xr.Dataset:
             'tref': 'avg_2t',
             'sst': 'avg_sst',
         },
-        del_ds_attrs=['history'],
         lead_is_month=True,
     )
 

@@ -1,28 +1,30 @@
 import xarray as xr
 
-import pydap_icechunk
+import cataloging
 
 
 def open(varname) -> xr.Dataset:
-    ds = pydap_icechunk.open_icechunk(
-        f'NMME/NASA-GMAO/GEOSS2S/hindcast/{varname}', decode_times=False
+    return cataloging.catalog(
+        varname,
+        varpath='NMME/NASA-GMAO/GEOSS2S/hindcast',
+        # maps icechunk names to pydap-icechunk conventional names
+        # Keys can not be changed,
+        # Values must correspond to icechunk names
+        original_names={
+            'S': 'IRIDL_time',
+            'L': 'time',
+            'Y': 'latitude',
+            'X': 'longitude',
+            'prec': 'precip',
+            'tref': 'tref',
+            'sst': 'sst',
+        },
+        lead_is_month=True,
     )
-    ds = ds.squeeze(dim="level", drop=True)
-    ds = ds.rename({
-        'IRIDL_time': 'S',
-        'time': 'L',
-        'latitude': 'Y',
-        'longitude': 'X',
-        'time_expanded': 'target',  # TODO convert target from noleap, or just drop and recreate it
-    })
-    original_names = {
-        'prec': 'precip',
-    }
-    if varname in original_names:
-        ds = ds.rename({original_names[varname]: varname})
-    # TODO overwrite the attrs wholesale rather than passing through what was saved in the zarr.
-    ds = ds.assign_coords(L=('L', range(ds.sizes['L'])))
-    return ds
 
 def list_vars():
-    return ['prec', 'tref', 'sst']
+    return [
+        cataloging.VARS_NAMES['prec'],
+        cataloging.VARS_NAMES['tref'],
+        cataloging.VARS_NAMES['sst'],
+    ]

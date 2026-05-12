@@ -39,18 +39,18 @@ def compare_coords(da1, da2):
         c1 = da1.coords.get(cname)
         c2 = da2.coords.get(cname)
         print(cname)
-        if np.array_equal(c1.values, c2.values):
-            print('values are the same')
-        else:
-            print('values differ:')
-            print(c1.values)
-            print(c2.values)
         if c1 is None:
             print(cname, 'absent', 'present')
             continue
         if c2 is None:
             print(cname, 'present', 'absent')
             continue
+        if np.array_equal(c1.values, c2.values):
+            print('values are the same')
+        else:
+            print('values differ:')
+            print(c1.values)
+            print(c2.values)
         compare_attrs(c1, c2)
 
 def compare_shape(da1, da2):
@@ -76,7 +76,7 @@ def compare_slice(da1, da2):
     start = time.time()
     a2 = da2.values
     print(f'da2 took {time.time() - start}s')
-    return np.array_equal(a1, a2, equal_nan=True)  # change to np.isclose?
+    return np.isclose(a1, a2, equal_nan=True).all()
 
 def compare_attrs(da1, da2):
     for a in sorted(set(da1.attrs) | set(da2.attrs)):
