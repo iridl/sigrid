@@ -208,6 +208,7 @@ class Server:
         )
 
     dir_template = jinja2.Template("""
+        <!-- OPeNDAP -->
         {% if dirs %}
         <h1>Datasets</h1>
         <table>
