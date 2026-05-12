@@ -23,4 +23,8 @@ def open(varname) -> xr.Dataset:
     )
 
 def list_vars():
-    return ['prec', 'tref', 'sst']
+    return [
+        cataloging.VARS_NAMES['prec'],
+        cataloging.VARS_NAMES['tref'],
+        cataloging.VARS_NAMES['sst'],
+    ]

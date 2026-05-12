@@ -68,8 +68,9 @@ def catalog(
     del_ds_attrs=None,
     lead_is_month=False,
     ):
+    icechunk_var = [key for key, value in VARS_NAMES.items() if value == varname][0]
     ds = pydap_icechunk.open_icechunk(
-        f'{varpath}/{varname}',
+        f'{varpath}/{icechunk_var}',
     )
     # Some varnames have scalar coordinates that break pydap
     ds = ds.drop_vars(
@@ -77,9 +78,13 @@ def catalog(
     )
     # Renaming
     for var in original_names:
-        if var in COORDS_NAMES:
+        if var in COORDS_NAMES and original_names[var] != COORDS_NAMES[var] :
             ds = ds.rename({original_names[var]: COORDS_NAMES[var]})
-        if var in VARS_NAMES and VARS_NAMES[var] == varname:
+        if (
+            var in VARS_NAMES
+            and VARS_NAMES[var] == varname
+            and original_names[var] != VARS_NAMES[var]
+        ):
             ds = ds.rename({original_names[var]: varname})
     # Drop coords not standard
     ds = ds.drop_vars(
