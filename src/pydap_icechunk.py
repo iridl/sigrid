@@ -245,6 +245,12 @@ class CatalogFileHandler(XarrayHandler):
             return super().__call__(environ, start_response)
         request = webob.Request(environ)
         ds = self.open()
+        ds = xr.decode_cf(ds)
+        # For some reason, decode_cf causes aux coords (e.g. target)
+        # to get unloaded, so we see "..." instead of values in the UI.
+        # Fix that by explicitly reloading them.
+        for coord in ds.coords.values():
+            coord.load()
         context = {
             'ds': xr.decode_cf(ds),
             'url': request.url,
