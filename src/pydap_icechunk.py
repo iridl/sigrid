@@ -92,7 +92,7 @@ class XarrayHandler(BaseHandler, abc.ABC):
     def open(self) -> xr.Dataset: ...
 
 
-def open_icechunk(rel_path, decode_times=True):
+def open_icechunk(rel_path, decode_times=True, drop_variables=None):
     storage = icechunk.local_filesystem_storage(Path(icechunk_root) / rel_path)
     # Workaround for https://github.com/earth-mover/icechunk/issues/2105
     if not icechunk.Repository.exists(storage):
@@ -102,7 +102,12 @@ def open_icechunk(rel_path, decode_times=True):
         authorize_virtual_chunk_access={f'file://{orig_root}/': None}
     )
     session = repo.readonly_session("main")
-    ds = xr.open_zarr(session.store, zarr_format=3, decode_times=decode_times)
+    ds = xr.open_zarr(
+        session.store,
+        zarr_format=3,
+        decode_times=decode_times,
+        drop_variables=drop_variables,
+    )
     return ds
 
 
@@ -283,34 +288,3 @@ def load_index(file_path):
     assert spec.loader  
     spec.loader.exec_module(module)
     return module
-
-    
-def encode_time(ds, cf_units='hours', ref='1960-01-01'):
-    time_coords = [
-        coord for coord in ds.coords
-        if ds[coord].dtype in ['datetime64[ns]', 'timedelta64[ns]']
-    ]
-    for tc in time_coords:
-        data, units, calendar = xr.coding.times.encode_cf_datetime(
-            ds[tc], f'{cf_units} since {ref}', 'standard'
-        )
-        ds = ds.assign_coords({tc: (ds[tc].dims, data)})
-        ds[tc].attrs['units'] = units
-        ds[tc].attrs['calendar'] = calendar
-    return ds
-
-
-def S_L_to_target(S, L):
-    return xr.DataArray(
-        data=[
-            xr.date_range(
-                start=s.item(),
-                # TODO may not be wise to simply rely on len(L)
-                periods=len(L),
-                freq='MS',
-            )
-            for s in S
-        ],
-        coords=dict(S=S, L=L),
-        attrs={'long_name': 'target date'},
-    )
