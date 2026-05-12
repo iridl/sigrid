@@ -28,6 +28,8 @@ xarray = ">=2026.4.0,<2027"
 icechunk = ">=2.0.3,<3"
 gunicorn = ">=25.3.0,<26"  # TODO shouldn't be required. This is a mistake/judgment error in pydap.wsgi.app.
 dask = ">=2026.3.0,<2027"
+pint = ">=0.25.3,<0.26"
+pint-xarray = ">=0.6.1,<0.7"
 
 [tool.pixi.feature.dev.dependencies]
 werkzeug = ">=3.1.8,<4"

@@ -1,6 +1,16 @@
 import xarray as xr
+from collections import namedtuple
 
 import pydap_icechunk
+
+
+# These as vocation to move to cataloging.py
+UNITS_CONVERTER = namedtuple('UNITS_CONVERTER', 'offset scale name')
+UNITS_CONVERSIONS = {
+    'm/s': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24, 'mm/day'),
+    'Kelvin': UNITS_CONVERTER(-272.15, 1, 'degree_Celsius'),
+    'degreeC': UNITS_CONVERTER(0, 1, 'degree_Celsius'),
+}
 
 
 def open(varname) -> xr.Dataset:
@@ -25,6 +35,21 @@ def open(varname) -> xr.Dataset:
     del ds[varname].attrs['lon']
     del ds[varname].attrs['lat']
     ds = ds.assign_coords(L=('L', range(ds.sizes['L'])))
+    original_units = [
+        name
+        for name, conv in UNITS_CONVERSIONS.items()
+        if name == ds[varname].attrs['units']
+    ][0]
+    if not (
+        UNITS_CONVERSIONS[original_units].scale == 1
+        and UNITS_CONVERSIONS[original_units].offset == 0
+    ):
+        ds[varname] = (
+            ds[varname]
+            * UNITS_CONVERSIONS[original_units].scale
+            + UNITS_CONVERSIONS[original_units].offset
+        )
+    ds[varname].attrs['units'] = UNITS_CONVERSIONS[original_units].name
     return ds
 
 def list_vars():

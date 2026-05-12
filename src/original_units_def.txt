@@ -1,0 +1,2 @@
+Kelvin = kelvin
+kg m-2 s-1 = kilogram / m ** 2 / s
