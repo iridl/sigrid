@@ -47,7 +47,7 @@ ENCODING = {
 
 STANDARD_ATTRS = {
     'S': {
-        'long_name': 'Forecast Start Time',
+        'long_name': 'Forecast start time',
         'standard_name': 'forecast_reference_time',
         'units': ENCODING['cf_units'],
         'calendar': ENCODING['calendar'],
@@ -57,22 +57,22 @@ STANDARD_ATTRS = {
         'standard_name': 'forecast_period',
     },
     'Y': {
-        'long_name': 'latitude',
+        'long_name': 'Latitude',
         'standard_name': 'latitude',
         'units': 'degree_north',
     },
     'X': {
-        'long_name': 'longitude',
+        'long_name': 'Longitude',
         'standard_name': 'longitude',
         'units': 'degree_east',
     },
     'M': {
-        'long_name': 'Ensemble Member',
+        'long_name': 'Ensemble member',
         'standard_name': 'realization',
         'units': 'unitless',
     },
     'target': {
-        'long_name': 'Forecast Target Period',
+        'long_name': 'Forecast target period',
         # CF Conventions standard names table says:
         # forecast_reference_time: The forecast reference time in NWP
         # is the "data time", the time of the analysis from which the
@@ -84,17 +84,17 @@ STANDARD_ATTRS = {
         'calendar': ENCODING['calendar'],
     },
     'prec': {
-        'long_name': 'Total Precipitation',
+        'long_name': 'Total precipitation',
         'standard_name': 'lwe_precipitation_rate',
         'units': 'mm/day',
     },
     'tref': {
-        'long_name': 'Reference Temperature',
+        'long_name': 'Reference temperature',
         'standard_name': 'air_temperature',
         'units': 'degree_C',
     },
     'sst': {
-        'long_name': 'Sea Surface Temperature',
+        'long_name': 'Sea surface temperature',
         'standard_name': 'sea_surface_temperature',
         'units': 'degree_C',
     }
