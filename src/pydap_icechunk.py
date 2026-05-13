@@ -244,15 +244,20 @@ class CatalogFileHandler(XarrayHandler):
         if self.extension:
             return super().__call__(environ, start_response)
         request = webob.Request(environ)
-        ds = self.open()
-        ds = xr.decode_cf(ds)
-        # For some reason, decode_cf causes aux coords (e.g. target)
-        # to get unloaded, so we see "..." instead of values in the UI.
-        # Fix that by explicitly reloading them.
-        for coord in ds.coords.values():
+        ds_orig = self.open()
+        ds_decoded = xr.decode_cf(ds_orig)
+        for name, coord in ds_decoded.coords.items():
+            # For some reason, decode_cf causes aux coords (e.g. target)
+            # to get unloaded, so we see "..." instead of values in the UI.
+            # Fix that by explicitly reloading them.
             coord.load()
+            # Xarray's CF decoding removes the units and calendar attributes.
+            # Put them back for display purposes.
+            if np.issubdtype(coord.dtype, np.datetime64):
+                for attr in ('units', 'calendar'):
+                    coord.attrs[attr] = ds_orig[name].attrs[attr]
         context = {
-            'ds': xr.decode_cf(ds),
+            'ds': ds_decoded,
             'url': request.url,
         }
         response = webob.Response(body=self.var_template.render(context))
