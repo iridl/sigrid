@@ -36,14 +36,30 @@ def open(varname) -> xr.Dataset:
     ds = ds.drop_vars(scalar_coords)
     # TODO overwrite the attrs wholesale rather than passing through what was saved in the zarr.
     ds.attrs.pop('history', None) #There are too many history messages, and they cause exceptions and warnings when the data is served.
-    ds = ds.assign_coords(L=('L', range(ds.sizes['L'])))
+    print("Valores de L:", ds['L'].values[:5])
+    print("Atributos de L:", ds['L'].attrs)
+
+    # L should be in days 
+    dic_conversion = {'days': 1, 'hours': 24, 'seconds': 86400}
+    l_units = ds['L'].attrs.get('units')
+    if l_units not in dic_conversion:
+        raise ValueError(f"L unit not contemplated: '{l_units}'")
+    # Assign the data type according to the resulting values from the conversion.
+    converted = ds['L'].values / dic_conversion[l_units]
+    converted = converted.astype(int) if (converted == converted.astype(int)).all() else converted
+
+    ds = ds.assign_coords(L=('L', converted))
+    ds['L'].attrs['units'] = 'days'
+
+    #ds = ds.assign_coords(L=('L', range(ds.sizes['L'])))
     #Grid order 
-    base_dims = ['S', 'L', 'X', 'Y']
+    base_dims = ['S', 'L', 'Y', 'X']
     if 'P' in ds[varname].dims:
         base_dims.insert(2, 'P') 
     ds[varname] = ds[varname].transpose(*base_dims)
-    #Invert Y from 90 -90 to -90 90
-    ds = ds.isel(Y=slice(None, None, -1))
+    #Invert Y from N-S to S-N
+    if ds['Y'].values[0] > ds['Y'].values[-1]:
+        ds = ds.isel(Y=slice(None, None, -1))
     #Force target as coordinate
     ds[varname].attrs['coordinates'] = "target"
     return ds
