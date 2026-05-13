@@ -228,10 +228,6 @@ def catalog(
         if str(ds.attrs[attr]).find('"') != -1 :
             del ds.attrs[attr]
     # Deleting dummy attributes
-    dummy_attrs = ['lon', 'lat']
-    for attr in dummy_attrs:
-        if attr in ds[varname].attrs:
-            del ds[varname].attrs[attr]
     if lead_is_month:
         # Set lead times
         ds = ds.assign_coords({
@@ -248,7 +244,6 @@ def catalog(
     # Encode time
     ds = encode_time(ds)
     # Force into coords
-    ds[varname].attrs['coordinates'] = COORDS_NAMES["target"]
 
     for cname in ds.variables:
         assert isinstance(cname, str)
@@ -256,7 +251,10 @@ def catalog(
         # than what's commented out here because of synonyms.
         # if 'units' in ds[cname].attrs:
         #     assert ds[cname].attrs['units'] == STANDARD_ATTRS[cname]['units']
-        ds[cname].attrs = dict(STANDARD_ATTRS[cname])
+        ds[cname].attrs = dict(
+            STANDARD_ATTRS[cname],
+            coordinates = COORDS_NAMES['target']
+        )
 
     # cfgrib generates a large number of mostly useless attributes. Until
     # we get around to identifying the interesting ones, drop them all.
