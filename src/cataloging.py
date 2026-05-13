@@ -100,6 +100,10 @@ STANDARD_ATTRS = {
     }
 }
 
+DS_STANDARD_ATTRS = {
+    'Conventions': 'CF-1.13',
+}
+
 
 def convert_units(dsvar, missing_units=None):
     if missing_units is not None:
@@ -253,5 +257,14 @@ def catalog(
         # if 'units' in ds[cname].attrs:
         #     assert ds[cname].attrs['units'] == STANDARD_ATTRS[cname]['units']
         ds[cname].attrs = dict(STANDARD_ATTRS[cname])
+
+    # cfgrib generates a large number of mostly useless attributes. Until
+    # we get around to identifying the interesting ones, drop them all.
+    ds.attrs = {
+        k: v for k, v in ds.attrs.items()
+        if not k.startswith('GRIB')
+    }
+    # Keep the provider's remaining dataset-level attributes, and add our own.
+    ds.attrs.update(DS_STANDARD_ATTRS)
 
     return ds
