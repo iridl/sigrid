@@ -45,6 +45,61 @@ ENCODING = {
     'calendar': 'standard',
 }
 
+STANDARD_ATTRS = {
+    'S': {
+        'long_name': 'Forecast start time',
+        'standard_name': 'forecast_reference_time',
+        'units': ENCODING['cf_units'],
+        'calendar': ENCODING['calendar'],
+    },
+    'L': {
+        'long_name': 'Lead',
+        'standard_name': 'forecast_period',
+    },
+    'Y': {
+        'long_name': 'Latitude',
+        'standard_name': 'latitude',
+        'units': 'degree_north',
+    },
+    'X': {
+        'long_name': 'Longitude',
+        'standard_name': 'longitude',
+        'units': 'degree_east',
+    },
+    'M': {
+        'long_name': 'Ensemble member',
+        'standard_name': 'realization',
+        'units': 'unitless',
+    },
+    'target': {
+        'long_name': 'Forecast target period',
+        # CF Conventions standard names table says:
+        # forecast_reference_time: The forecast reference time in NWP
+        # is the "data time", the time of the analysis from which the
+        # forecast was made. It is not the time for which the forecast
+        # is valid; the standard name of time should be used for that time.
+        # https://cfconventions.org/Data/cf-standard-names/current/build/cf-standard-name-table.html
+        'standard_name': 'time',
+        'units': ENCODING['cf_units'],
+        'calendar': ENCODING['calendar'],
+    },
+    'prec': {
+        'long_name': 'Total precipitation',
+        'standard_name': 'lwe_precipitation_rate',
+        'units': 'mm/day',
+    },
+    'tref': {
+        'long_name': 'Reference temperature',
+        'standard_name': 'air_temperature',
+        'units': 'degree_Celsius',
+    },
+    'sst': {
+        'long_name': 'Sea surface temperature',
+        'standard_name': 'sea_surface_temperature',
+        'units': 'degree_Celsius',
+    }
+}
+
 
 def convert_units(dsvar, missing_units=None):
     if missing_units is not None:
@@ -190,4 +245,13 @@ def catalog(
     ds = encode_time(ds)
     # Force into coords
     ds[varname].attrs['coordinates'] = COORDS_NAMES["target"]
+
+    for cname in ds.variables:
+        assert isinstance(cname, str)
+        # TODO double-check that units are what we expect. It's harder
+        # than what's commented out here because of synonyms.
+        # if 'units' in ds[cname].attrs:
+        #     assert ds[cname].attrs['units'] == STANDARD_ATTRS[cname]['units']
+        ds[cname].attrs = dict(STANDARD_ATTRS[cname])
+
     return ds
