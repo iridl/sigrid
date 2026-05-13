@@ -91,12 +91,12 @@ STANDARD_ATTRS = {
     'tref': {
         'long_name': 'Reference temperature',
         'standard_name': 'air_temperature',
-        'units': 'degree_C',
+        'units': 'degree_Celsius',
     },
     'sst': {
         'long_name': 'Sea surface temperature',
         'standard_name': 'sea_surface_temperature',
-        'units': 'degree_C',
+        'units': 'degree_Celsius',
     }
 }
 
