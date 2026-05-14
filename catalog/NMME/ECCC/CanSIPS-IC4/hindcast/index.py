@@ -16,8 +16,8 @@ def open(varname) -> xr.Dataset:
             'Y': 'latitude',
             'X': 'longitude',
             'M': 'number',
-            'prec': 'prate',
-            'tref': 'avg_2t',
+            'prcp': 'prate',
+            't2m': 'avg_2t',
             'sst': 'avg_sst',
         },
         lead_is_month=True,
@@ -25,8 +25,8 @@ def open(varname) -> xr.Dataset:
 
 def list_vars():
     return [
-        cataloging.VARS_NAMES['prec'],
-        cataloging.VARS_NAMES['tref'],
+        cataloging.VARS_NAMES['prcp'],
+        cataloging.VARS_NAMES['t2m'],
         cataloging.VARS_NAMES['sst'],
     ]
     

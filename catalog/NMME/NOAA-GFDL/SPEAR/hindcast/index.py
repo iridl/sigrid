@@ -15,13 +15,13 @@ def open(varname) -> xr.Dataset:
             'L': ['TIME', 'TIME1'],
             'Y': ['LAT', 'LAT1'],
             'X': ['LON', 'LON1'],
-            'prec': 'PRECIP_1X1',
-            'tref': 'T_REF_1X1',
+            'prcp': 'PRECIP_1X1',
+            't2m': 'T_REF_1X1',
             'sst': 'SST_1X1',
         },
         units={
-            'prec': 'mm/s',
-            'tref': 'K',
+            'prcp': 'mm/s',
+            't2m': 'K',
             'sst': 'degree_Celsius'
         },
         lead_is_month=True,
@@ -29,8 +29,8 @@ def open(varname) -> xr.Dataset:
 
 def list_vars():
     return [
-        cataloging.VARS_NAMES['prec'],
-        cataloging.VARS_NAMES['tref'],
+        cataloging.VARS_NAMES['prcp'],
+        cataloging.VARS_NAMES['t2m'],
         cataloging.VARS_NAMES['sst'],
     ]
     
