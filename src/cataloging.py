@@ -33,8 +33,8 @@ COORDS_NAMES = {
     'X': 'X',
     'M': 'M',
     'target': 'target',
-    # NB target_bounds should be named after target
-    'target_bounds': 'target_bounds'
+    # NB target_bnds should be named after target
+    'target_bnds': 'target_bnds'
 }
 # Same as above, additionally, keys are the icechunk variables names.
 VARS_NAMES = {
@@ -84,9 +84,9 @@ STANDARD_ATTRS = {
         # is valid; the standard name of time should be used for that time.
         # https://cfconventions.org/Data/cf-standard-names/current/build/cf-standard-name-table.html
         'standard_name': 'time',
-        'bounds': COORDS_NAMES['target_bounds'],
+        'bounds': COORDS_NAMES['target_bnds'],
     },
-    'target_bounds': {
+    'target_bnds': {
         'long_name': 'Forecast target period bounds',
         'standard_name': 'time',
     },
@@ -130,7 +130,7 @@ def standardize(
         )
     ds[varname].attrs = dict(
         STANDARD_ATTRS[varname],
-        coordinates=f"{COORDS_NAMES['target']} {COORDS_NAMES['target_bounds']}",
+        coordinates=f"{COORDS_NAMES['target']} {COORDS_NAMES['target_bnds']}",
         units=UNITS_CONVERSIONS[original_units].name,
     )
     # Encode time coords and apply standard attrs
@@ -168,7 +168,7 @@ def standardize(
 
 
 def S_L_to_target(S, L):
-    target_bounds = xr.DataArray(
+    target_bnds = xr.DataArray(
         data=[
             np.transpose([
                 xr.date_range(
@@ -191,7 +191,7 @@ def S_L_to_target(S, L):
         dims=['S', 'L', 'nbound'],
         coords={'S': S, 'L': L},
     )
-    return target_bounds.isel(nbound=0, drop=True), target_bounds
+    return target_bnds.isel(nbound=0, drop=True), target_bnds
 
 
 def catalog(
@@ -272,12 +272,12 @@ def catalog(
             COORDS_NAMES['L']: range(ds.sizes[COORDS_NAMES['L']])
         })
         # Set target
-        target, target_bounds = S_L_to_target(
+        target, target_bnds = S_L_to_target(
             ds[COORDS_NAMES['S']], ds[COORDS_NAMES['L']]
         )
         ds = ds.assign_coords({
             COORDS_NAMES["target"]: target,
-            COORDS_NAMES["target_bounds"]: target_bounds,
+            COORDS_NAMES["target_bnds"]: target_bnds,
         })
     # Convert units, encode time and standardize attrs
     ds = standardize(ds, varname, units=units)
