@@ -8,6 +8,10 @@ import pydap_icechunk
 
 
 UNITS_CONVERTER = namedtuple('UNITS_CONVERTER', 'offset scale name')
+# Achtung: while monthly prcp are converted in mm/day, they are then converted to 
+# total mm in the month (mm)
+# TODO Be mindful as to whether we can continue to have UNITS_CONVERSIONS 
+# independent from varname...
 UNITS_CONVERSIONS = {
     # This may sound silly but is needed as things are written now
     # it does nothing other than redefining units attr to the same value
@@ -113,6 +117,7 @@ def standardize(
     ds,
     varname,
     units=None,
+    lead_is_month=False,
 ):
     # Convert varname units and apply standard attrs
     if units is not None:
@@ -128,6 +133,14 @@ def standardize(
             * UNITS_CONVERSIONS[original_units].scale
             + UNITS_CONVERSIONS[original_units].offset
         )
+    if lead_is_month and varname == 'prcp':
+        target_length = (
+            ds['target_bnds'].isel(nbounds=1, drop=True)
+            - ds['target_bnds'].isel(nbounds=0, drop=True)
+        ).dt.days
+        print(target_length)
+        ds[varname] = ds[varname] * target_length
+        ds[varname]['units'] = 'mm'
     ds[varname].attrs = dict(
         STANDARD_ATTRS[varname],
         coordinates=f"{COORDS_NAMES['target']} {COORDS_NAMES['target_bnds']}",
@@ -280,6 +293,6 @@ def catalog(
             COORDS_NAMES["target_bnds"]: target_bnds,
         })
     # Convert units, encode time and standardize attrs
-    ds = standardize(ds, varname, units=units)
+    ds = standardize(ds, varname, units=units, lead_is_month=lead_is_month)
 
     return ds
