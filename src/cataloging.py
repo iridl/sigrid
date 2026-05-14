@@ -29,6 +29,7 @@ UNITS_CONVERSIONS = {
     'Kelvin': UNITS_CONVERTER(-273.15, 1, 'degree_Celsius'),
     'kg m**-2 s**-1': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24 / 1000, 'mm/day'),
     'kg m-2 s-1': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24 / 1000, 'mm/day'),
+    'kg m^-2 s^-1': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24 / 1000, 'mm'),
     'mm/day': UNITS_CONVERTER(0, 1, 'mm/day'),
     'mm/s': UNITS_CONVERTER(0, 60 * 60 * 24, 'mm/day'),
     'm/s': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24, 'mm/day'),
@@ -104,6 +105,10 @@ STANDARD_ATTRS = {
         'bounds': NAMES['target_bnds'],
     },
     'target_bnds': {},
+    'pr': {
+        'long_name': 'Total precipitation',
+        'standard_name': 'lwe_precipitation_rate',
+    },
     'prcp': {
         'long_name': 'Total precipitation',
         'standard_name': 'lwe_precipitation_rate',
