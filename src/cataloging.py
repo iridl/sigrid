@@ -104,7 +104,6 @@ def standardize(
     ds,
     varname,
     units=None,
-    time_enconding=TIME_ENCODING,
 ):
     # Convert varname units and apply standard attrs
     if units is not None:
@@ -179,7 +178,7 @@ def catalog(
     varname,
     varpath,
     original_names,
-    # to define if not define in-file
+    # to define if not define in-file (or to overwrite what's defined in-file)
     # Definition must be a key of UNITS_CONVERSIONS
     units=None,
     lead_is_month=False,
