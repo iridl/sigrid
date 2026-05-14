@@ -45,12 +45,12 @@ ENCODING = {
     'calendar': 'standard',
 }
 
+# Note the time vars' units and calendar are dealt with separately
+# as well as variables units conversion and definition
 STANDARD_ATTRS = {
     'S': {
         'long_name': 'Forecast start time',
         'standard_name': 'forecast_reference_time',
-        'units': ENCODING['cf_units'],
-        'calendar': ENCODING['calendar'],
     },
     'L': {
         'long_name': 'Lead',
@@ -80,23 +80,18 @@ STANDARD_ATTRS = {
         # is valid; the standard name of time should be used for that time.
         # https://cfconventions.org/Data/cf-standard-names/current/build/cf-standard-name-table.html
         'standard_name': 'time',
-        'units': ENCODING['cf_units'],
-        'calendar': ENCODING['calendar'],
     },
     'prec': {
         'long_name': 'Total precipitation',
         'standard_name': 'lwe_precipitation_rate',
-        'units': 'mm/day',
     },
     'tref': {
         'long_name': 'Reference temperature',
         'standard_name': 'air_temperature',
-        'units': 'degree_Celsius',
     },
     'sst': {
         'long_name': 'Sea surface temperature',
         'standard_name': 'sea_surface_temperature',
-        'units': 'degree_Celsius',
     }
 }
 
@@ -105,29 +100,33 @@ DS_STANDARD_ATTRS = {
 }
 
 
-def convert_units(dsvar, missing_units=None):
+def standardize(
+    ds,
+    varname,
+    missing_units=None,
+    cf_catalog=ENCODING['calendar'],
+    cf_units=ENCODING['cf_units'],
+):
+    # Convert varname units and apply standard attrs
     if missing_units is not None:
         # GFDL data has simply no units attribute
-        dsvar.attrs['units'] = missing_units[dsvar.name]
-    original_units = dsvar.attrs['units']
+        ds[varname].attrs['units'] = missing_units[dsvar.name]
+    original_units = ds[varname].attrs['units']
     if not (
         UNITS_CONVERSIONS[original_units].scale == 1
         and UNITS_CONVERSIONS[original_units].offset == 0
     ):
-        dsvar = (
-            dsvar
+        ds[varname] = (
+            ds[varname]
             * UNITS_CONVERSIONS[original_units].scale
             + UNITS_CONVERSIONS[original_units].offset
         )
-    dsvar.attrs['units'] = UNITS_CONVERSIONS[original_units].name
-    return dsvar
-
-
-def encode_time(
-    ds,
-    cf_catalog=ENCODING['calendar'],
-    cf_units=ENCODING['cf_units'],
-):
+    ds[varname].attrs = dict(
+        STANDARD_ATTRS[varname],
+        coordinates=COORDS_NAMES['target'],
+        units=UNITS_CONVERSIONS[original_units].name,
+    )
+    # Encode time coords and apply standard attrs
     time_coords = [
         coord for coord in ds.coords
         if ds[coord].dtype in ['datetime64[ns]', 'timedelta64[ns]']
@@ -137,8 +136,24 @@ def encode_time(
             ds[tc], cf_units, cf_catalog, dtype=np.dtype("int64")
         )
         ds = ds.assign_coords({tc: (ds[tc].dims, data)})
-        ds[tc].attrs['units'] = units
-        ds[tc].attrs['calendar'] = calendar
+        ds[tc].attrs = dict(
+            STANDARD_ATTRS[tc],    
+            units=units,
+            calendar=calendar,
+        )
+    # Apply standard attrs to other coords
+    other_coords = [coord for coord in ds.coords if coord not in time_coords]
+    for coord in other_coords:
+        ds[coord].attrs = dict(STANDARD_ATTRS[coord])
+    # Top ds attrs standardization
+    # cfgrib generates a large number of mostly useless attributes. Until
+    # we get around to identifying the interesting ones, drop them all.
+    ds.attrs = {
+        k: v for k, v in ds.attrs.items()
+        if not k.startswith('GRIB')
+    }
+    # Keep the provider's remaining dataset-level attributes, and add our own.
+    ds.attrs.update(DS_STANDARD_ATTRS)
     return ds
 
 
@@ -239,30 +254,7 @@ def catalog(
                 ds[COORDS_NAMES['S']], ds[COORDS_NAMES['L']]
             )
         })
-    # Convert varname units
-    ds[varname] = convert_units(ds[varname], missing_units=missing_units)
-    # Encode time
-    ds = encode_time(ds)
-    # Force into coords
-
-    for cname in ds.variables:
-        assert isinstance(cname, str)
-        # TODO double-check that units are what we expect. It's harder
-        # than what's commented out here because of synonyms.
-        # if 'units' in ds[cname].attrs:
-        #     assert ds[cname].attrs['units'] == STANDARD_ATTRS[cname]['units']
-        ds[cname].attrs = dict(
-            STANDARD_ATTRS[cname],
-            coordinates = COORDS_NAMES['target']
-        )
-
-    # cfgrib generates a large number of mostly useless attributes. Until
-    # we get around to identifying the interesting ones, drop them all.
-    ds.attrs = {
-        k: v for k, v in ds.attrs.items()
-        if not k.startswith('GRIB')
-    }
-    # Keep the provider's remaining dataset-level attributes, and add our own.
-    ds.attrs.update(DS_STANDARD_ATTRS)
+    # Convert units, encode time and standardize attrs
+    ds = standardize(ds, varname, missing_units=missing_units)
 
     return ds
