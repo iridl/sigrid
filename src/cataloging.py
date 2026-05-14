@@ -180,6 +180,7 @@ def catalog(
     varpath,
     original_names,
     # to define if not define in-file
+    # Definition must be a key of UNITS_CONVERSIONS
     units=None,
     lead_is_month=False,
     ):
