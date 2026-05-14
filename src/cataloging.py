@@ -34,8 +34,8 @@ COORDS_NAMES = {
 }
 # Same as above, additionally, keys are the icechunk variables names.
 VARS_NAMES = {
-    'prec': 'prec',
-    'tref': 'tref',
+    'prcp': 'prcp',
+    't2m': 't2m',
     'sst': 'sst',
 }
 # Change the dictionary values 
@@ -81,12 +81,12 @@ STANDARD_ATTRS = {
         # https://cfconventions.org/Data/cf-standard-names/current/build/cf-standard-name-table.html
         'standard_name': 'time',
     },
-    'prec': {
+    'prcp': {
         'long_name': 'Total precipitation',
         'standard_name': 'lwe_precipitation_rate',
     },
-    'tref': {
-        'long_name': 'Reference temperature',
+    't2m': {
+        'long_name': 'Air temperature',
         'standard_name': 'air_temperature',
     },
     'sst': {

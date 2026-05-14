@@ -10,7 +10,7 @@ Change PYDAP_PORT so you don't collide with other developers.
 ```
 > pixi run python
 >>> import pydap_icechunk
->>> ds = pydap_icechunk.open_icechunk('NMME/ECCC/CanSIPS-IC4/hindcast/prec')
+>>> ds = pydap_icechunk.open_icechunk('NMME/ECCC/CanSIPS-IC4/hindcast/prcp')
 >>> ds
 <xarray.Dataset> Size: 52GB
 Dimensions:        (IRIDL_time: 414, number: 40, step: 12, latitude: 181,
