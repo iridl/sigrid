@@ -130,7 +130,7 @@ def standardize(
         )
     ds[varname].attrs = dict(
         STANDARD_ATTRS[varname],
-        coordinates=[COORDS_NAMES['target'], COORDS_NAMES['target_bounds']],
+        coordinates=f"{COORDS_NAMES['target']} {COORDS_NAMES['target_bounds']}",
         units=UNITS_CONVERSIONS[original_units].name,
     )
     # Encode time coords and apply standard attrs
@@ -178,7 +178,9 @@ def S_L_to_target(S, L):
                     freq='MS',
                 ),
                 xr.date_range(
-                    start=datetime.datetime(s.dt.year.item(), s.dt.month.item(), s.dt.day.item()) + relativedelta(months=1),
+                    start=datetime.datetime(
+                        s.dt.year.item(), s.dt.month.item(), s.dt.day.item()
+                    ) + relativedelta(months=1),
                     # TODO may not be wise to simply rely on len(L)
                     periods=len(L),
                     freq='MS',
