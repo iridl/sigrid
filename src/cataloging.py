@@ -245,7 +245,10 @@ def catalog(
     for attr in list(ds.attrs):
         if str(ds.attrs[attr]).find('"') != -1 :
             del ds.attrs[attr]
-    # Deleting dummy attributes
+    # Invert Y from N-S to S-N
+    if ds['Y'].values[0] > ds['Y'].values[-1]:
+        ds = ds.isel(Y=slice(None, None, -1))
+    # Set L and target
     if lead_is_month:
         # Set lead times
         ds = ds.assign_coords({
