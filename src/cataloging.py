@@ -18,6 +18,7 @@ UNITS_CONVERSIONS = {
     'mm/day': UNITS_CONVERTER(0, 1, 'mm/day'),
     'mm/s': UNITS_CONVERTER(0, 60 * 60 * 24, 'mm/day'),
     'm/s': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24, 'mm/day'),
+    'm s**-1': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24, 'mm/day'),
 }
 
 # Keys are the conventional names used by pydap-icechunk.
