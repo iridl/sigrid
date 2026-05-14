@@ -19,7 +19,7 @@ def open(varname) -> xr.Dataset:
             'tref': 'T_REF_1X1',
             'sst': 'SST_1X1',
         },
-        missing_units={
+        units={
             'prec': 'mm/s',
             'tref': 'K',
             'sst': 'degree_Celsius'

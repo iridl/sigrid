@@ -40,8 +40,8 @@ VARS_NAMES = {
 }
 # Change the dictionary values 
 # should you different time encoding throughout your system
-ENCODING = {
-    'cf_units': 'hours since 1960-01-01',
+TIME_ENCODING = {
+    'units': 'hours since 1960-01-01',
     'calendar': 'standard',
 }
 
@@ -103,14 +103,13 @@ DS_STANDARD_ATTRS = {
 def standardize(
     ds,
     varname,
-    missing_units=None,
-    cf_catalog=ENCODING['calendar'],
-    cf_units=ENCODING['cf_units'],
+    units=None,
+    time_enconding=TIME_ENCODING,
 ):
     # Convert varname units and apply standard attrs
-    if missing_units is not None:
+    if units is not None:
         # GFDL data has simply no units attribute
-        ds[varname].attrs['units'] = missing_units[dsvar.name]
+        ds[varname].attrs['units'] = units[varname]
     original_units = ds[varname].attrs['units']
     if not (
         UNITS_CONVERSIONS[original_units].scale == 1
@@ -132,13 +131,16 @@ def standardize(
         if ds[coord].dtype in ['datetime64[ns]', 'timedelta64[ns]']
     ]
     for tc in time_coords:
-        data, units, calendar = xr.coding.times.encode_cf_datetime(
-            ds[tc], cf_units, cf_catalog, dtype=np.dtype("int64")
+        data, time_units, calendar = xr.coding.times.encode_cf_datetime(
+            ds[tc],
+            TIME_ENCODING['units'],
+            TIME_ENCODING['calendar'],
+            dtype=np.dtype("int64"),
         )
         ds = ds.assign_coords({tc: (ds[tc].dims, data)})
         ds[tc].attrs = dict(
             STANDARD_ATTRS[tc],    
-            units=units,
+            units=time_units,
             calendar=calendar,
         )
     # Apply standard attrs to other coords
@@ -177,7 +179,8 @@ def catalog(
     varname,
     varpath,
     original_names,
-    missing_units=None,
+    # to define if not define in-file
+    units=None,
     lead_is_month=False,
     ):
     icechunk_var = [key for key, value in VARS_NAMES.items() if value == varname][0]
@@ -255,6 +258,6 @@ def catalog(
             )
         })
     # Convert units, encode time and standardize attrs
-    ds = standardize(ds, varname, missing_units=missing_units)
+    ds = standardize(ds, varname, units=units)
 
     return ds
