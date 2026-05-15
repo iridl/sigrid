@@ -144,8 +144,8 @@ def standardize(
         # xarray knows which variables are aux coords,
         # but cf_encoder fails to encode that information,
         # so we do it ourselves.
-        if 'L' in var.dims and 'S' in var.dims:
-            var.attrs['coordinates'] = 'target target_bnds'
+        if COORDS_NAMES['L'] in var.dims and COORDS_NAMES['S'] in var.dims:
+            var.attrs['coordinates'] = f'{COORDS_NAMES['target']} {COORDS_NAMES['target_bnds']}'
 
         # convert units
         if name in ds.data_vars:
