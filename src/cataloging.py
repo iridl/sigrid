@@ -135,10 +135,9 @@ def standardize(
         )
     if lead_is_month and varname == 'prcp':
         target_length = (
-            ds['target_bnds'].isel(nbounds=1, drop=True)
-            - ds['target_bnds'].isel(nbounds=0, drop=True)
+            ds['target_bnds'].isel(nbound=1, drop=True)
+            - ds['target_bnds'].isel(nbound=0, drop=True)
         ).dt.days
-        print(target_length)
         ds[varname] = ds[varname] * target_length
         ds[varname]['units'] = 'mm'
     ds[varname].attrs = dict(
