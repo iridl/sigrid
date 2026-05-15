@@ -1,13 +1,25 @@
+# pyright: strict, reportUnknownMemberType=false
+
+from dataclasses import dataclass
+from typing import Mapping, cast
+
 import xarray as xr
+import xarray.coding.times
 import numpy as np
-from collections import namedtuple
+import pandas as pd
 from dateutil.relativedelta import relativedelta
 import datetime
 
 import pydap_icechunk
 
 
-UNITS_CONVERTER = namedtuple('UNITS_CONVERTER', 'offset scale name')
+@dataclass
+class UNITS_CONVERTER:
+    offset: float
+    scale: float
+    name: str
+
+
 UNITS_CONVERSIONS = {
     # This may sound silly but is needed as things are written now
     # it does nothing other than redefining units attr to the same value
@@ -110,9 +122,9 @@ DS_STANDARD_ATTRS = {
 
 
 def standardize(
-    ds,
-    varname,
-    units=None,
+    ds: xr.Dataset,
+    varname: str,
+    units: Mapping[str, str] | None = None,
 ):
     # Convert varname units and apply standard attrs
     if units is not None:
@@ -135,11 +147,11 @@ def standardize(
     )
     # Encode time coords and apply standard attrs
     time_coords = [
-        coord for coord in ds.coords
+        coord for coord in coords_of(ds)
         if ds[coord].dtype in ['datetime64[ns]', 'timedelta64[ns]']
     ]
     for tc in time_coords:
-        data, time_units, calendar = xr.coding.times.encode_cf_datetime(
+        data, time_units, calendar = xarray.coding.times.encode_cf_datetime(
             ds[tc],
             TIME_ENCODING['units'],
             TIME_ENCODING['calendar'],
@@ -152,7 +164,7 @@ def standardize(
             calendar=calendar,
         )
     # Apply standard attrs to other coords
-    other_coords = [coord for coord in ds.coords if coord not in time_coords]
+    other_coords = [coord for coord in coords_of(ds) if coord not in time_coords]
     for coord in other_coords:
         ds[coord].attrs = dict(STANDARD_ATTRS[coord])
     # Top ds attrs standardization
@@ -167,24 +179,26 @@ def standardize(
     return ds
 
 
-def S_L_to_target(S, L):
+def S_L_to_target(S: xr.DataArray, L: xr.DataArray):
+
     target_bnds = xr.DataArray(
         data=[
             np.transpose([
-                xr.date_range(
+                # This cast is only valid when using standard calendar
+                cast(pd.DatetimeIndex, xr.date_range(
                     start=s.item(),
                     # TODO may not be wise to simply rely on len(L)
                     periods=len(L),
                     freq='MS',
-                ),
-                xr.date_range(
+                )),
+                cast(pd.DatetimeIndex, xr.date_range(
                     start=datetime.datetime(
                         s.dt.year.item(), s.dt.month.item(), s.dt.day.item()
                     ) + relativedelta(months=1),
                     # TODO may not be wise to simply rely on len(L)
                     periods=len(L),
                     freq='MS',
-                ),
+                )),
             ])
             for s in S
         ],
@@ -195,13 +209,13 @@ def S_L_to_target(S, L):
 
 
 def catalog(
-    varname,
-    varpath,
-    original_names,
+    varname: str,
+    varpath: str,
+    original_names: Mapping[str, str],
     # to define if not define in-file (or to overwrite what's defined in-file)
     # Definition must be a key of UNITS_CONVERSIONS
-    units=None,
-    lead_is_month=False,
+    units: Mapping[str, str] | None = None,
+    lead_is_month: bool = False,
     ):
     icechunk_var = [key for key, value in VARS_NAMES.items() if value == varname][0]
     ds = pydap_icechunk.open_icechunk(
@@ -209,7 +223,7 @@ def catalog(
     )
     # Some varnames have scalar coordinates that break pydap
     ds = ds.drop_vars(
-        [name for name, coord in ds.coords.items() if coord.dims == ()]
+        [name for name, coord in coords_of(ds).items() if coord.dims == ()]
     )
     # Squeeze dims of size 1
     for dim in ds.dims:
@@ -247,7 +261,7 @@ def catalog(
     ds = ds.drop_vars(
         [
             name
-            for name, coord in ds.coords.items()
+            for name in ds.coords
             if name not in COORDS_NAMES.values()
         ]
     )
@@ -283,3 +297,9 @@ def catalog(
     ds = standardize(ds, varname, units=units)
 
     return ds
+
+
+def coords_of(ds: xr.Dataset | xr.DataArray):
+    """A version of the coords attribute with a better type hint"""
+    assert all(isinstance(k, str) for k in ds.coords)
+    return cast(Mapping[str, xr.DataArray], ds.coords)
