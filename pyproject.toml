@@ -51,3 +51,9 @@ client = {features = ["client"]}
 [tool.pixi.tasks]
 #server = "env $(cat .env) python test/server_for_test.py"
 python = "env $(cat .env) python"
+
+
+[tool.pyright]
+typeCheckingMode = "recommended"
+reportUnknownMemberType = false
+
