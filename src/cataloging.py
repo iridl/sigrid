@@ -23,17 +23,28 @@ class UNITS_CONVERTER:
 UNITS_CONVERSIONS = {
     # This may sound silly but is needed as things are written now
     # it does nothing other than redefining units attr to the same value
+    'degree_north': UNITS_CONVERTER(0, 1, 'degree_north'),
+    'degrees_north': UNITS_CONVERTER(0, 1, 'degree_north'),
+    'degree_east': UNITS_CONVERTER(0, 1, 'degree_east'),
+    'degrees_east': UNITS_CONVERTER(0, 1, 'degree_east'),
+    'unitless': UNITS_CONVERTER(0, 1, 'unitless'),
+    '1': UNITS_CONVERTER(0, 1, 'unitless'),
     'degree_Celsius': UNITS_CONVERTER(0, 1, 'degree_Celsius'),
     'degreeC': UNITS_CONVERTER(0, 1, 'degree_Celsius'),
     'K': UNITS_CONVERTER(-273.15, 1, 'degree_Celsius'),
     'Kelvin': UNITS_CONVERTER(-273.15, 1, 'degree_Celsius'),
+    'gpm': UNITS_CONVERTER(0, 1, 'm'),
+    # Let's pray there won't be prcp in m s-1
+    'm s-1': UNITS_CONVERTER(0, 1, 'm s-1'),
     'kg m**-2 s**-1': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24 / 1000, 'mm/day'),
     'kg m-2 s-1': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24 / 1000, 'mm/day'),
-    'kg m^-2 s^-1': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24 / 1000, 'mm'),
+    'kg m^-2 s^-1': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24 / 1000, 'mm/day'),
     'mm/day': UNITS_CONVERTER(0, 1, 'mm/day'),
     'mm/s': UNITS_CONVERTER(0, 60 * 60 * 24, 'mm/day'),
     'm/s': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24, 'mm/day'),
     'm s**-1': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24, 'mm/day'),
+    'Pa': UNITS_CONVERTER(0, 1, 'Pa'),
+    'hPa': UNITS_CONVERTER(0, 100, 'Pa'),
 }
 
 # Keys are the conventional names used by pydap-icechunk.
@@ -47,13 +58,22 @@ NAMES = {
     'Y': 'Y',
     'X': 'X',
     'M': 'M',
+    'P': 'P',
     'target': 'target',
     # NB target_bnds should be named after target
     'target_bnds': 'target_bnds',
     # Additionally, these keys are also the icechunk variables names.
+    'pr': 'pr',
     'prcp': 'prcp',
+    'tas': 'tas',
+    'tasmax': 'tasmax',
+    'tasmin': 'tasmin',
     't2m': 't2m',
     'sst': 'sst',
+    'psl': 'psl',
+    'uas': 'uas',
+    'vas': 'vas',
+    'zg': 'zg',
 }
 # Change the dictionary values 
 # should you different time encoding throughout your system
@@ -79,12 +99,10 @@ STANDARD_ATTRS = {
     'Y': {
         'long_name': 'Latitude',
         'standard_name': 'latitude',
-        'units': 'degree_north',
     },
     'X': {
         'long_name': 'Longitude',
         'standard_name': 'longitude',
-        'units': 'degree_east',
     },
     'M': {
         'long_name': 'Ensemble member',
@@ -92,6 +110,10 @@ STANDARD_ATTRS = {
         # No units. From
         # https://cfconventions.org/Data/cf-conventions/cf-conventions-1.13/cf-conventions.html#dimensionless-units
         # "A variable with no units attribute is assumed to be dimensionless."
+    },
+    'P': {
+        'long_name': 'Pressure level',
+        'standard_name': 'air_pressure',
     },
     'target': {
         'long_name': 'Forecast target period',
@@ -113,6 +135,18 @@ STANDARD_ATTRS = {
         'long_name': 'Total precipitation',
         'standard_name': 'lwe_precipitation_rate',
     },
+    'tas': {
+        'long_name': 'Air temperature',
+        'standard_name': 'air_temperature',
+    },
+    'tasmax': {
+        'long_name': 'Maximum air temperature',
+        'standard_name': 'air_temperature',
+    },
+    'tasmin': {
+        'long_name': 'Minimum air temperature',
+        'standard_name': 'air_temperature',
+    },
     't2m': {
         'long_name': 'Air temperature',
         'standard_name': 'air_temperature',
@@ -120,7 +154,23 @@ STANDARD_ATTRS = {
     'sst': {
         'long_name': 'Sea surface temperature',
         'standard_name': 'sea_surface_temperature',
-    }
+    },
+    'psl': {
+        'long_name': 'Pressure at sea level',
+        'standard_name': 'air_pressure_at_sea_level',
+    },
+    'uas': {
+        'long_name': '10m eastward wind',
+        'standard_name': 'eastward_wind',
+    },
+    'vas': {
+        'long_name': '10m northward wind',
+        'standard_name': 'northward_wind',
+    },
+    'zg': {
+        'long_name': 'Geopotential height',
+        'standard_name': 'geopotential_height',
+    },
 }
 
 DS_STANDARD_ATTRS = {
