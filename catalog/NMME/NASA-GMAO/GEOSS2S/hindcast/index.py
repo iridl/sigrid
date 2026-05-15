@@ -16,7 +16,7 @@ def open(varname) -> xr.Dataset:
             'Y': 'latitude',
             'X': 'longitude',
             'prcp': 'precip',
-            't2m': 't2m',
+            't2m': 'tref',
             'sst': 'sst',
         },
         lead_is_month=True,
