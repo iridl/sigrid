@@ -1,6 +1,8 @@
 import xarray as xr
 import numpy as np
 from collections import namedtuple
+from dateutil.relativedelta import relativedelta
+import datetime
 
 import pydap_icechunk
 
@@ -31,6 +33,8 @@ COORDS_NAMES = {
     'X': 'X',
     'M': 'M',
     'target': 'target',
+    # NB target_bnds should be named after target
+    'target_bnds': 'target_bnds'
 }
 # Same as above, additionally, keys are the icechunk variables names.
 VARS_NAMES = {
@@ -80,6 +84,11 @@ STANDARD_ATTRS = {
         # is valid; the standard name of time should be used for that time.
         # https://cfconventions.org/Data/cf-standard-names/current/build/cf-standard-name-table.html
         'standard_name': 'time',
+        'bounds': COORDS_NAMES['target_bnds'],
+    },
+    'target_bnds': {
+        'long_name': 'Forecast target period bounds',
+        'standard_name': 'time',
     },
     'prcp': {
         'long_name': 'Total precipitation',
@@ -121,7 +130,7 @@ def standardize(
         )
     ds[varname].attrs = dict(
         STANDARD_ATTRS[varname],
-        coordinates=COORDS_NAMES['target'],
+        coordinates=f"{COORDS_NAMES['target']} {COORDS_NAMES['target_bnds']}",
         units=UNITS_CONVERSIONS[original_units].name,
     )
     # Encode time coords and apply standard attrs
@@ -159,19 +168,30 @@ def standardize(
 
 
 def S_L_to_target(S, L):
-    return xr.DataArray(
+    target_bnds = xr.DataArray(
         data=[
-            xr.date_range(
-                start=s.item(),
-                # TODO may not be wise to simply rely on len(L)
-                periods=len(L),
-                freq='MS',
-            )
+            np.transpose([
+                xr.date_range(
+                    start=s.item(),
+                    # TODO may not be wise to simply rely on len(L)
+                    periods=len(L),
+                    freq='MS',
+                ),
+                xr.date_range(
+                    start=datetime.datetime(
+                        s.dt.year.item(), s.dt.month.item(), s.dt.day.item()
+                    ) + relativedelta(months=1),
+                    # TODO may not be wise to simply rely on len(L)
+                    periods=len(L),
+                    freq='MS',
+                ),
+            ])
             for s in S
         ],
-        coords=dict(S=S, L=L),
-        attrs={'long_name': 'target date'},
+        dims=['S', 'L', 'nbound'],
+        coords={'S': S, 'L': L},
     )
+    return target_bnds.isel(nbound=0, drop=True), target_bnds
 
 
 def catalog(
@@ -252,10 +272,12 @@ def catalog(
             COORDS_NAMES['L']: range(ds.sizes[COORDS_NAMES['L']])
         })
         # Set target
+        target, target_bnds = S_L_to_target(
+            ds[COORDS_NAMES['S']], ds[COORDS_NAMES['L']]
+        )
         ds = ds.assign_coords({
-            COORDS_NAMES["target"]: S_L_to_target(
-                ds[COORDS_NAMES['S']], ds[COORDS_NAMES['L']]
-            )
+            COORDS_NAMES["target"]: target,
+            COORDS_NAMES["target_bnds"]: target_bnds,
         })
     # Convert units, encode time and standardize attrs
     ds = standardize(ds, varname, units=units)
