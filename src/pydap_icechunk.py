@@ -185,7 +185,7 @@ class Server:
         dirs = [
             d.name
             for d in dir_path.iterdir()
-            if d.is_dir() and d.name != '__pycache__'
+            if d.is_dir() and d.name != '__pycache__' and not (d / 'hidden').exists()
         ]
         dirs = sorted(dirs, key=alphanum_key)
 
