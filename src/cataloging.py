@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Mapping, cast
 
 import xarray as xr
-import xarray.coding.times
+import xarray.conventions
 import numpy as np
 import pandas as pd
 from dateutil.relativedelta import relativedelta
@@ -57,9 +57,10 @@ VARS_NAMES = {
 }
 # Change the dictionary values 
 # should you different time encoding throughout your system
-TIME_ENCODING = {
+DATETIME_ENCODING = {
     'units': 'hours since 1960-01-01',
     'calendar': 'standard',
+    'dtype': 'int32',
 }
 
 # Note the time vars' units and calendar are dealt with separately
@@ -86,7 +87,9 @@ STANDARD_ATTRS = {
     'M': {
         'long_name': 'Ensemble member',
         'standard_name': 'realization',
-        'units': 'unitless',
+        # No units. From
+        # https://cfconventions.org/Data/cf-conventions/cf-conventions-1.13/cf-conventions.html#dimensionless-units
+        # "A variable with no units attribute is assumed to be dimensionless."
     },
     'target': {
         'long_name': 'Forecast target period',
@@ -124,60 +127,61 @@ DS_STANDARD_ATTRS = {
 
 def standardize(
     ds: xr.Dataset,
-    varname: str,
     units: Mapping[str, str] | None = None,
 ):
-    # Convert varname units and apply standard attrs
-    if units is not None:
-        # GFDL data has simply no units attribute
-        ds[varname].attrs['units'] = units[varname]
-    original_units = ds[varname].attrs['units']
-    if not (
-        UNITS_CONVERSIONS[original_units].scale == 1
-        and UNITS_CONVERSIONS[original_units].offset == 0
-    ):
-        ds[varname] = (
-            ds[varname]
-            * UNITS_CONVERSIONS[original_units].scale
-            + UNITS_CONVERSIONS[original_units].offset
-        )
-    ds[varname].attrs = dict(
-        STANDARD_ATTRS[varname],
-        coordinates=f"{COORDS_NAMES['target']} {COORDS_NAMES['target_bnds']}",
-        units=UNITS_CONVERSIONS[original_units].name,
-    )
-    # Encode time coords and apply standard attrs
-    time_coords = [
-        coord for coord in coords_of(ds)
-        if ds[coord].dtype in ['datetime64[ns]', 'timedelta64[ns]']
-    ]
-    for tc in time_coords:
-        data, time_units, calendar = xarray.coding.times.encode_cf_datetime(
-            ds[tc],
-            TIME_ENCODING['units'],
-            TIME_ENCODING['calendar'],
-            dtype=np.dtype("int64"),
-        )
-        ds = ds.assign_coords({tc: (ds[tc].dims, data)})
-        ds[tc].attrs = dict(
-            STANDARD_ATTRS[tc],    
-            units=time_units,
-            calendar=calendar,
-        )
-    # Apply standard attrs to other coords
-    other_coords = [coord for coord in coords_of(ds) if coord not in time_coords]
-    for coord in other_coords:
-        ds[coord].attrs = dict(STANDARD_ATTRS[coord])
+    if units is None:
+        units = {}
+
+    vars: Mapping[str, xr.Variable] = {}
+
+    for name, var in vars_of(ds).items():
+        # save the original attributes, then replace them
+        # with standard ones
+        original_attrs = var.attrs
+        var.attrs = dict(STANDARD_ATTRS[name])
+
+        # Override provider's encoding for datetimes
+        if np.issubdtype(var, np.datetime64):
+            var.encoding = dict(DATETIME_ENCODING)
+
+        # xarray knows which variables are aux coords,
+        # but cf_encoder fails to encode that information,
+        # so we do it ourselves.
+        if COORDS_NAMES['L'] in var.dims and COORDS_NAMES['S'] in var.dims:
+            var.attrs['coordinates'] = f'{COORDS_NAMES['target']} {COORDS_NAMES['target_bnds']}'
+
+        # convert units
+        # TODO will need to generalize to coords, e.g. Z in Pa vs hPa
+        if name in ds.data_vars:
+            # provide units explicitly if provider didn't (e.g. GFDL)
+            if name in units:
+                original_attrs['units'] = units[name]
+            original_units = original_attrs.get('units')
+            if original_units is not None:
+                conversion = UNITS_CONVERSIONS[original_units]
+                if not (conversion.scale == 1 and conversion.offset == 0):
+                    var = var * conversion.scale + conversion.offset
+                var.attrs['units'] = conversion.name
+
+        vars[name] = var
+
+
     # Top ds attrs standardization
     # cfgrib generates a large number of mostly useless attributes. Until
     # we get around to identifying the interesting ones, drop them all.
-    ds.attrs = {
+    attrs = {
         k: v for k, v in ds.attrs.items()
         if not k.startswith('GRIB')
     }
     # Keep the provider's remaining dataset-level attributes, and add our own.
-    ds.attrs.update(DS_STANDARD_ATTRS)
-    return ds
+    attrs.update(DS_STANDARD_ATTRS)
+
+    vars, attrs = cast(
+        tuple[Mapping[str, xr.Variable], Mapping[str, str]],
+        xarray.conventions.cf_encoder(vars, attrs)
+    )
+
+    return xr.Dataset(vars, attrs=attrs)
 
 
 def S_L_to_target(S: xr.DataArray, L: xr.DataArray):
@@ -294,8 +298,8 @@ def catalog(
             COORDS_NAMES["target"]: target,
             COORDS_NAMES["target_bnds"]: target_bnds,
         })
-    # Convert units, encode time and standardize attrs
-    ds = standardize(ds, varname, units=units)
+    # Convert units, do cf-encoding and standardize attrs
+    ds = standardize(ds, units)
 
     return ds
 
@@ -304,3 +308,8 @@ def coords_of(ds: xr.Dataset | xr.DataArray):
     """A version of the coords attribute with a better type hint"""
     assert all(isinstance(k, str) for k in ds.coords)
     return cast(Mapping[str, xr.DataArray], ds.coords)
+
+
+def vars_of(ds: xr.Dataset):
+    assert all(isinstance(k, str) for k in ds.variables)
+    return cast(Mapping[str, xr.Variable], ds.variables)
