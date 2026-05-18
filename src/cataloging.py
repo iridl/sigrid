@@ -42,6 +42,7 @@ UNITS_CONVERSIONS = {
 COORDS_NAMES = {
     'S': 'S',
     'L': 'L',
+    'L_bnds': 'L_bnds',
     'Y': 'Y',
     'X': 'X',
     'M': 'M',
@@ -73,7 +74,9 @@ STANDARD_ATTRS = {
     'L': {
         'long_name': 'Lead',
         'standard_name': 'forecast_period',
+        'bounds': COORDS_NAMES['L_bnds'],
     },
+    'L_bnds': {},
     'Y': {
         'long_name': 'Latitude',
         'standard_name': 'latitude',
@@ -102,10 +105,7 @@ STANDARD_ATTRS = {
         'standard_name': 'time',
         'bounds': COORDS_NAMES['target_bnds'],
     },
-    'target_bnds': {
-        'long_name': 'Forecast target period bounds',
-        'standard_name': 'time',
-    },
+    'target_bnds': {},
     'prcp': {
         'long_name': 'Total precipitation',
         'standard_name': 'lwe_precipitation_rate',
@@ -144,19 +144,25 @@ def standardize(
         if np.issubdtype(var, np.datetime64):
             var.encoding = dict(DATETIME_ENCODING)
 
-        # xarray knows which variables are aux coords,
-        # but cf_encoder fails to encode that information,
-        # so we do it ourselves.
-        if COORDS_NAMES['L'] in var.dims and COORDS_NAMES['S'] in var.dims:
-            var.attrs['coordinates'] = f'{COORDS_NAMES['target']} {COORDS_NAMES['target_bnds']}'
-
-        # convert units
-        # TODO will need to generalize to coords, e.g. Z in Pa vs hPa
         if name in ds.data_vars:
-            # provide units explicitly if provider didn't (e.g. GFDL)
+            # xarray knows which variables are aux coords,
+            # but cf_encoder fails to encode that information,
+            # so we do it ourselves.
+            aux_coords: list[str] = []
+            if COORDS_NAMES['L'] in var.dims:
+                aux_coords.append(COORDS_NAMES['L_bnds'])
+                if COORDS_NAMES['S'] in var.dims:
+                    aux_coords.extend([COORDS_NAMES['target'], COORDS_NAMES['target_bnds']])
+            if aux_coords:
+                var.attrs['coordinates'] = ' '.join(aux_coords)
+
+            # convert units
+            # TODO will need to generalize to coords, e.g. Z in Pa vs hPa
             if name in units:
-                original_attrs['units'] = units[name]
-            original_units = original_attrs.get('units')
+                # provide units explicitly if provider didn't (e.g. GFDL)
+                original_units = units[name]
+            else:
+                original_units = original_attrs.get('units')
             if original_units is not None:
                 conversion = UNITS_CONVERSIONS[original_units]
                 if not (conversion.scale == 1 and conversion.offset == 0):
@@ -181,7 +187,13 @@ def standardize(
         xarray.conventions.cf_encoder(vars, attrs)
     )
 
-    return xr.Dataset(vars, attrs=attrs)
+    ds = xr.Dataset(
+        data_vars={k: v for k, v in vars.items() if k in ds.data_vars},
+        coords={k: v for k, v in vars.items() if k in ds.coords},
+        attrs=attrs,
+    )
+
+    return ds
 
 
 def S_L_to_target(S: xr.DataArray, L: xr.DataArray):
@@ -284,11 +296,14 @@ def catalog(
     for attr in list(ds.attrs):
         if str(ds.attrs[attr]).find('"') != -1 :
             del ds.attrs[attr]
-    # Deleting dummy attributes
+
     if lead_is_month:
         # Set lead times
+        l = np.arange(ds.sizes[COORDS_NAMES['L']])
+        l_bnds = np.stack([l, l+1], axis=1)
         ds = ds.assign_coords({
-            COORDS_NAMES['L']: range(ds.sizes[COORDS_NAMES['L']])
+            COORDS_NAMES['L']: l,
+            COORDS_NAMES['L_bnds']: ((COORDS_NAMES['L'], 'nbound'), l_bnds)
         })
         # Set target
         target, target_bnds = S_L_to_target(
@@ -298,6 +313,7 @@ def catalog(
             COORDS_NAMES["target"]: target,
             COORDS_NAMES["target_bnds"]: target_bnds,
         })
+
     # Convert units, do cf-encoding and standardize attrs
     ds = standardize(ds, units)
 
