@@ -86,7 +86,9 @@ STANDARD_ATTRS = {
     'M': {
         'long_name': 'Ensemble member',
         'standard_name': 'realization',
-        'units': 'unitless',
+        # No units. From
+        # https://cfconventions.org/Data/cf-conventions/cf-conventions-1.13/cf-conventions.html#dimensionless-units
+        # "A variable with no units attribute is assumed to be dimensionless."
     },
     'target': {
         'long_name': 'Forecast target period',
@@ -148,6 +150,7 @@ def standardize(
             var.attrs['coordinates'] = f'{COORDS_NAMES['target']} {COORDS_NAMES['target_bnds']}'
 
         # convert units
+        # TODO will need to generalize to coords, e.g. Z in Pa vs hPa
         if name in ds.data_vars:
             # provide units explicitly if provider didn't (e.g. GFDL)
             if name in units:
@@ -157,7 +160,7 @@ def standardize(
                 conversion = UNITS_CONVERSIONS[original_units]
                 if not (conversion.scale == 1 and conversion.offset == 0):
                     var = var * conversion.scale + conversion.offset
-                    var.attrs['units'] = conversion.name
+                var.attrs['units'] = conversion.name
 
         vars[name] = var
 
