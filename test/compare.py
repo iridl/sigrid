@@ -4,7 +4,7 @@ import time
 import numpy as np
 import xarray as xr
 
-def compare(url1, url2, var1=None, var2=None, check_data=False):
+def compare(url1, url2, check_data=False):
     ds1 = fetch(url1)
     ds2 = fetch(url2)
 
@@ -15,15 +15,13 @@ def compare(url1, url2, var1=None, var2=None, check_data=False):
         print('second failed', ds2)
         return
     
-    if var1 is None:
-        names = list(ds1.data_vars)
-        assert len(names) == 1, f"Specify var1 as one of {names}"
-        var1 = names[0]
+    names = list(ds1.data_vars)
+    assert len(names) == 1
+    var1 = names[0]
     
-    if var2 is None:
-        names = list(ds2.data_vars)
-        assert len(names) == 1, f"Specify var2 as one of {names}"
-        var2 = names[0]
+    names = list(ds2.data_vars)
+    assert len(names) == 1
+    var2 = names[0]
     
     da1 = ds1[var1]
     da2 = ds2[var2]
@@ -93,12 +91,33 @@ def fetch(url):
     except Exception as e:
         return e
 
+def parse_listfile(filename):
+    paths = {}
+    with open(filename) as f:
+        url1 = None
+        for line in f:
+            line = line.strip()
+            if line == '' or line.startswith('#'):
+                continue
+            if url1 is None:
+                url1 = line
+            else:
+                paths[url1] = line
+                url1 = None
+    return paths
+                
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("url1")
-    parser.add_argument("url2")
-    parser.add_argument("--var1")
-    parser.add_argument("--var2")
+    parser.add_argument("root1")
+    parser.add_argument("root2")
+    parser.add_argument("listfile")
+    parser.add_argument("path1")
+    parser.add_argument("--check-data", action='store_true')
+    
     args = parser.parse_args()
-
-    compare(args.url1, args.url2, args.var1, args.var2)
+    path_mapping = parse_listfile(args.listfile)
+    url1 = f'{args.root1}/{args.path1}'
+    url2 = f'{args.root2}/{path_mapping[args.path1]}'
+    print(url1)
+    print(url2)
+    compare(url1, url2, check_data=args.check_data)
