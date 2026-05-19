@@ -25,8 +25,8 @@ UNITS_CONVERSIONS = {
     # it does nothing other than redefining units attr to the same value
     'degree_Celsius': UNITS_CONVERTER(0, 1, 'degree_Celsius'),
     'degreeC': UNITS_CONVERTER(0, 1, 'degree_Celsius'),
-    'K': UNITS_CONVERTER(-272.15, 1, 'degree_Celsius'),
-    'Kelvin': UNITS_CONVERTER(-272.15, 1, 'degree_Celsius'),
+    'K': UNITS_CONVERTER(-273.15, 1, 'degree_Celsius'),
+    'Kelvin': UNITS_CONVERTER(-273.15, 1, 'degree_Celsius'),
     'kg m**-2 s**-1': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24 / 1000, 'mm/day'),
     'kg m-2 s-1': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24 / 1000, 'mm/day'),
     'mm/day': UNITS_CONVERTER(0, 1, 'mm/day'),
