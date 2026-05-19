@@ -5,6 +5,7 @@ from typing import Mapping, cast
 
 import xarray as xr
 import xarray.conventions
+import xarray.coding.times
 import numpy as np
 import pandas as pd
 from dateutil.relativedelta import relativedelta
@@ -79,6 +80,11 @@ NAMES = {
 # should you different time encoding throughout your system
 DATETIME_ENCODING = {
     'units': 'hours since 1960-01-01',
+    'calendar': 'standard',
+    'dtype': 'int32',
+}
+TIMEDELTA_ENCODING = {
+    'units': 'hours',
     'calendar': 'standard',
     'dtype': 'int32',
 }
@@ -244,11 +250,30 @@ def standardize(
     # Keep the provider's remaining dataset-level attributes, and add our own.
     attrs.update(DS_STANDARD_ATTRS)
 
-    vars, attrs = cast(
+    timedelta_vars = {
+        name: var
+        for name, var in vars.items()
+        if np.issubdtype(var, np.timedelta64)
+    }
+    for name, var in timedelta_vars.items():
+        encoded_var, encoded_units = xarray.coding.times.encode_cf_timedelta(var, TIMEDELTA_ENCODING['units'], TIMEDELTA_ENCODING['dtype'])
+        encoded_var = xr.DataArray(
+            data=encoded_var,
+            dims=var.dims,
+            attrs=var.attrs,
+        )
+        encoded_var.attrs['units'] = encoded_units
+        timedelta_vars[name] = encoded_var
+    other_vars = {
+        name: var
+        for name, var in vars.items()
+        if ~np.issubdtype(var, np.timedelta64)
+    }
+    other_vars, attrs = cast(
         tuple[Mapping[str, xr.Variable], Mapping[str, str]],
-        xarray.conventions.cf_encoder(vars, attrs)
+        xarray.conventions.cf_encoder(other_vars, attrs)
     )
-
+    vars = other_vars | timedelta_vars
     ds = xr.Dataset(
         data_vars={k: v for k, v in vars.items() if k in ds.data_vars},
         coords={k: v for k, v in vars.items() if k in ds.coords},
