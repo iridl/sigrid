@@ -127,6 +127,7 @@ DS_STANDARD_ATTRS = {
 
 def standardize(
     ds: xr.Dataset,
+    lead_is_month: bool,
     units: Mapping[str, str] | None = None,
 ):
     if units is None:
@@ -168,6 +169,14 @@ def standardize(
                 if not (conversion.scale == 1 and conversion.offset == 0):
                     var = var * conversion.scale + conversion.offset
                 var.attrs['units'] = conversion.name
+
+            if lead_is_month and name == 'prcp':
+                target_length = (
+                    ds['target_bnds'].isel(nbound=1, drop=True)
+                    - ds['target_bnds'].isel(nbound=0, drop=True)
+                ).dt.days
+                var = var * target_length.variable
+                var.attrs['units'] = 'mm'
 
         vars[name] = var
 
@@ -315,7 +324,7 @@ def catalog(
         })
 
     # Convert units, do cf-encoding and standardize attrs
-    ds = standardize(ds, units)
+    ds = standardize(ds, lead_is_month, units)
 
     return ds
 
