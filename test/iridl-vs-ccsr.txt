@@ -7,10 +7,10 @@ NMME/COLA-RSMAS/CCSM4/sst
 SOURCES/.Models/.NMME/.COLA-RSMAS-CCSM4/.MONTHLY/.sst/%5BX/Y/L/M/S%5D/REORDER/%5BX/Y%5D/REORDER/dods
 
 NMME/COLA-RSMAS/CCSM4/prcp
-SOURCES/.Models/.NMME/.COLA-RSMAS-CCSM4/.MONTHLY/a:/.prec/:a:/.T/.S/units//TT/exch/gridtype/first/0.5/add/1/last/5.5/add/1.0/add/NewEvenGRID/nip/c:/1/:c//name//target_length/def/exch/0/mul/add/TT/%28days%20since%201960-01-01%29streamgridunitconvert/TT/differential_mul/TT/%28months%20since%201960-01-01%29streamgridunitconvert//units//days/def/T/TT/sample-along%5BL/S%5DREORDER/0/RECHUNK/:a/mul%5BX/Y/L/M/S%5DREORDER%5BX/Y%5DREORDER//name//prcp/def/dods
+SOURCES/.Models/.NMME/.COLA-RSMAS-CCSM4/.MONTHLY/a:/.prec/:a:/.T/S/units//TT/exch/gridtype/first/L/.first/add/1/last/L/.last/add/1.0/add/NewEvenGRID/nip/nip/c:/1/:c//name//target_length/def/exch/0/mul/add/TT/%28days%20since%201960-01-01%29streamgridunitconvert/TT/differential_mul/TT/%28months%20since%201960-01-01%29streamgridunitconvert//units//days/def/T/TT/sample-along%5BL/S%5DREORDER/0/RECHUNK/:a/mul%5BX/Y/L/M/S%5DREORDER%5BX/Y%5DREORDER//name//prcp/def/dods
 
 NMME/COLA-RSMAS/CESM1/prcp
-SOURCES/.Models/.NMME/.COLA-RSMAS-CESM1/.MONTHLY/a%3A/.prec/%3Aa%3A/.T/.S/units//TT/exch/gridtype/first/0.5/add/1/last/5.5/add/1.0/add/NewEvenGRID/nip/c%3A/1/%3Ac//name//target_length/def/exch/0/mul/add/TT/(days%20since%201960-01-01)/streamgridunitconvert/TT/differential_mul/TT/(months%20since%201960-01-01)/streamgridunitconvert//units//days/def/T/TT/sample-along/%5BL/S%5DREORDER/0/RECHUNK/%3Aa/mul/%5BX/Y/L/M/S%5DREORDER/%5BX/Y%5DREORDER//name//prcp/def/dods
+SOURCES/.Models/.NMME/.COLA-RSMAS-CESM1/.MONTHLY/a%3A/.prec/%3Aa%3A/.T/S/units//TT/exch/gridtype/first/L/.first/add/1/last/L/.last/add/1.0/add/NewEvenGRID/nip/nip/c%3A/1/%3Ac//name//target_length/def/exch/0/mul/add/TT/(days%20since%201960-01-01)/streamgridunitconvert/TT/differential_mul/TT/(months%20since%201960-01-01)/streamgridunitconvert//units//days/def/T/TT/sample-along/%5BL/S%5DREORDER/0/RECHUNK/%3Aa/mul/%5BX/Y/L/M/S%5DREORDER/%5BX/Y%5DREORDER//name//prcp/def/dods
 
 NMME/COLA-RSMAS/CESM1/t2m
 SOURCES/.Models/.NMME/.COLA-RSMAS-CESM1/.MONTHLY/.tref/Z/removeGRID//Celsius_scale/unitconvert/%5BX/Y/L/M/S%5D/REORDER/%5BX/Y%5D/REORDER//name//t2m/def/dods
@@ -19,7 +19,7 @@ NMME/COLA-RSMAS/CESM1/sst
 SOURCES/.Models/.NMME/.COLA-RSMAS-CESM1/.MONTHLY/.sst/%5BX/Y/L/M/S%5D/REORDER/%5BX/Y%5D/REORDER/dods
 
 NMME/ECCC/CanSIPS-IC4/forecast/prcp
-SOURCES/.Models/.NMME/.CanSIPS-IC4/.FORECAST/.MONTHLY/a%3A/.prec/%3Aa%3A/.T/.S/units//TT/exch/gridtype/first/0.5/add/1/last/5.5/add/1.0/add/NewEvenGRID/nip/c%3A/1/%3Ac//name//target_length/def/exch/0/mul/add/TT/(days%20since%201960-01-01)/streamgridunitconvert/TT/differential_mul/TT/(months%20since%201960-01-01)/streamgridunitconvert//units//days/def/T/TT/sample-along/%5BL/S%5DREORDER/0/RECHUNK/%3Aa/mul/%5BX/Y/L/M/S%5DREORDER/%5BX/Y%5DREORDER//name//prcp/def/dods
+SOURCES/.Models/.NMME/.CanSIPS-IC4/.FORECAST/.MONTHLY/a%3A/.prec/%3Aa%3A/.T/S/units//TT/exch/gridtype/first/L/.first/add/1/last/L/.last/add/1.0/add/NewEvenGRID/nip/nip/c%3A/1/%3Ac//name//target_length/def/exch/0/mul/add/TT/(days%20since%201960-01-01)/streamgridunitconvert/TT/differential_mul/TT/(months%20since%201960-01-01)/streamgridunitconvert//units//days/def/T/TT/sample-along/%5BL/S%5DREORDER/0/RECHUNK/%3Aa/mul/%5BX/Y/L/M/S%5DREORDER/%5BX/Y%5DREORDER//name//prcp/def/dods
 
 NMME/ECCC/CanSIPS-IC4/forecast/t2m
 SOURCES/.Models/.NMME/.CanSIPS-IC4/.FORECAST/.MONTHLY/.tref//Celsius_scale/unitconvert//name//t2m/def/dods
@@ -28,7 +28,7 @@ NMME/ECCC/CanSIPS-IC4/forecast/sst
 SOURCES/.Models/.NMME/.CanSIPS-IC4/.FORECAST/.MONTHLY/.sst//Celsius_scale/unitconvert/dods
 
 NMME/ECCC/CanSIPS-IC4/hindcast/prcp
-SOURCES/.Models/.NMME/.CanSIPS-IC4/.HINDCAST/.MONTHLY/a%3A/.prec/%3Aa%3A/.T/.S/units//TT/exch/gridtype/first/0.5/add/1/last/5.5/add/1.0/add/NewEvenGRID/nip/c%3A/1/%3Ac//name//target_length/def/exch/0/mul/add/TT/(days%20since%201960-01-01)/streamgridunitconvert/TT/differential_mul/TT/(months%20since%201960-01-01)/streamgridunitconvert//units//days/def/T/TT/sample-along/%5BL/S%5DREORDER/0/RECHUNK/%3Aa/mul/%5BX/Y/L/M/S%5DREORDER/%5BX/Y%5DREORDER//name//prcp/def/dods
+SOURCES/.Models/.NMME/.CanSIPS-IC4/.HINDCAST/.MONTHLY/a%3A/.prec/%3Aa%3A/.T/S/units//TT/exch/gridtype/first/L/.first/add/1/last/L/.last/add/1.0/add/NewEvenGRID/nip/nip/c%3A/1/%3Ac//name//target_length/def/exch/0/mul/add/TT/(days%20since%201960-01-01)/streamgridunitconvert/TT/differential_mul/TT/(months%20since%201960-01-01)/streamgridunitconvert//units//days/def/T/TT/sample-along/%5BL/S%5DREORDER/0/RECHUNK/%3Aa/mul/%5BX/Y/L/M/S%5DREORDER/%5BX/Y%5DREORDER//name//prcp/def/dods
 
 NMME/ECCC/CanSIPS-IC4/hindcast/t2m
 SOURCES/.Models/.NMME/.CanSIPS-IC4/.HINDCAST/.MONTHLY/.tref//Celsius_scale/unitconvert//name//t2m/def/dods
@@ -37,7 +37,7 @@ NMME/ECCC/CanSIPS-IC4/hindcast/sst
 SOURCES/.Models/.NMME/.CanSIPS-IC4/.HINDCAST/.MONTHLY/.sst//Celsius_scale/unitconvert/dods
 
 NMME/NASA-GMAO/GEOSS2S/forecast/prcp
-SOURCES/.Models/.NMME/.NASA-GEOSS2S/.FORECAST/.MONTHLY/a%3A/.prec/%3Aa%3A/.T/.S/units//TT/exch/gridtype/first/0.5/add/1/last/5.5/add/1.0/add/NewEvenGRID/nip/c%3A/1/%3Ac//name//target_length/def/exch/0/mul/add/TT/(days%20since%201960-01-01)/streamgridunitconvert/TT/differential_mul/TT/(months%20since%201960-01-01)/streamgridunitconvert//units//days/def/T/TT/sample-along/%5BL/S%5DREORDER/0/RECHUNK/%3Aa/mul/%5BX/Y/L/M/S%5DREORDER/%5BX/Y%5DREORDER//name//prcp/def/dods
+SOURCES/.Models/.NMME/.NASA-GEOSS2S/.FORECAST/.MONTHLY/a%3A/.prec/%3Aa%3A/.T/S/units//TT/exch/gridtype/first/L/.first/add/1/last/L/.last/add/1.0/add/NewEvenGRID/nip/nip/c%3A/1/%3Ac//name//target_length/def/exch/0/mul/add/TT/(days%20since%201960-01-01)/streamgridunitconvert/TT/differential_mul/TT/(months%20since%201960-01-01)/streamgridunitconvert//units//days/def/T/TT/sample-along/%5BL/S%5DREORDER/0/RECHUNK/%3Aa/mul/%5BX/Y/L/M/S%5DREORDER/%5BX/Y%5DREORDER//name//prcp/def/dods
 
 NMME/NASA-GMAO/GEOSS2S/forecast/t2m
 SOURCES/.Models/.NMME/.NASA-GEOSS2S/.FORECAST/.MONTHLY/.tref/Z/removeGRID//Celsius_scale/unitconvert/%5BX/Y/L/M/S%5D/REORDER/%5BX/Y%5D/REORDER//name//t2m/def/dods
@@ -46,7 +46,7 @@ NMME/NASA-GMAO/GEOSS2S/forecast/sst
 SOURCES/.Models/.NMME/.NASA-GEOSS2S/.FORECAST_iri1/.MONTHLY/.sst/%5BX/Y/L/M/S%5D/REORDER/%5BX/Y%5D/REORDER/dods
 
 NMME/NASA-GMAO/GEOSS2S/hindcast/prcp
-SOURCES/.Models/.NMME/.NASA-GEOSS2S/.HINDCAST/.MONTHLY/a%3A/.prec/%3Aa%3A/.T/.S/units//TT/exch/gridtype/first/0.5/add/1/last/5.5/add/1.0/add/NewEvenGRID/nip/c%3A/1/%3Ac//name//target_length/def/exch/0/mul/add/TT/(days%20since%201960-01-01)/streamgridunitconvert/TT/differential_mul/TT/(months%20since%201960-01-01)/streamgridunitconvert//units//days/def/T/TT/sample-along/%5BL/S%5DREORDER/0/RECHUNK/%3Aa/mul/%5BX/Y/L/M/S%5DREORDER/%5BX/Y%5DREORDER//name//prcp/def/dods
+SOURCES/.Models/.NMME/.NASA-GEOSS2S/.HINDCAST/.MONTHLY/a%3A/.prec/%3Aa%3A/.T/S/units//TT/exch/gridtype/first/L/.first/add/1/last/L/.last/add/1.0/add/NewEvenGRID/nip/nip/c%3A/1/%3Ac//name//target_length/def/exch/0/mul/add/TT/(days%20since%201960-01-01)/streamgridunitconvert/TT/differential_mul/TT/(months%20since%201960-01-01)/streamgridunitconvert//units//days/def/T/TT/sample-along/%5BL/S%5DREORDER/0/RECHUNK/%3Aa/mul/%5BX/Y/L/M/S%5DREORDER/%5BX/Y%5DREORDER//name//prcp/def/dods
 
 NMME/NASA-GMAO/GEOSS2S/hindcast/t2m
 SOURCES/.Models/.NMME/.NASA-GEOSS2S/.HINDCAST/.MONTHLY/.tref/Z/removeGRID//Celsius_scale/unitconvert/%5BX/Y/L/M/S%5D/REORDER/%5BX/Y%5D/REORDER//name//t2m/def/dods
@@ -55,7 +55,7 @@ NMME/NASA-GMAO/GEOSS2S/hindcast/sst
 SOURCES/.Models/.NMME/.NASA-GEOSS2S/.HINDCAST/.MONTHLY/.sst%5BX/Y/L/M/S%5DREORDER%5BX/Y%5DREORDER/dods
 
 NMME/NOAA-GFDL/SPEAR/forecast/prcp
-SOURCES/.Models/.NMME/.GFDL-SPEAR/.FORECAST/.MONTHLY/a%3A/.prec/%3Aa%3A/.T/.S/units//TT/exch/gridtype/first/0.5/add/1/last/5.5/add/1.0/add/NewEvenGRID/nip/c%3A/1/%3Ac//name//target_length/def/exch/0/mul/add/TT/(days%20since%201960-01-01)/streamgridunitconvert/TT/differential_mul/TT/(months%20since%201960-01-01)/streamgridunitconvert//units//days/def/T/TT/sample-along/%5BL/S%5DREORDER/0/RECHUNK/%3Aa/mul/%5BX/Y/L/M/S%5DREORDER/%5BX/Y%5DREORDER//name//prcp/def/dods
+SOURCES/.Models/.NMME/.GFDL-SPEAR/.FORECAST/.MONTHLY/a%3A/.prec/%3Aa%3A/.T/S/units//TT/exch/gridtype/first/L/.first/add/1/last/L/.last/add/1.0/add/NewEvenGRID/nip/nip/c%3A/1/%3Ac//name//target_length/def/exch/0/mul/add/TT/(days%20since%201960-01-01)/streamgridunitconvert/TT/differential_mul/TT/(months%20since%201960-01-01)/streamgridunitconvert//units//days/def/T/TT/sample-along/%5BL/S%5DREORDER/0/RECHUNK/%3Aa/mul/%5BX/Y/L/M/S%5DREORDER/%5BX/Y%5DREORDER//name//prcp/def/dods
 
 NMME/NOAA-GFDL/SPEAR/forecast/t2m
 SOURCES/.Models/.NMME/.GFDL-SPEAR/.FORECAST/.MONTHLY/.tref/Z/removeGRID//Celsius_scale/unitconvert/%5BX/Y/L/M/S%5D/REORDER/%5BX/Y%5D/REORDER//name//t2m/def/dods
@@ -64,7 +64,7 @@ NMME/NOAA-GFDL/SPEAR/forecast/sst
 SOURCES/.Models/.NMME/.GFDL-SPEAR/.FORECAST/.MONTHLY/.sst/%5BX/Y/L/M/S%5DREORDER/%5BX/Y%5DREORDER/dods
 
 NMME/NOAA-GFDL/SPEAR/hindcast/prcp
-SOURCES/.Models/.NMME/.GFDL-SPEAR/.HINDCAST/.MONTHLY/a%3A/.prec/%3Aa%3A/.T/.S/units//TT/exch/gridtype/first/0.5/add/1/last/5.5/add/1.0/add/NewEvenGRID/nip/c%3A/1/%3Ac//name//target_length/def/exch/0/mul/add/TT/(days%20since%201960-01-01)/streamgridunitconvert/TT/differential_mul/TT/(months%20since%201960-01-01)/streamgridunitconvert//units//days/def/T/TT/sample-along/%5BL/S%5DREORDER/0/RECHUNK/%3Aa/mul/%5BX/Y/L/M/S%5DREORDER/%5BX/Y%5DREORDER//name//prcp/def/dods
+SOURCES/.Models/.NMME/.GFDL-SPEAR/.HINDCAST/.MONTHLY/a%3A/.prec/%3Aa%3A/.T/S/units//TT/exch/gridtype/first/L/.first/add/1/last/L/.last/add/1.0/add/NewEvenGRID/nip/nip/c%3A/1/%3Ac//name//target_length/def/exch/0/mul/add/TT/(days%20since%201960-01-01)/streamgridunitconvert/TT/differential_mul/TT/(months%20since%201960-01-01)/streamgridunitconvert//units//days/def/T/TT/sample-along/%5BL/S%5DREORDER/0/RECHUNK/%3Aa/mul/%5BX/Y/L/M/S%5DREORDER/%5BX/Y%5DREORDER//name//prcp/def/dods
 
 NMME/NOAA-GFDL/SPEAR/hindcast/t2m
 SOURCES/.Models/.NMME/.GFDL-SPEAR/.HINDCAST/.MONTHLY/.tref/Z/removeGRID//Celsius_scale/unitconvert/%5BX/Y/L/M/S%5D/REORDER/%5BX/Y%5D/REORDER//name//t2m/def/dods
