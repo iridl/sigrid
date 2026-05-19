@@ -170,10 +170,10 @@ def standardize(
                     var = var * conversion.scale + conversion.offset
                 var.attrs['units'] = conversion.name
 
-            if lead_is_month and name == 'prcp':
+            if lead_is_month and name == VARS_NAMES['prcp']:
                 target_length = (
-                    ds['target_bnds'].isel(nbound=1, drop=True)
-                    - ds['target_bnds'].isel(nbound=0, drop=True)
+                    ds[COORDS_NAMES['target_bnds']].isel(nbound=1, drop=True)
+                    - ds[COORDS_NAMES['target_bnds']].isel(nbound=0, drop=True)
                 ).dt.days
                 var = var * target_length.variable
                 var.attrs['units'] = 'mm'
