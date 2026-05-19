@@ -56,6 +56,7 @@ VARS_NAMES = {
     't2m': 't2m',
     'sst': 'sst',
 }
+ALL_NAMES = COORDS_NAMES | VARS_NAMES
 # Change the dictionary values 
 # should you different time encoding throughout your system
 DATETIME_ENCODING = {
@@ -255,52 +256,23 @@ def catalog(
     for dim in ds.dims:
         if ds.sizes[dim] == 1 :
             ds = ds.squeeze(dim, drop=True)
-    # Renaming
-    # TODO This lot has become wild. Revisit
-    for var in original_names:
-        # Need to cover list of original names 
-        # when different vars have different coords names, see e.g. SPEAR
-        if not isinstance(original_names[var], list):
-            orig_names = [original_names[var]]
-        else :
-            orig_names = original_names[var]
-        for orig_name in orig_names:
-            if (
-                # accomodates when different vars have diffrent coord names
-                orig_name in ds.dims
-                # only conventional coords
-                and var in COORDS_NAMES
-                # rename can't rename with same name
-                and orig_name != COORDS_NAMES[var]
-            ):
-                ds = ds.rename({orig_name: COORDS_NAMES[var]})
-            if (
-                # only conventional vars
-                var in VARS_NAMES
-                # accommodates same catalog catalogs all variables
-                and VARS_NAMES[var] == varname
-                # rename can't rename with same name
-                and orig_name != VARS_NAMES[var]
-            ):
-                ds = ds.rename({original_names[var]: varname})
-    # Drop coords not standard
-    ds = ds.drop_vars(
-        [
-            name
-            for name in ds.coords
-            if name not in COORDS_NAMES.values()
-        ]
-    )
-    # Drop vars not standard
-    # This is for SPEAR TIME_bnds
-    # TODO all bounds
-    ds = ds.drop_vars(
-        [
-            name
-            for name in ds.keys()
-            if name not in VARS_NAMES.values()
-        ]
-    )
+    # Renaming std and dropping non-std
+    ds_full_list = list(ds.variables)
+    ds_full_list = ds_full_list + [
+        name for name in list(ds.sizes) if name not in ds_full_list
+    ]
+    for name in ds_full_list:
+        # Get DL standard name if ds' name has one
+        std_name = [std for std, orig in original_names.items() if orig == name]
+        if len(std_name) != 0: # If it has one...
+            if name != ALL_NAMES[std_name[0]]: # Can't rename with same name
+                ds = ds.rename({name: ALL_NAMES[std_name[0]]})
+        else: # not std will be dropped
+            try:
+                ds = ds.drop_vars(name)
+            except:
+                if name in list(ds.sizes): # could have been dropped with a var
+                    ds = ds.drop_dims(name)
     # Deleting buggy attributes
     for attr in list(ds.attrs):
         if str(ds.attrs[attr]).find('"') != -1 :

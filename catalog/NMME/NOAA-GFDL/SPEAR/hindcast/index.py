@@ -12,9 +12,12 @@ def open(varname) -> xr.Dataset:
         # Values must correspond to icechunk names
         original_names={
             'S': 'IRIDL_time',
-            'L': ['TIME', 'TIME1'],
-            'Y': ['LAT', 'LAT1'],
-            'X': ['LON', 'LON1'],
+            'L': 'TIME',
+            'L': 'TIME1',
+            'Y': 'LAT',
+            'Y': 'LAT1',
+            'X': 'LON',
+            'X': 'LON1',
             'prcp': 'PRECIP_1X1',
             't2m': 'T_REF_1X1',
             'sst': 'SST_1X1',

@@ -13,8 +13,10 @@ def open(varname) -> xr.Dataset:
         original_names={
             'S': 'IRIDL_time',
             'L': 'TIME',
-            'Y': ['LAT', 'LAT1'],
-            'X': ['LON', 'LON1'],
+            'Y': 'LAT',
+            'Y': 'LAT1',
+            'X': 'LON',
+            'X': 'LON1',
             'prcp': 'PRECIP_1X1',
             't2m': 'T_REF_1X1',
             'sst': 'SST_1X1',
