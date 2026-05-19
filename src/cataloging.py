@@ -139,7 +139,12 @@ def standardize(
         # save the original attributes, then replace them
         # with standard ones
         original_attrs = var.attrs
-        var.attrs = dict(STANDARD_ATTRS[name])
+        dl_name = [
+            key
+            for key, value in dict(VARS_NAMES, **COORDS_NAMES).items()
+            if value == name
+        ][0]
+        var.attrs = dict(STANDARD_ATTRS[dl_name])
 
         # Override provider's encoding for datetimes
         if np.issubdtype(var, np.datetime64):
@@ -159,9 +164,9 @@ def standardize(
 
             # convert units
             # TODO will need to generalize to coords, e.g. Z in Pa vs hPa
-            if name in units:
+            if dl_name in units:
                 # provide units explicitly if provider didn't (e.g. GFDL)
-                original_units = units[name]
+                original_units = units[dl_name]
             else:
                 original_units = original_attrs.get('units')
             if original_units is not None:
@@ -170,7 +175,7 @@ def standardize(
                     var = var * conversion.scale + conversion.offset
                 var.attrs['units'] = conversion.name
 
-            if lead_is_month and name == VARS_NAMES['prcp']:
+            if lead_is_month and name == VARS_NAMES['prcp']: #(or dl_name == 'prcp' :) )
                 target_length = (
                     ds[COORDS_NAMES['target_bnds']].isel(nbound=1, drop=True)
                     - ds[COORDS_NAMES['target_bnds']].isel(nbound=0, drop=True)
