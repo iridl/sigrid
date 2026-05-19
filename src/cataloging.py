@@ -329,20 +329,29 @@ def catalog(
 
     if lead_is_month:
         # Set lead times
-        l = np.arange(ds.sizes[NAMES['L']])
-        l_bnds = np.stack([l, l+1], axis=1)
-        ds = ds.assign_coords({
-            NAMES['L']: l,
-            NAMES['L_bnds']: ((NAMES['L'], 'nbound'), l_bnds)
-        })
+        leads = np.arange(ds.sizes[COORDS_NAMES['L']])
+        leads_bnds = np.stack([leads, leads + 1], axis=1)
         # Set target
-        target, target_bnds = S_L_to_target(
-            ds[NAMES['S']], ds[NAMES['L']]
+        targets, targets_bnds = S_L_to_target(
+            ds[COORDS_NAMES['S']], ds[COORDS_NAMES['L']]
         )
-        ds = ds.assign_coords({
-            NAMES["target"]: target,
-            NAMES["target_bnds"]: target_bnds,
-        })
+        targets_bnds = targets_bnds.data
+    else:
+        targets = ds[COORDS_NAMES["target"]]
+        leads = (
+            targets.isel({COORDS_NAMES['S']: 0}, drop=True)
+            - ds[COORDS_NAMES['S']].isel({COORDS_NAMES['S']: 0}, drop=True)
+        )
+        leads_bnds = np.stack([leads, leads + np.timedelta64(1, 'D')], axis=1)
+        targets_bnds = np.stack([targets, targets + np.timedelta64(1, 'D')], axis=2)
+    ds = ds.assign_coords({
+        COORDS_NAMES['L']: leads,
+        COORDS_NAMES['L_bnds']: ((COORDS_NAMES['L'], 'nbound'), leads_bnds),
+        COORDS_NAMES['target']: targets,
+        COORDS_NAMES['target_bnds']: (
+            (COORDS_NAMES['S'], COORDS_NAMES['L'], 'nbound'), targets_bnds
+        ),
+    })
 
     # Convert units, do cf-encoding and standardize attrs
     ds = standardize(ds, lead_is_month, units)
