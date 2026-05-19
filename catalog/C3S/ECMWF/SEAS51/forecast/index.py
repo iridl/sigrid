@@ -19,6 +19,9 @@ def open(varname) -> xr.Dataset:
             'tprate': 'prcp',
         },
         lead_is_month=True,
+        units={
+            'M': None,
+        },
     )
 
 def list_vars():

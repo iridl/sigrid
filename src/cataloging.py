@@ -28,8 +28,6 @@ UNITS_CONVERSIONS = {
     'degrees_north': UNITS_CONVERTER(0, 1, 'degree_north'),
     'degree_east': UNITS_CONVERTER(0, 1, 'degree_east'),
     'degrees_east': UNITS_CONVERTER(0, 1, 'degree_east'),
-    'unitless': UNITS_CONVERTER(0, 1, 'unitless'),
-    '1': UNITS_CONVERTER(0, 1, 'unitless'),
     'degree_Celsius': UNITS_CONVERTER(0, 1, 'degree_Celsius'),
     'degreeC': UNITS_CONVERTER(0, 1, 'degree_Celsius'),
     'K': UNITS_CONVERTER(-273.15, 1, 'degree_Celsius'),
@@ -216,26 +214,26 @@ def standardize(
             if aux_coords:
                 var.attrs['coordinates'] = ' '.join(aux_coords)
 
-            # convert units
-            # TODO will need to generalize to coords, e.g. Z in Pa vs hPa
-            if name in units:
-                # provide units explicitly if provider didn't (e.g. GFDL)
-                original_units = units[name]
-            else:
-                original_units = original_attrs.get('units')
-            if original_units is not None:
-                conversion = UNITS_CONVERSIONS[original_units]
-                if not (conversion.scale == 1 and conversion.offset == 0):
-                    var = var * conversion.scale + conversion.offset
-                var.attrs['units'] = conversion.name
+        # convert units
+        # TODO will need to generalize to coords, e.g. Z in Pa vs hPa
+        if name in units:
+            # provide units explicitly if provider didn't (e.g. GFDL)
+            original_units = units[name]
+        else:
+            original_units = original_attrs.get('units')
+        if original_units is not None:
+            conversion = UNITS_CONVERSIONS[original_units]
+            if not (conversion.scale == 1 and conversion.offset == 0):
+                var = var * conversion.scale + conversion.offset
+            var.attrs['units'] = conversion.name
 
-            if lead_is_month and name == 'prcp':
-                target_length = (
-                    ds['target_bnds'].isel(nbound=1, drop=True)
-                    - ds['target_bnds'].isel(nbound=0, drop=True)
-                ).dt.days
-                var = var * target_length.variable
-                var.attrs['units'] = 'mm'
+        if lead_is_month and name == 'prcp':
+            target_length = (
+                ds['target_bnds'].isel(nbound=1, drop=True)
+                - ds['target_bnds'].isel(nbound=0, drop=True)
+            ).dt.days
+            var = var * target_length.variable
+            var.attrs['units'] = 'mm'
 
         vars[name] = var
 

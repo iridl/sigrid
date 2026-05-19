@@ -21,6 +21,9 @@ def open(varname) -> xr.Dataset:
             'avg_sst': 'sst',
         },
         lead_is_month=True,
+        units={
+            'M': None,
+        },
     )
 
 def list_vars():
