@@ -3,6 +3,10 @@
 NMME/COLA-RSMAS/CCSM4/t2m
 SOURCES/.Models/.NMME/.COLA-RSMAS-CCSM4/.MONTHLY/.tref/Z/removeGRID//Celsius_scale/unitconvert/%5BX/Y/L/M/S%5D/REORDER/%5BX/Y%5D/REORDER//name//t2m/def/dods
 
+# CCSM4 SST original data contain files for Oct 1981, then nothing for Nov or Dec,
+# and then contiguous months from Jan 1982 on. Ingrid catalog entry ignores the
+# Oct 1981 files, whereas our icechunk includes them, so the length of the S
+# dimension differs by one.
 NMME/COLA-RSMAS/CCSM4/sst
 SOURCES/.Models/.NMME/.COLA-RSMAS-CCSM4/.MONTHLY/.sst/%5BX/Y/L/M/S%5D/REORDER/%5BX/Y%5D/REORDER/dods
 
@@ -54,6 +58,10 @@ SOURCES/.Models/.NMME/.NASA-GEOSS2S/.HINDCAST/.MONTHLY/.tref/Z/removeGRID//Celsi
 NMME/NASA-GMAO/GEOSS2S/hindcast/sst
 SOURCES/.Models/.NMME/.NASA-GEOSS2S/.HINDCAST/.MONTHLY/.sst%5BX/Y/L/M/S%5DREORDER%5BX/Y%5DREORDER/dods
 
+# SPEAR forecasts are now only issued quarterly. Ingrid has a regular grid,
+# in which the missing forecasts are all NaN, whereas pydap has an irregular
+# grid that lists only the forecasts for which we have files. Therefore, the
+# array shapes are different in the S dimension.
 NMME/NOAA-GFDL/SPEAR/forecast/prcp
 SOURCES/.Models/.NMME/.GFDL-SPEAR/.FORECAST/.MONTHLY/a%3A/.prec/%3Aa%3A/.T/S/units//TT/exch/gridtype/first/L/.first/add/1/last/L/.last/add/1.0/add/NewEvenGRID/nip/nip/c%3A/1/%3Ac//name//target_length/def/exch/0/mul/add/TT/(days%20since%201960-01-01)/streamgridunitconvert/TT/differential_mul/TT/(months%20since%201960-01-01)/streamgridunitconvert//units//days/def/T/TT/sample-along/%5BL/S%5DREORDER/0/RECHUNK/%3Aa/mul/%5BX/Y/L/M/S%5DREORDER/%5BX/Y%5DREORDER//name//prcp/def/dods
 
