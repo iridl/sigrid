@@ -61,7 +61,7 @@ NMME/NOAA-GFDL/SPEAR/forecast/t2m
 SOURCES/.Models/.NMME/.GFDL-SPEAR/.FORECAST/.MONTHLY/.tref/Z/removeGRID//Celsius_scale/unitconvert/%5BX/Y/L/M/S%5D/REORDER/%5BX/Y%5D/REORDER//name//t2m/def/dods
 
 NMME/NOAA-GFDL/SPEAR/forecast/sst
-SOURCES/.Models/.NMME/.GFDL-SPEAR/.FORECAST/.MONTHLY/.sst/%5BX/Y/L/M/S%5DREORDER/%5BX/Y%5DREORDER/dods
+SOURCES/.Models/.NMME/.GFDL-SPEAR/.FORECAST/.MONTHLY/.sst_regridded/%5BX/Y/L/M/S%5DREORDER/%5BX/Y%5DREORDER/dods
 
 NMME/NOAA-GFDL/SPEAR/hindcast/prcp
 SOURCES/.Models/.NMME/.GFDL-SPEAR/.HINDCAST/.MONTHLY/a%3A/.prec/%3Aa%3A/.T/S/units//TT/exch/gridtype/first/L/.first/add/1/last/L/.last/add/1.0/add/NewEvenGRID/nip/nip/c%3A/1/%3Ac//name//target_length/def/exch/0/mul/add/TT/(days%20since%201960-01-01)/streamgridunitconvert/TT/differential_mul/TT/(months%20since%201960-01-01)/streamgridunitconvert//units//days/def/T/TT/sample-along/%5BL/S%5DREORDER/0/RECHUNK/%3Aa/mul/%5BX/Y/L/M/S%5DREORDER/%5BX/Y%5DREORDER//name//prcp/def/dods
