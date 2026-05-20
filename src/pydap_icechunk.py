@@ -96,22 +96,27 @@ class XarrayHandler(BaseHandler, abc.ABC):
 
 
 def open_icechunk(rel_path, decode_times=True, drop_variables=None):
-    storage = icechunk.local_filesystem_storage(Path(icechunk_root) / rel_path)
+    abspath = Path(icechunk_root) / rel_path
+    storage = icechunk.local_filesystem_storage(abspath)
     # Workaround for https://github.com/earth-mover/icechunk/issues/2105
     if not icechunk.Repository.exists(storage):
-        raise Exception(f'No repository exists at {storage}')
-    repo = icechunk.Repository.open(
-        storage,
-        authorize_virtual_chunk_access={f'file://{orig_root}/': None}
-    )
-    session = repo.readonly_session("main")
-    ds = xr.open_zarr(
-        session.store,
-        zarr_format=3,
-        decode_times=decode_times,
-        drop_variables=drop_variables,
-    )
-    return ds
+        raise Exception(f'No repository exists at {abspath}')
+    try:
+        repo = icechunk.Repository.open(
+            storage,
+            authorize_virtual_chunk_access={f'file://{orig_root}/': None}
+        )
+        session = repo.readonly_session("main")
+        ds = xr.open_zarr(
+            session.store,
+            zarr_format=3,
+            decode_times=decode_times,
+            drop_variables=drop_variables,
+        )
+        return ds
+    except Exception as e:
+        e.add_note(f'When trying to open {abspath}')
+        raise
 
 
 class DaskArrayProxy:
