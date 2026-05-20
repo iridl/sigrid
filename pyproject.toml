@@ -40,6 +40,10 @@ pydap-icechunk = { path = ".", editable = true }
 netcdf4 = "*"
 xarray = ">=2026.4.0,<2027"
 
+[tool.pixi.feature.client.pypi-dependencies]
+#recording-proxy = { path = "../recording-proxy", editable = true }
+recording-proxy = { git = "ssh://git@github.com/iridl/recording-proxy.git", rev = "5e058cb"}
+
 [tool.pixi.package.host-dependencies]
 setuptools = ">=80,<90"
 

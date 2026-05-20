@@ -3,6 +3,7 @@ import sys
 import time
 
 import numpy as np
+import recording_proxy
 import xarray as xr
 
 def compare(url1, url2):
@@ -153,6 +154,7 @@ if __name__ == '__main__':
     parser.add_argument("reference_root")
     parser.add_argument("listfile")
     parser.add_argument("test_path")
+    parser.add_argument("--record", action='store_true')
     
     args = parser.parse_args()
     path_mapping = parse_listfile(args.listfile)
@@ -160,7 +162,12 @@ if __name__ == '__main__':
     url2 = f'{args.reference_root}/{path_mapping[args.test_path]}'
     print(url1)
     print(url2)
-    all_same = compare(url1, url2)
+    with recording_proxy.recording_proxy(
+            "responses",
+            args.record,
+            prefixes=[args.reference_root],
+    ):
+        all_same = compare(url1, url2)
     print(all_same)
     if all_same:
         sys.exit(0)
