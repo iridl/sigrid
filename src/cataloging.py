@@ -263,8 +263,6 @@ def catalog(
                 ds = ds.drop_vars(name)
             elif name in ds.sizes: # dims, could have been dropped with a var
                 ds = ds.drop_dims(name, errors='ignore')
-            else:
-                assert False
     # Deleting buggy attributes
     for attr in list(ds.attrs):
         if str(ds.attrs[attr]).find('"') != -1 :
