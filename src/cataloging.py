@@ -262,8 +262,10 @@ def catalog(
             if name not in NAMES: # not std will be dropped
                 if name in ds.variables:
                     ds = ds.drop_vars(name)
-                else: # dims, could have been dropped with a var
+                elif name in ds.sizes: # dims, could have been dropped with a var
                     ds = ds.drop_dims(name, errors='ignore')
+                else:
+                    assert False
     # Deleting buggy attributes
     for attr in list(ds.attrs):
         if str(ds.attrs[attr]).find('"') != -1 :
