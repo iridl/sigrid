@@ -3,10 +3,13 @@ An opendap server for icechunk stores, based on pydap and xarray. It supports tr
 icechunk data with xarray before sending it to the user.
 
 ## Initial setup
+
 ```cp dot-env-example .env```
-Change PYDAP_PORT so you don't collide with other developers.
+
+Change `PYDAP_PORT` so you don't collide with other developers.
 
 ## Inspecting an icechunk store
+
 ```
 > pixi run python
 >>> import pydap_icechunk
@@ -35,7 +38,7 @@ Attributes:
     Conventions:             CF-1.7
     institution:             Canadian Meteorological Service - Montreal
     history:                 2026-04-28T18:33 GRIB to CDM+CF via cfgrib-0.9.1...
->>>
+```
 
 ## Testing
 ```
