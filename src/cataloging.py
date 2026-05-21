@@ -258,14 +258,13 @@ def catalog(
         if name in original_names:
             if name != original_names[name]: # Can't rename with same name
                 ds = ds.rename({name: NAMES[original_names[name]]})
-        else: 
-            if name not in NAMES: # not std will be dropped
-                if name in ds.variables:
-                    ds = ds.drop_vars(name)
-                elif name in ds.sizes: # dims, could have been dropped with a var
-                    ds = ds.drop_dims(name, errors='ignore')
-                else:
-                    assert False
+        elif name not in NAMES: # not std will be dropped
+            if name in ds.variables:
+                ds = ds.drop_vars(name)
+            elif name in ds.sizes: # dims, could have been dropped with a var
+                ds = ds.drop_dims(name, errors='ignore')
+            else:
+                assert False
     # Deleting buggy attributes
     for attr in list(ds.attrs):
         if str(ds.attrs[attr]).find('"') != -1 :
