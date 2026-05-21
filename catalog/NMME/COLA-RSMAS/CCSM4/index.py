@@ -7,17 +7,17 @@ def open(varname) -> xr.Dataset:
     return cataloging.catalog(
         varname,
         varpath='NMME/COLA-RSMAS/CCSM4',
-        # maps icechunk names to pydap-icechunk conventional names
-        # Keys can not be changed,
-        # Values must correspond to icechunk names
+        # maps icechunk names (keys)to pydap-icechunk conventional names (values)
+        # Values can not be changed,
+        # Keys must correspond to icechunk names
         original_names={
-            'S': 'IRIDL_time',
-            'L': 'TIME',
-            'Y': 'LAT',
-            'X': 'LON',
-            'prcp': 'PRECIP_1X1',
-            't2m': 'T_REF_1X1',
-            'sst': 'SST_1X1',
+            'IRIDL_time': 'S',
+            'TIME': 'L',
+            'LAT': 'Y',
+            'LON': 'X',
+            'PRECIP_1X1': 'prcp',
+            'T_REF_1X1': 't2m',
+            'SST_1X1': 'sst',
         },
         lead_is_month=True,
     )

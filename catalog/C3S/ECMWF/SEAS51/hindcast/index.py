@@ -11,12 +11,12 @@ def open(varname) -> xr.Dataset:
         # Keys can not be changed,
         # Values must correspond to icechunk names
         original_names={
-            'S': 'IRIDL_time',
-            'L': 'step',
-            'Y': 'latitude',
-            'X': 'longitude',
-            'M': 'number',
-            'prcp': 'tprate',
+            'IRIDL_time': 'S',
+            'step': 'L',
+            'latitude': 'Y',
+            'longitude': 'X',
+            'number': 'M',
+            'tprate': 'prcp',
         },
         lead_is_month=True,
     )

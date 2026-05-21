@@ -254,22 +254,16 @@ def catalog(
         if ds.sizes[dim] == 1 :
             ds = ds.squeeze(dim, drop=True)
     # Renaming std and dropping non-std
-    ds_full_list = list(ds.variables)
-    ds_full_list = ds_full_list + [
-        name for name in list(ds.sizes) if name not in ds_full_list
-    ]
-    for name in ds_full_list:
-        # Get DL standard name if ds' name has one
-        std_name = [std for std, orig in original_names.items() if orig == name]
-        if len(std_name) != 0: # If it has one...
-            if name != NAMES[std_name[0]]: # Can't rename with same name
-                ds = ds.rename({name: NAMES[std_name[0]]})
-        else: # not std will be dropped
-            try:
-                ds = ds.drop_vars(name)
-            except:
-                if name in list(ds.sizes): # could have been dropped with a var
-                    ds = ds.drop_dims(name)
+    for name in (set(ds.variables) | set(ds.sizes)):
+        if name in original_names: # is to be renamed
+            if name != original_names[name]: # Can't rename with same name
+                ds = ds.rename({name: NAMES[original_names[name]]})
+        else: 
+            if name not in NAMES: # not std will be dropped
+                if name in ds.variables:
+                    ds = ds.drop_vars(name)
+                else: # dims, could have been dropped with a var
+                    ds = ds.drop_dims(name, errors='ignore')
     # Deleting buggy attributes
     for attr in list(ds.attrs):
         if str(ds.attrs[attr]).find('"') != -1 :

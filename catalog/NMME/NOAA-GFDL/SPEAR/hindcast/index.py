@@ -7,20 +7,19 @@ def open(varname) -> xr.Dataset:
     return cataloging.catalog(
         varname,
         varpath='NMME/NOAA-GFDL/SPEAR/hindcast',
-        # maps icechunk names to pydap-icechunk conventional names
-        # Keys can not be changed,
-        # Values must correspond to icechunk names
+        # maps icechunk names (keys)to pydap-icechunk conventional names (values)
+        # Values can not be changed,
+        # Keys must correspond to icechunk names
         original_names={
-            'S': 'IRIDL_time',
-            'L': 'TIME',
-            'L': 'TIME1',
-            'Y': 'LAT',
-            'Y': 'LAT1',
-            'X': 'LON',
-            'X': 'LON1',
-            'prcp': 'PRECIP_1X1',
-            't2m': 'T_REF_1X1',
-            'sst': 'SST_1X1',
+            'IRIDL_time': 'S',
+            'TIME1': 'L',
+            'LAT': 'Y',
+            'LAT1': 'Y',
+            'LON': 'X',
+            'LON1': 'X',
+            'PRECIP_1X1': 'prcp',
+            'T_REF_1X1': 't2m',
+            'SST_1X1': 'sst',
         },
         units={
             'prcp': 'mm/s',
