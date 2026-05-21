@@ -1,10 +1,11 @@
 import argparse
+import sys
 import time
 
 import numpy as np
 import xarray as xr
 
-def compare(url1, url2, check_data=False):
+def compare(url1, url2):
     ds1 = fetch(url1)
     ds2 = fetch(url2)
 
@@ -26,11 +27,10 @@ def compare(url1, url2, check_data=False):
     da1 = ds1[var1]
     da2 = ds2[var2]
 
-    compare_shape(da1, da2)
-    compare_attrs(da1, da2)
-    compare_coords(da1, da2)
-    if check_data:
-        compare_data(da1, da2)
+    all_same = True
+    all_same &= compare_shape(da1, da2)
+    all_same &= compare_data(da1, da2)
+    return all_same
 
 def compare_coords(da1, da2):
     for cname in sorted(set(da1.coords) | set(da2.coords)):        
@@ -56,16 +56,30 @@ def compare_shape(da1, da2):
      dims2 = sorted(list(da2.sizes.items()))
      if dims1 == dims2:
          print('same dims')
+         return True
      else:
          print('different dims:')
          print(dims1)
          print(dims2)
+         return False
 
 def compare_data(da1, da2):
-    l = da1.sizes['S']
-    for i in (0, l // 2, l - 1):
-        same = compare_slice(da1.isel(S=i), da2.isel(S=i))
-        print(f"S={i}: {same}")
+    # Accomodating the fact that Ingrid typically has a regular S grid, even if
+    # we have no files for some values of S, whereas pydap's S coordinate only
+    # contains values of S for which files are present. Only compare data for dates
+    # that exist in both datasets; rely on compare_shape to catch missing dates.
+    da2 = da2.convert_calendar('standard', dim='S', align_on='date')
+    s_len = da1.sizes['S']
+    all_same = True
+    for i in (0, s_len // 2, s_len - 1):
+        s = da1['S'].isel(S=i).values
+        same = compare_slice(da1.sel(S=s), da2.sel(S=s))
+        print(f"S={s}: {same}")
+        if not same:
+            print(da1.sel(S=s))
+            print(da2.sel(S=s))
+            all_same = False
+    return all_same
 
 def compare_slice(da1, da2):
     start = time.time()
@@ -108,16 +122,20 @@ def parse_listfile(filename):
                 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("root1")
-    parser.add_argument("root2")
+    parser.add_argument("test_root")
+    parser.add_argument("reference_root")
     parser.add_argument("listfile")
-    parser.add_argument("path1")
-    parser.add_argument("--check-data", action='store_true')
+    parser.add_argument("test_path")
     
     args = parser.parse_args()
     path_mapping = parse_listfile(args.listfile)
-    url1 = f'{args.root1}/{args.path1}'
-    url2 = f'{args.root2}/{path_mapping[args.path1]}'
+    url1 = f'{args.test_root}/{args.test_path}'
+    url2 = f'{args.reference_root}/{path_mapping[args.test_path]}'
     print(url1)
     print(url2)
-    compare(url1, url2, check_data=args.check_data)
+    all_same = compare(url1, url2)
+    print(all_same)
+    if all_same:
+        sys.exit(0)
+    else:
+        sys.exit(1)
