@@ -83,7 +83,6 @@ DATETIME_ENCODING = {
 }
 TIMEDELTA_ENCODING = {
     'units': 'hours',
-    'calendar': 'standard',
     'dtype': 'int32',
 }
 
