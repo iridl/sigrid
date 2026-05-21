@@ -214,7 +214,6 @@ def standardize(
                 var.attrs['coordinates'] = ' '.join(aux_coords)
 
         # convert units
-        # TODO will need to generalize to coords, e.g. Z in Pa vs hPa
         if name in units:
             # provide units explicitly if provider didn't (e.g. GFDL)
             original_units = units[name]
