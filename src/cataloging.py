@@ -255,7 +255,7 @@ def catalog(
             ds = ds.squeeze(dim, drop=True)
     # Renaming std and dropping non-std
     for name in (set(ds.variables) | set(ds.sizes)):
-        if name in original_names: # is to be renamed
+        if name in original_names:
             if name != original_names[name]: # Can't rename with same name
                 ds = ds.rename({name: NAMES[original_names[name]]})
         else: 
