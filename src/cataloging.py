@@ -39,7 +39,7 @@ UNITS_CONVERSIONS = {
 # They can not be changed and serve as well as identifiers for the different objects.
 # Values are what are going to be shown on, and served, by the pydap server
 # They can be changed to the taste of the Catalog administrator
-COORDS_NAMES = {
+NAMES = {
     'S': 'S',
     'L': 'L',
     'L_bnds': 'L_bnds',
@@ -48,15 +48,12 @@ COORDS_NAMES = {
     'M': 'M',
     'target': 'target',
     # NB target_bnds should be named after target
-    'target_bnds': 'target_bnds'
-}
-# Same as above, additionally, keys are the icechunk variables names.
-VARS_NAMES = {
+    'target_bnds': 'target_bnds',
+    # Additionally, these keys are also the icechunk variables names.
     'prcp': 'prcp',
     't2m': 't2m',
     'sst': 'sst',
 }
-ALL_NAMES = COORDS_NAMES | VARS_NAMES
 # Change the dictionary values 
 # should you different time encoding throughout your system
 DATETIME_ENCODING = {
@@ -75,7 +72,7 @@ STANDARD_ATTRS = {
     'L': {
         'long_name': 'Lead',
         'standard_name': 'forecast_period',
-        'bounds': COORDS_NAMES['L_bnds'],
+        'bounds': NAMES['L_bnds'],
     },
     'L_bnds': {},
     'Y': {
@@ -104,7 +101,7 @@ STANDARD_ATTRS = {
         # is valid; the standard name of time should be used for that time.
         # https://cfconventions.org/Data/cf-standard-names/current/build/cf-standard-name-table.html
         'standard_name': 'time',
-        'bounds': COORDS_NAMES['target_bnds'],
+        'bounds': NAMES['target_bnds'],
     },
     'target_bnds': {},
     'prcp': {
@@ -151,10 +148,10 @@ def standardize(
             # but cf_encoder fails to encode that information,
             # so we do it ourselves.
             aux_coords: list[str] = []
-            if COORDS_NAMES['L'] in var.dims:
-                aux_coords.append(COORDS_NAMES['L_bnds'])
-                if COORDS_NAMES['S'] in var.dims:
-                    aux_coords.extend([COORDS_NAMES['target'], COORDS_NAMES['target_bnds']])
+            if NAMES['L'] in var.dims:
+                aux_coords.append(NAMES['L_bnds'])
+                if NAMES['S'] in var.dims:
+                    aux_coords.extend([NAMES['target'], NAMES['target_bnds']])
             if aux_coords:
                 var.attrs['coordinates'] = ' '.join(aux_coords)
 
@@ -244,7 +241,7 @@ def catalog(
     units: Mapping[str, str] | None = None,
     lead_is_month: bool = False,
     ):
-    icechunk_var = [key for key, value in VARS_NAMES.items() if value == varname][0]
+    icechunk_var = [key for key, value in NAMES.items() if value == varname][0]
     ds = pydap_icechunk.open_icechunk(
         f'{varpath}/{icechunk_var}',
     )
@@ -265,8 +262,8 @@ def catalog(
         # Get DL standard name if ds' name has one
         std_name = [std for std, orig in original_names.items() if orig == name]
         if len(std_name) != 0: # If it has one...
-            if name != ALL_NAMES[std_name[0]]: # Can't rename with same name
-                ds = ds.rename({name: ALL_NAMES[std_name[0]]})
+            if name != NAMES[std_name[0]]: # Can't rename with same name
+                ds = ds.rename({name: NAMES[std_name[0]]})
         else: # not std will be dropped
             try:
                 ds = ds.drop_vars(name)
@@ -280,19 +277,19 @@ def catalog(
 
     if lead_is_month:
         # Set lead times
-        l = np.arange(ds.sizes[COORDS_NAMES['L']])
+        l = np.arange(ds.sizes[NAMES['L']])
         l_bnds = np.stack([l, l+1], axis=1)
         ds = ds.assign_coords({
-            COORDS_NAMES['L']: l,
-            COORDS_NAMES['L_bnds']: ((COORDS_NAMES['L'], 'nbound'), l_bnds)
+            NAMES['L']: l,
+            NAMES['L_bnds']: ((NAMES['L'], 'nbound'), l_bnds)
         })
         # Set target
         target, target_bnds = S_L_to_target(
-            ds[COORDS_NAMES['S']], ds[COORDS_NAMES['L']]
+            ds[NAMES['S']], ds[NAMES['L']]
         )
         ds = ds.assign_coords({
-            COORDS_NAMES["target"]: target,
-            COORDS_NAMES["target_bnds"]: target_bnds,
+            NAMES["target"]: target,
+            NAMES["target_bnds"]: target_bnds,
         })
 
     # Convert units, do cf-encoding and standardize attrs
