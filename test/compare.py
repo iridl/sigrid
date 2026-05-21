@@ -103,10 +103,7 @@ def compare_data(da1, da2):
         s = da1['S'].isel(S=i).values
         same = compare_slice(da1.sel(S=s), da2.sel(S=s))
         print(f"S={s}: {same}")
-        if not same:
-            print(da1.sel(S=s))
-            print(da2.sel(S=s))
-            all_same = False
+        all_same &= same
     return all_same
 
 def compare_slice(da1, da2):
