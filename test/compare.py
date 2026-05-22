@@ -79,21 +79,13 @@ def compare_shape(da1, da2):
 
 def compare_targets(c1, c2):
     c2 = c2.convert_calendar('standard', dim='S', align_on='date')
-    for c in [c1, c2]:
-        c = c.dt.strftime("%Y%m%dT%H:%M")
-    all_same = all([
-        [
-            [
-                c1.sel(S=s).isel(L=l, nbound=n).values == c2.sel(S=s).isel(L=l, nbound=n).values
-                for n in range(c1.sizes['nbound'])
-            ]
-            for l in range(c1.sizes['L'])
-        ]
-        for s in c1['S']
-    ])
+    c1 = c1.dt.strftime("%Y%m%dT%H:%M").data
+    c2 = c2.dt.strftime("%Y%m%dT%H:%M").data
+    all_same = np.array_equal(c1, c2)
     if all_same:
         print(f'target_bnds are the same')
     else:
+        print('target bounds differ')
         print(c1)
         print(c2)
     return all_same
