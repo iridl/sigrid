@@ -33,6 +33,6 @@ def open(varname) -> xr.Dataset:
 
 def list_vars():
     return [
-        cataloging.VARS_NAMES['pr'],
+        cataloging.NAMES['pr'],
     ]
     
