@@ -6,12 +6,7 @@ import numpy as np
 import xarray as xr
 
 def compare(url1, url2):
-    target = False
-    split_url1 = url1.split('/')
-    if split_url1[-1] == 'target':
-        url1 = '/'.join(split_url1[0:-1])
-        target = True
-    ds1 = fetch(url1, target=target)
+    ds1 = fetch(url1)
     ds2 = fetch(url2)
 
     if isinstance(ds1, Exception):
@@ -26,9 +21,20 @@ def compare(url1, url2):
     var1 = names[0]
     
     names = list(ds2.data_vars)
-    assert len(names) == 1
-    var2 = names[0]
-    
+    assert len(names) == 1 or len(names) == 2
+    if len(names) == 2:
+        if 'target_bnds' in names:
+            ds2 = ds2.assign_coords({'target_bnds': ds2['target_bnds']})
+            names = list(ds2.data_vars)
+            assert len(names) == 1
+            var2 = names[0]
+        else:
+            raise Exception('2nd var should be target_bnds')
+    else:
+        var2 = names[0]
+
+    #compare_coords(ds1, ds2)
+
     da1 = ds1[var1]
     da2 = ds2[var2]
 
@@ -37,10 +43,10 @@ def compare(url1, url2):
     all_same &= compare_data(da1, da2)
     return all_same
 
-def compare_coords(da1, da2):
-    for cname in sorted(set(da1.coords) | set(da2.coords)):        
-        c1 = da1.coords.get(cname)
-        c2 = da2.coords.get(cname)
+def compare_coords(ds1, ds2):
+    for cname in sorted(set(ds1.coords) | set(ds2.coords)):        
+        c1 = ds1.coords.get(cname)
+        c2 = ds2.coords.get(cname)
         print(cname)
         if c1 is None:
             print(cname, 'absent', 'present')
@@ -48,12 +54,15 @@ def compare_coords(da1, da2):
         if c2 is None:
             print(cname, 'present', 'absent')
             continue
-        if np.array_equal(c1.values, c2.values):
-            print('values are the same')
-        else:
-            print('values differ:')
-            print(c1.values)
-            print(c2.values)
+        if cname == 'target_bnds':
+            compare_targets(c1, c2)
+        else:    
+            if np.array_equal(c1.values, c2.values):
+                print('values are the same')
+            else:
+                print('values differ:')
+                print(c1.values)
+                print(c2.values)
         compare_attrs(c1, c2)
 
 def compare_shape(da1, da2):
@@ -68,6 +77,27 @@ def compare_shape(da1, da2):
          print(dims2)
          return False
 
+def compare_targets(c1, c2):
+    c2 = c2.convert_calendar('standard', dim='S', align_on='date')
+    for c in [c1, c2]:
+        c = c.dt.strftime("%Y%m%dT%H:%M")
+    all_same = all([
+        [
+            [
+                c1.sel(S=s).isel(L=l, nbound=n).values == c2.sel(S=s).isel(L=l, nbound=n).values
+                for n in range(c1.sizes['nbound'])
+            ]
+            for l in range(c1.sizes['L'])
+        ]
+        for s in c1['S']
+    ])
+    if all_same:
+        print(f'target_bnds are the same')
+    else:
+        print(c1)
+        print(c2)
+    return all_same
+
 def compare_data(da1, da2):
     # Accomodating the fact that Ingrid typically has a regular S grid, even if
     # we have no files for some values of S, whereas pydap's S coordinate only
@@ -76,28 +106,14 @@ def compare_data(da1, da2):
     da2 = da2.convert_calendar('standard', dim='S', align_on='date')
     s_len = da1.sizes['S']
     all_same = True
-    if da1.name == 'target_bounds':
-        da1 = da1['target_bnds'].dt.strftime("%Y%m%dT%H:%M")
-        da2 = da2.dt.strftime("%Y%m%dT%H:%M")
-        all_same = all([
-            [
-                [
-                    da1.sel(S=s).isel(L=l, nbound=n).values == da2.sel(S=s).isel(L=l, nbound=n).values
-                    for n in range(da1.sizes['nbound'])
-                ]
-                for l in range(da1.sizes['L'])
-            ]
-            for s in da1['S']
-        ])
-    else:
-        for i in (0, s_len // 2, s_len - 1):
-            s = da1['S'].isel(S=i).values
-            same = compare_slice(da1.sel(S=s), da2.sel(S=s))
-            print(f"S={s}: {same}")
-            if not same:
-                print(da1.sel(S=s))
-                print(da2.sel(S=s))
-                all_same = False
+    for i in (0, s_len // 2, s_len - 1):
+        s = da1['S'].isel(S=i).values
+        same = compare_slice(da1.sel(S=s), da2.sel(S=s))
+        print(f"S={s}: {same}")
+        if not same:
+            print(da1.sel(S=s))
+            print(da2.sel(S=s))
+            all_same = False
     return all_same
 
 def compare_slice(da1, da2):
@@ -113,12 +129,9 @@ def compare_attrs(da1, da2):
     for a in sorted(set(da1.attrs) | set(da2.attrs)):
         print(f"  {a:30.30} {str(da1.attrs.get(a, '')):20.20} {str(da2.attrs.get(a,'')):20.20}")
 
-def fetch(url, target=False):
+def fetch(url):
     try:
-        if target:
-            ds = xr.open_dataset(url, decode_times=False)['target_bnds'].to_dataset(name='target_bounds')
-        else:
-            ds = xr.open_dataset(url, decode_times=False)
+        ds = xr.open_dataset(url, decode_times=False)
         for name, coord in ds.variables.items():
             if coord.attrs.get("calendar") == "360":
                 coord.attrs["calendar"] = "360_day"
