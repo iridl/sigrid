@@ -6,7 +6,12 @@ import numpy as np
 import xarray as xr
 
 def compare(url1, url2):
-    ds1 = fetch(url1)
+    target = False
+    split_url1 = url1.split('/')
+    if split_url1[-1] == 'target':
+        url1 = '/'.join(split_url1[0:-1])
+        target = True
+    ds1 = fetch(url1, target=target)
     ds2 = fetch(url2)
 
     if isinstance(ds1, Exception):
@@ -71,14 +76,28 @@ def compare_data(da1, da2):
     da2 = da2.convert_calendar('standard', dim='S', align_on='date')
     s_len = da1.sizes['S']
     all_same = True
-    for i in (0, s_len // 2, s_len - 1):
-        s = da1['S'].isel(S=i).values
-        same = compare_slice(da1.sel(S=s), da2.sel(S=s))
-        print(f"S={s}: {same}")
-        if not same:
-            print(da1.sel(S=s))
-            print(da2.sel(S=s))
-            all_same = False
+    if da1.name == 'target_bounds':
+        da1 = da1['target_bnds'].dt.strftime("%Y%m%dT%H:%M")
+        da2 = da2.dt.strftime("%Y%m%dT%H:%M")
+        all_same = all([
+            [
+                [
+                    da1.sel(S=s).isel(L=l, nbound=n).values == da2.sel(S=s).isel(L=l, nbound=n).values
+                    for n in range(da1.sizes['nbound'])
+                ]
+                for l in range(da1.sizes['L'])
+            ]
+            for s in da1['S']
+        ])
+    else:
+        for i in (0, s_len // 2, s_len - 1):
+            s = da1['S'].isel(S=i).values
+            same = compare_slice(da1.sel(S=s), da2.sel(S=s))
+            print(f"S={s}: {same}")
+            if not same:
+                print(da1.sel(S=s))
+                print(da2.sel(S=s))
+                all_same = False
     return all_same
 
 def compare_slice(da1, da2):
@@ -94,10 +113,13 @@ def compare_attrs(da1, da2):
     for a in sorted(set(da1.attrs) | set(da2.attrs)):
         print(f"  {a:30.30} {str(da1.attrs.get(a, '')):20.20} {str(da2.attrs.get(a,'')):20.20}")
 
-def fetch(url):
+def fetch(url, target=False):
     try:
-        ds = xr.open_dataset(url, decode_times=False)
-        for name, coord in ds.coords.items():
+        if target:
+            ds = xr.open_dataset(url, decode_times=False)['target_bnds'].to_dataset(name='target_bounds')
+        else:
+            ds = xr.open_dataset(url, decode_times=False)
+        for name, coord in ds.variables.items():
             if coord.attrs.get("calendar") == "360":
                 coord.attrs["calendar"] = "360_day"
         ds = xr.decode_cf(ds)
