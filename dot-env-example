@@ -1,4 +1,4 @@
 PYDAP_ICECHUNK_ORIGINAL_ROOT=/data/original
 PYDAP_ICECHUNK_PROCESSED_ROOT=/data/processed
-PYDAP_CATALOG_ROOT=./catalog
+PYDAP_CATALOG_ROOT=../ccsr-config/catalog/cooked
 PYDAP_PORT=8001
