@@ -265,7 +265,8 @@ def catalog(
     non_std_names = [
         name for name in (set(ds.variables) | set(ds.sizes)) if name not in NAMES
     ]
-    assert len(non_std_names) == 0, f'non standard {*name,} in dataset'
+    if len(non_std_names) > 0:
+        raise Exception(f'non standard {*non_std_names,} in dataset')
     # Deleting buggy attributes
     for attr in list(ds.attrs):
         if str(ds.attrs[attr]).find('"') != -1 :
