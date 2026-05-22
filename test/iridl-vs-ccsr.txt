@@ -11,7 +11,7 @@ NMME/COLA-RSMAS/CCSM4/sst
 SOURCES/.Models/.NMME/.COLA-RSMAS-CCSM4/.MONTHLY/.sst/%5BX/Y/L/M/S%5D/REORDER/%5BX/Y%5D/REORDER/dods
 
 NMME/COLA-RSMAS/CCSM4/prcp
-SOURCES/.Models/.NMME/.COLA-RSMAS-CCSM4/.MONTHLY/a:/.prec/:a:/.T/S/units//TT/exch/gridtype/first/L/.first/add/1/last/L/.last/add/1.0/add/NewEvenGRID/nip/nip/c:/1/:c//name//target_length/def/exch/0/mul/add/TT/%28days%20since%201960-01-01%29streamgridunitconvert/TT/differential_mul/TT/%28months%20since%201960-01-01%29streamgridunitconvert//units//days/def/T/TT/sample-along%5BL/S%5DREORDER/0/RECHUNK/:a/mul%5BX/Y/L/M/S%5DREORDER%5BX/Y%5DREORDER//name//prcp/def/dods
+SOURCES/.Models/.NMME/.COLA-RSMAS-CCSM4/.MONTHLY/a%3A/a%3A/.prec/%3Aa%3A/.T/S/units//TT/exch/gridtype/first/L/.first/add/1/last/L/.last/add/1.0/add/NewEvenGRID/nip/nip/c%3A/1/%3Ac//name//target_length/def/exch/0/mul/add/TT/(days%20since%201960-01-01)/streamgridunitconvert/TT/differential_mul/TT/(months%20since%201960-01-01)/streamgridunitconvert//units//days/def/T/TT/sample-along/%5BL/S%5DREORDER/0/RECHUNK/%3Aa/mul/%5BX/Y/L/M/S%5DREORDER/%5BX/Y%5DREORDER//name//prcp/def/%3Aa%3A/.T/a%3A/.S/%3Aa%3A/.L/.get_bounds/%3Aa/add/I_bounds//nbound/renameGRID/%5B/nbound/L/S%5DREORDER//name//target_bnds/def/%3Aa/2/ds/dods
 
 NMME/COLA-RSMAS/CESM1/prcp
 SOURCES/.Models/.NMME/.COLA-RSMAS-CESM1/.MONTHLY/a%3A/.prec/%3Aa%3A/.T/S/units//TT/exch/gridtype/first/L/.first/add/1/last/L/.last/add/1.0/add/NewEvenGRID/nip/nip/c%3A/1/%3Ac//name//target_length/def/exch/0/mul/add/TT/(days%20since%201960-01-01)/streamgridunitconvert/TT/differential_mul/TT/(months%20since%201960-01-01)/streamgridunitconvert//units//days/def/T/TT/sample-along/%5BL/S%5DREORDER/0/RECHUNK/%3Aa/mul/%5BX/Y/L/M/S%5DREORDER/%5BX/Y%5DREORDER//name//prcp/def/dods

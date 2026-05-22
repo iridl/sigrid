@@ -21,9 +21,20 @@ def compare(url1, url2):
     var1 = names[0]
     
     names = list(ds2.data_vars)
-    assert len(names) == 1
-    var2 = names[0]
-    
+    assert len(names) == 1 or len(names) == 2
+    if len(names) == 2:
+        if 'target_bnds' in names:
+            ds2 = ds2.assign_coords({'target_bnds': ds2['target_bnds']})
+            names = list(ds2.data_vars)
+            assert len(names) == 1
+            var2 = names[0]
+        else:
+            raise Exception('2nd var should be target_bnds')
+    else:
+        var2 = names[0]
+
+    #compare_coords(ds1, ds2)
+
     da1 = ds1[var1]
     da2 = ds2[var2]
 
@@ -32,10 +43,10 @@ def compare(url1, url2):
     all_same &= compare_data(da1, da2)
     return all_same
 
-def compare_coords(da1, da2):
-    for cname in sorted(set(da1.coords) | set(da2.coords)):        
-        c1 = da1.coords.get(cname)
-        c2 = da2.coords.get(cname)
+def compare_coords(ds1, ds2):
+    for cname in sorted(set(ds1.coords) | set(ds2.coords)):        
+        c1 = ds1.coords.get(cname)
+        c2 = ds2.coords.get(cname)
         print(cname)
         if c1 is None:
             print(cname, 'absent', 'present')
@@ -43,12 +54,15 @@ def compare_coords(da1, da2):
         if c2 is None:
             print(cname, 'present', 'absent')
             continue
-        if np.array_equal(c1.values, c2.values):
-            print('values are the same')
-        else:
-            print('values differ:')
-            print(c1.values)
-            print(c2.values)
+        if cname == 'target_bnds':
+            compare_targets(c1, c2)
+        else:    
+            if np.array_equal(c1.values, c2.values):
+                print('values are the same')
+            else:
+                print('values differ:')
+                print(c1.values)
+                print(c2.values)
         compare_attrs(c1, c2)
 
 def compare_shape(da1, da2):
@@ -62,6 +76,19 @@ def compare_shape(da1, da2):
          print(dims1)
          print(dims2)
          return False
+
+def compare_targets(c1, c2):
+    c2 = c2.convert_calendar('standard', dim='S', align_on='date')
+    c1 = c1.dt.strftime("%Y%m%dT%H:%M").data
+    c2 = c2.dt.strftime("%Y%m%dT%H:%M").data
+    all_same = np.array_equal(c1, c2)
+    if all_same:
+        print(f'target_bnds are the same')
+    else:
+        print('target bounds differ')
+        print(c1)
+        print(c2)
+    return all_same
 
 def compare_data(da1, da2):
     # Accomodating the fact that Ingrid typically has a regular S grid, even if
@@ -97,7 +124,7 @@ def compare_attrs(da1, da2):
 def fetch(url):
     try:
         ds = xr.open_dataset(url, decode_times=False)
-        for name, coord in ds.coords.items():
+        for name, coord in ds.variables.items():
             if coord.attrs.get("calendar") == "360":
                 coord.attrs["calendar"] = "360_day"
         ds = xr.decode_cf(ds)
