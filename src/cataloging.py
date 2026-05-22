@@ -5,6 +5,7 @@ from typing import Mapping, cast
 
 import xarray as xr
 import xarray.conventions
+import xarray.coding.times
 import numpy as np
 import pandas as pd
 from dateutil.relativedelta import relativedelta
@@ -23,16 +24,26 @@ class UNITS_CONVERTER:
 UNITS_CONVERSIONS = {
     # This may sound silly but is needed as things are written now
     # it does nothing other than redefining units attr to the same value
+    'degree_north': UNITS_CONVERTER(0, 1, 'degree_north'),
+    'degrees_north': UNITS_CONVERTER(0, 1, 'degree_north'),
+    'degree_east': UNITS_CONVERTER(0, 1, 'degree_east'),
+    'degrees_east': UNITS_CONVERTER(0, 1, 'degree_east'),
     'degree_Celsius': UNITS_CONVERTER(0, 1, 'degree_Celsius'),
     'degreeC': UNITS_CONVERTER(0, 1, 'degree_Celsius'),
     'K': UNITS_CONVERTER(-273.15, 1, 'degree_Celsius'),
     'Kelvin': UNITS_CONVERTER(-273.15, 1, 'degree_Celsius'),
+    'gpm': UNITS_CONVERTER(0, 1, 'm'),
+    # Let's pray there won't be prcp in m s-1
+    'm s-1': UNITS_CONVERTER(0, 1, 'm s-1'),
     'kg m**-2 s**-1': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24 / 1000, 'mm/day'),
     'kg m-2 s-1': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24 / 1000, 'mm/day'),
+    'kg m^-2 s^-1': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24 / 1000, 'mm/day'),
     'mm/day': UNITS_CONVERTER(0, 1, 'mm/day'),
     'mm/s': UNITS_CONVERTER(0, 60 * 60 * 24, 'mm/day'),
     'm/s': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24, 'mm/day'),
     'm s**-1': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24, 'mm/day'),
+    'Pa': UNITS_CONVERTER(0, 1, 'Pa'),
+    'hPa': UNITS_CONVERTER(0, 100, 'Pa'),
 }
 
 # Keys are the conventional names used by pydap-icechunk.
@@ -42,23 +53,35 @@ UNITS_CONVERSIONS = {
 NAMES = {
     'S': 'S',
     'L': 'L',
-    'L_bnds': 'L_bnds',
     'Y': 'Y',
     'X': 'X',
     'M': 'M',
+    'P': 'P',
     'target': 'target',
     # NB target_bnds should be named after target
     'target_bnds': 'target_bnds',
     # Additionally, these keys are also the icechunk variables names.
+    'pr': 'pr',
     'prcp': 'prcp',
+    'tas': 'tas',
+    'tasmax': 'tasmax',
+    'tasmin': 'tasmin',
     't2m': 't2m',
     'sst': 'sst',
+    'psl': 'psl',
+    'uas': 'uas',
+    'vas': 'vas',
+    'zg': 'zg',
 }
 # Change the dictionary values 
 # should you different time encoding throughout your system
 DATETIME_ENCODING = {
     'units': 'hours since 1960-01-01',
     'calendar': 'standard',
+    'dtype': 'int32',
+}
+TIMEDELTA_ENCODING = {
+    'units': 'hours',
     'dtype': 'int32',
 }
 
@@ -72,18 +95,14 @@ STANDARD_ATTRS = {
     'L': {
         'long_name': 'Lead',
         'standard_name': 'forecast_period',
-        'bounds': NAMES['L_bnds'],
     },
-    'L_bnds': {},
     'Y': {
         'long_name': 'Latitude',
         'standard_name': 'latitude',
-        'units': 'degree_north',
     },
     'X': {
         'long_name': 'Longitude',
         'standard_name': 'longitude',
-        'units': 'degree_east',
     },
     'M': {
         'long_name': 'Ensemble member',
@@ -91,6 +110,10 @@ STANDARD_ATTRS = {
         # No units. From
         # https://cfconventions.org/Data/cf-conventions/cf-conventions-1.13/cf-conventions.html#dimensionless-units
         # "A variable with no units attribute is assumed to be dimensionless."
+    },
+    'P': {
+        'long_name': 'Pressure level',
+        'standard_name': 'air_pressure',
     },
     'target': {
         'long_name': 'Forecast target period',
@@ -104,9 +127,25 @@ STANDARD_ATTRS = {
         'bounds': NAMES['target_bnds'],
     },
     'target_bnds': {},
+    'pr': {
+        'long_name': 'Total precipitation',
+        'standard_name': 'lwe_precipitation_rate',
+    },
     'prcp': {
         'long_name': 'Total precipitation',
         'standard_name': 'lwe_precipitation_rate',
+    },
+    'tas': {
+        'long_name': 'Air temperature',
+        'standard_name': 'air_temperature',
+    },
+    'tasmax': {
+        'long_name': 'Maximum air temperature',
+        'standard_name': 'air_temperature',
+    },
+    'tasmin': {
+        'long_name': 'Minimum air temperature',
+        'standard_name': 'air_temperature',
     },
     't2m': {
         'long_name': 'Air temperature',
@@ -115,7 +154,23 @@ STANDARD_ATTRS = {
     'sst': {
         'long_name': 'Sea surface temperature',
         'standard_name': 'sea_surface_temperature',
-    }
+    },
+    'psl': {
+        'long_name': 'Pressure at sea level',
+        'standard_name': 'air_pressure_at_sea_level',
+    },
+    'uas': {
+        'long_name': '10m eastward wind',
+        'standard_name': 'eastward_wind',
+    },
+    'vas': {
+        'long_name': '10m northward wind',
+        'standard_name': 'northward_wind',
+    },
+    'zg': {
+        'long_name': 'Geopotential height',
+        'standard_name': 'geopotential_height',
+    },
 }
 
 DS_STANDARD_ATTRS = {
@@ -142,39 +197,38 @@ def standardize(
         # Override provider's encoding for datetimes
         if np.issubdtype(var, np.datetime64):
             var.encoding = dict(DATETIME_ENCODING)
+        elif np.issubdtype(var, np.timedelta64):
+            var.encoding = dict(TIMEDELTA_ENCODING)
 
         if name in ds.data_vars:
             # xarray knows which variables are aux coords,
             # but cf_encoder fails to encode that information,
             # so we do it ourselves.
             aux_coords: list[str] = []
-            if NAMES['L'] in var.dims:
-                aux_coords.append(NAMES['L_bnds'])
-                if NAMES['S'] in var.dims:
-                    aux_coords.extend([NAMES['target'], NAMES['target_bnds']])
+            if NAMES['S'] in var.dims:
+                aux_coords.extend([NAMES['target'], NAMES['target_bnds']])
             if aux_coords:
                 var.attrs['coordinates'] = ' '.join(aux_coords)
 
-            # convert units
-            # TODO will need to generalize to coords, e.g. Z in Pa vs hPa
-            if name in units:
-                # provide units explicitly if provider didn't (e.g. GFDL)
-                original_units = units[name]
-            else:
-                original_units = original_attrs.get('units')
-            if original_units is not None:
-                conversion = UNITS_CONVERSIONS[original_units]
-                if not (conversion.scale == 1 and conversion.offset == 0):
-                    var = var * conversion.scale + conversion.offset
-                var.attrs['units'] = conversion.name
+        # convert units
+        if name in units:
+            # provide units explicitly if provider didn't (e.g. GFDL)
+            original_units = units[name]
+        else:
+            original_units = original_attrs.get('units')
+        if original_units is not None:
+            conversion = UNITS_CONVERSIONS[original_units]
+            if not (conversion.scale == 1 and conversion.offset == 0):
+                var = var * conversion.scale + conversion.offset
+            var.attrs['units'] = conversion.name
 
-            if lead_is_month and name == 'prcp':
-                target_length = (
-                    ds['target_bnds'].isel(nbound=1, drop=True)
-                    - ds['target_bnds'].isel(nbound=0, drop=True)
-                ).dt.days
-                var = var * target_length.variable
-                var.attrs['units'] = 'mm'
+        if lead_is_month and name == 'prcp':
+            target_length = (
+                ds['target_bnds'].isel(nbound=1, drop=True)
+                - ds['target_bnds'].isel(nbound=0, drop=True)
+            ).dt.days
+            var = var * target_length.variable
+            var.attrs['units'] = 'mm'
 
         vars[name] = var
 
@@ -193,7 +247,6 @@ def standardize(
         tuple[Mapping[str, xr.Variable], Mapping[str, str]],
         xarray.conventions.cf_encoder(vars, attrs)
     )
-
     ds = xr.Dataset(
         data_vars={k: v for k, v in vars.items() if k in ds.data_vars},
         coords={k: v for k, v in vars.items() if k in ds.coords},
@@ -274,20 +327,26 @@ def catalog(
 
     if lead_is_month:
         # Set lead times
-        l = np.arange(ds.sizes[NAMES['L']])
-        l_bnds = np.stack([l, l+1], axis=1)
-        ds = ds.assign_coords({
-            NAMES['L']: l,
-            NAMES['L_bnds']: ((NAMES['L'], 'nbound'), l_bnds)
-        })
+        leads = np.arange(ds.sizes[NAMES['L']])
         # Set target
-        target, target_bnds = S_L_to_target(
+        targets, targets_bnds = S_L_to_target(
             ds[NAMES['S']], ds[NAMES['L']]
         )
-        ds = ds.assign_coords({
-            NAMES["target"]: target,
-            NAMES["target_bnds"]: target_bnds,
-        })
+        targets_bnds = targets_bnds.data
+    else:
+        targets = ds[NAMES["target"]]
+        leads = (
+            targets.isel({NAMES['S']: 0}, drop=True)
+            - ds[NAMES['S']].isel({NAMES['S']: 0}, drop=True)
+        )
+        targets_bnds = np.stack([targets, targets + np.timedelta64(1, 'D')], axis=2)
+    ds = ds.assign_coords({
+        NAMES['L']: leads,
+        NAMES['target']: targets,
+        NAMES['target_bnds']: (
+            (NAMES['S'], NAMES['L'], 'nbound'), targets_bnds
+        ),
+    })
 
     # Convert units, do cf-encoding and standardize attrs
     ds = standardize(ds, lead_is_month, units)

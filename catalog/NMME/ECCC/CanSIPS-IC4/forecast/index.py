@@ -21,11 +21,14 @@ def open(varname) -> xr.Dataset:
             'avg_sst': 'sst',
         },
         lead_is_month=True,
+        units={
+            'M': None,
+        },
     )
 
 def list_vars():
     return [
-        cataloging.VARS_NAMES['prcp'],
-        cataloging.VARS_NAMES['t2m'],
-        cataloging.VARS_NAMES['sst'],
+        cataloging.NAMES['prcp'],
+        cataloging.NAMES['t2m'],
+        cataloging.NAMES['sst'],
     ]
