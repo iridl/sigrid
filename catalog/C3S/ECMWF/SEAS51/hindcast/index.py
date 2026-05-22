@@ -7,9 +7,9 @@ def open(varname) -> xr.Dataset:
     return cataloging.catalog(
         varname,
         varpath='C3S/ECMWF/SEAS51/hindcast',
-        # maps icechunk names to pydap-icechunk conventional names
-        # Keys can not be changed,
-        # Values must correspond to icechunk names
+        # maps icechunk names (keys)to pydap-icechunk conventional names (values)
+        # Values can not be changed,
+        # Keys must correspond to icechunk names
         original_names={
             'IRIDL_time': 'S',
             'step': 'L',

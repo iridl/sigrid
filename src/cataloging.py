@@ -256,13 +256,16 @@ def catalog(
     # Renaming std and dropping non-std
     for name in (set(ds.variables) | set(ds.sizes)):
         if name in original_names:
-            if name != original_names[name]: # Can't rename with same name
+            if name != original_names[name]: 
                 ds = ds.rename({name: NAMES[original_names[name]]})
-        elif name not in NAMES: # not std will be dropped
+        elif name not in NAMES:
             if name in ds.variables:
                 ds = ds.drop_vars(name)
-            elif name in ds.sizes: # dims, could have been dropped with a var
-                ds = ds.drop_dims(name, errors='ignore')
+    # Checking everything is standard:
+    non_std_names = [
+        name for name in (set(ds.variables) | set(ds.sizes)) if name not in NAMES
+    ]
+    assert len(non_std_names) == 0, f'non standard {*name,} in dataset'
     # Deleting buggy attributes
     for attr in list(ds.attrs):
         if str(ds.attrs[attr]).find('"') != -1 :
