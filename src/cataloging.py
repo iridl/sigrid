@@ -39,7 +39,7 @@ UNITS_CONVERSIONS = {
 # They can not be changed and serve as well as identifiers for the different objects.
 # Values are what are going to be shown on, and served, by the pydap server
 # They can be changed to the taste of the Catalog administrator
-COORDS_NAMES = {
+NAMES = {
     'S': 'S',
     'L': 'L',
     'L_bnds': 'L_bnds',
@@ -48,10 +48,8 @@ COORDS_NAMES = {
     'M': 'M',
     'target': 'target',
     # NB target_bnds should be named after target
-    'target_bnds': 'target_bnds'
-}
-# Same as above, additionally, keys are the icechunk variables names.
-VARS_NAMES = {
+    'target_bnds': 'target_bnds',
+    # Additionally, these keys are also the icechunk variables names.
     'prcp': 'prcp',
     't2m': 't2m',
     'sst': 'sst',
@@ -74,7 +72,7 @@ STANDARD_ATTRS = {
     'L': {
         'long_name': 'Lead',
         'standard_name': 'forecast_period',
-        'bounds': COORDS_NAMES['L_bnds'],
+        'bounds': NAMES['L_bnds'],
     },
     'L_bnds': {},
     'Y': {
@@ -103,7 +101,7 @@ STANDARD_ATTRS = {
         # is valid; the standard name of time should be used for that time.
         # https://cfconventions.org/Data/cf-standard-names/current/build/cf-standard-name-table.html
         'standard_name': 'time',
-        'bounds': COORDS_NAMES['target_bnds'],
+        'bounds': NAMES['target_bnds'],
     },
     'target_bnds': {},
     'prcp': {
@@ -150,10 +148,10 @@ def standardize(
             # but cf_encoder fails to encode that information,
             # so we do it ourselves.
             aux_coords: list[str] = []
-            if COORDS_NAMES['L'] in var.dims:
-                aux_coords.append(COORDS_NAMES['L_bnds'])
-                if COORDS_NAMES['S'] in var.dims:
-                    aux_coords.extend([COORDS_NAMES['target'], COORDS_NAMES['target_bnds']])
+            if NAMES['L'] in var.dims:
+                aux_coords.append(NAMES['L_bnds'])
+                if NAMES['S'] in var.dims:
+                    aux_coords.extend([NAMES['target'], NAMES['target_bnds']])
             if aux_coords:
                 var.attrs['coordinates'] = ' '.join(aux_coords)
 
@@ -243,7 +241,7 @@ def catalog(
     units: Mapping[str, str] | None = None,
     lead_is_month: bool = False,
     ):
-    icechunk_var = [key for key, value in VARS_NAMES.items() if value == varname][0]
+    icechunk_var = [key for key, value in NAMES.items() if value == varname][0]
     ds = pydap_icechunk.open_icechunk(
         f'{varpath}/{icechunk_var}',
     )
@@ -255,52 +253,20 @@ def catalog(
     for dim in ds.dims:
         if ds.sizes[dim] == 1 :
             ds = ds.squeeze(dim, drop=True)
-    # Renaming
-    # TODO This lot has become wild. Revisit
-    for var in original_names:
-        # Need to cover list of original names 
-        # when different vars have different coords names, see e.g. SPEAR
-        if not isinstance(original_names[var], list):
-            orig_names = [original_names[var]]
-        else :
-            orig_names = original_names[var]
-        for orig_name in orig_names:
-            if (
-                # accomodates when different vars have diffrent coord names
-                orig_name in ds.dims
-                # only conventional coords
-                and var in COORDS_NAMES
-                # rename can't rename with same name
-                and orig_name != COORDS_NAMES[var]
-            ):
-                ds = ds.rename({orig_name: COORDS_NAMES[var]})
-            if (
-                # only conventional vars
-                var in VARS_NAMES
-                # accommodates same catalog catalogs all variables
-                and VARS_NAMES[var] == varname
-                # rename can't rename with same name
-                and orig_name != VARS_NAMES[var]
-            ):
-                ds = ds.rename({original_names[var]: varname})
-    # Drop coords not standard
-    ds = ds.drop_vars(
-        [
-            name
-            for name in ds.coords
-            if name not in COORDS_NAMES.values()
-        ]
-    )
-    # Drop vars not standard
-    # This is for SPEAR TIME_bnds
-    # TODO all bounds
-    ds = ds.drop_vars(
-        [
-            name
-            for name in ds.keys()
-            if name not in VARS_NAMES.values()
-        ]
-    )
+    # Renaming std and dropping non-std
+    for name in (set(ds.variables) | set(ds.sizes)):
+        if name in original_names:
+            if name != original_names[name]: 
+                ds = ds.rename({name: NAMES[original_names[name]]})
+        elif name not in NAMES:
+            if name in ds.variables:
+                ds = ds.drop_vars(name)
+    # Checking everything is standard:
+    non_std_names = [
+        name for name in (set(ds.variables) | set(ds.sizes)) if name not in NAMES
+    ]
+    if len(non_std_names) > 0:
+        raise Exception(f'non standard {*non_std_names,} in dataset')
     # Deleting buggy attributes
     for attr in list(ds.attrs):
         if str(ds.attrs[attr]).find('"') != -1 :
@@ -308,19 +274,19 @@ def catalog(
 
     if lead_is_month:
         # Set lead times
-        l = np.arange(ds.sizes[COORDS_NAMES['L']])
+        l = np.arange(ds.sizes[NAMES['L']])
         l_bnds = np.stack([l, l+1], axis=1)
         ds = ds.assign_coords({
-            COORDS_NAMES['L']: l,
-            COORDS_NAMES['L_bnds']: ((COORDS_NAMES['L'], 'nbound'), l_bnds)
+            NAMES['L']: l,
+            NAMES['L_bnds']: ((NAMES['L'], 'nbound'), l_bnds)
         })
         # Set target
         target, target_bnds = S_L_to_target(
-            ds[COORDS_NAMES['S']], ds[COORDS_NAMES['L']]
+            ds[NAMES['S']], ds[NAMES['L']]
         )
         ds = ds.assign_coords({
-            COORDS_NAMES["target"]: target,
-            COORDS_NAMES["target_bnds"]: target_bnds,
+            NAMES["target"]: target,
+            NAMES["target_bnds"]: target_bnds,
         })
 
     # Convert units, do cf-encoding and standardize attrs
