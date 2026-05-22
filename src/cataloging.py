@@ -53,7 +53,6 @@ UNITS_CONVERSIONS = {
 NAMES = {
     'S': 'S',
     'L': 'L',
-    'L_bnds': 'L_bnds',
     'Y': 'Y',
     'X': 'X',
     'M': 'M',
@@ -96,9 +95,7 @@ STANDARD_ATTRS = {
     'L': {
         'long_name': 'Lead',
         'standard_name': 'forecast_period',
-        'bounds': NAMES['L_bnds'],
     },
-    'L_bnds': {},
     'Y': {
         'long_name': 'Latitude',
         'standard_name': 'latitude',
@@ -200,16 +197,16 @@ def standardize(
         # Override provider's encoding for datetimes
         if np.issubdtype(var, np.datetime64):
             var.encoding = dict(DATETIME_ENCODING)
+        elif np.issubdtype(var, np.timedelta64):
+            var.encoding = dict(TIMEDELTA_ENCODING)
 
         if name in ds.data_vars:
             # xarray knows which variables are aux coords,
             # but cf_encoder fails to encode that information,
             # so we do it ourselves.
             aux_coords: list[str] = []
-            if NAMES['L'] in var.dims:
-                aux_coords.append(NAMES['L_bnds'])
-                if NAMES['S'] in var.dims:
-                    aux_coords.extend([NAMES['target'], NAMES['target_bnds']])
+            if NAMES['S'] in var.dims:
+                aux_coords.extend([NAMES['target'], NAMES['target_bnds']])
             if aux_coords:
                 var.attrs['coordinates'] = ' '.join(aux_coords)
 
@@ -246,30 +243,10 @@ def standardize(
     # Keep the provider's remaining dataset-level attributes, and add our own.
     attrs.update(DS_STANDARD_ATTRS)
 
-    timedelta_vars = {
-        name: var
-        for name, var in vars.items()
-        if np.issubdtype(var, np.timedelta64)
-    }
-    for name, var in timedelta_vars.items():
-        encoded_var, encoded_units = xarray.coding.times.encode_cf_timedelta(var, TIMEDELTA_ENCODING['units'], TIMEDELTA_ENCODING['dtype'])
-        encoded_var = xr.DataArray(
-            data=encoded_var,
-            dims=var.dims,
-            attrs=var.attrs,
-        )
-        encoded_var.attrs['units'] = encoded_units
-        timedelta_vars[name] = encoded_var
-    other_vars = {
-        name: var
-        for name, var in vars.items()
-        if ~np.issubdtype(var, np.timedelta64)
-    }
-    other_vars, attrs = cast(
+    vars, attrs = cast(
         tuple[Mapping[str, xr.Variable], Mapping[str, str]],
-        xarray.conventions.cf_encoder(other_vars, attrs)
+        xarray.conventions.cf_encoder(vars, attrs)
     )
-    vars = other_vars | timedelta_vars
     ds = xr.Dataset(
         data_vars={k: v for k, v in vars.items() if k in ds.data_vars},
         coords={k: v for k, v in vars.items() if k in ds.coords},
@@ -351,7 +328,6 @@ def catalog(
     if lead_is_month:
         # Set lead times
         leads = np.arange(ds.sizes[NAMES['L']])
-        leads_bnds = np.stack([leads, leads + 1], axis=1)
         # Set target
         targets, targets_bnds = S_L_to_target(
             ds[NAMES['S']], ds[NAMES['L']]
@@ -363,11 +339,9 @@ def catalog(
             targets.isel({NAMES['S']: 0}, drop=True)
             - ds[NAMES['S']].isel({NAMES['S']: 0}, drop=True)
         )
-        leads_bnds = np.stack([leads, leads + np.timedelta64(1, 'D')], axis=1)
         targets_bnds = np.stack([targets, targets + np.timedelta64(1, 'D')], axis=2)
     ds = ds.assign_coords({
         NAMES['L']: leads,
-        NAMES['L_bnds']: ((NAMES['L'], 'nbound'), leads_bnds),
         NAMES['target']: targets,
         NAMES['target_bnds']: (
             (NAMES['S'], NAMES['L'], 'nbound'), targets_bnds
