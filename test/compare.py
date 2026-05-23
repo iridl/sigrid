@@ -152,17 +152,17 @@ if __name__ == '__main__':
     parser.add_argument("listfile")
     parser.add_argument("test_path")
     parser.add_argument("--record", action='store_true')
+    parser.add_argument("--verbose", action='store_true')
     
     args = parser.parse_args()
     path_mapping = parse_listfile(args.listfile)
     url1 = f'{args.test_root}/{args.test_path}'
     url2 = f'{args.reference_root}/{path_mapping[args.test_path]}'
-    print(url1)
-    print(url2)
     with recording_proxy.recording_proxy(
             "responses",
             args.record,
             prefixes=[args.reference_root],
+            verbose=args.verbose,
     ):
         all_same = compare(url1, url2)
     print(all_same)
