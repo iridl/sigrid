@@ -3,6 +3,7 @@ import sys
 import time
 
 import numpy as np
+import recording_proxy
 import xarray as xr
 
 def compare(url1, url2):
@@ -102,10 +103,7 @@ def compare_data(da1, da2):
         s = da1['S'].isel(S=i).values
         same = compare_slice(da1.sel(S=s), da2.sel(S=s))
         print(f"S={s}: {same}")
-        if not same:
-            print(da1.sel(S=s))
-            print(da2.sel(S=s))
-            all_same = False
+        all_same &= same
     return all_same
 
 def compare_slice(da1, da2):
@@ -153,14 +151,20 @@ if __name__ == '__main__':
     parser.add_argument("reference_root")
     parser.add_argument("listfile")
     parser.add_argument("test_path")
+    parser.add_argument("--record", action='store_true')
+    parser.add_argument("--verbose", action='store_true')
     
     args = parser.parse_args()
     path_mapping = parse_listfile(args.listfile)
     url1 = f'{args.test_root}/{args.test_path}'
     url2 = f'{args.reference_root}/{path_mapping[args.test_path]}'
-    print(url1)
-    print(url2)
-    all_same = compare(url1, url2)
+    with recording_proxy.recording_proxy(
+            "responses",
+            args.record,
+            prefixes=[args.reference_root],
+            verbose=args.verbose,
+    ):
+        all_same = compare(url1, url2)
     print(all_same)
     if all_same:
         sys.exit(0)
