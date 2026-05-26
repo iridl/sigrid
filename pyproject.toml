@@ -12,22 +12,12 @@ build-backend = "setuptools.build_meta"
 [tool.pixi.workspace]
 channels = ["conda-forge"]
 platforms = ["linux-64"]
-preview = ["pixi-build"]
-
-[tool.pixi.package.build.backend]
-name = "pixi-build-python"
-version = "==0.4.4"
-channels = ["https://prefix.dev/conda-forge"]
-
-#[tool.pixi.package.build.config]
-#ignore-pypi-mapping = false
 
 [tool.pixi.dependencies]
 pydap = ">=3.5.8,<4"
-xarray = ">=2026.4.0,<2027"
+xarray = "*"  # doesn't use semantic versioning
 icechunk = ">=2.0.3,<3"
-gunicorn = ">=25.3.0,<26"  # TODO shouldn't be required. This is a mistake/judgment error in pydap.wsgi.app.
-dask = ">=2026.3.0,<2027"
+dask = "*"  # doesn't use semantic versioning
 cftime = ">=1.6.5,<2"
 
 [tool.pixi.feature.dev.dependencies]
@@ -38,14 +28,13 @@ pydap-icechunk = { path = ".", editable = true }
 
 [tool.pixi.feature.client.dependencies]
 netcdf4 = "*"
-xarray = ">=2026.4.0,<2027"
+# client environment is separate from default, so
+# it doesn't have xarray unless we explicitly add it.
+xarray = "*"
 
 [tool.pixi.feature.client.pypi-dependencies]
 #recording-proxy = { path = "../recording-proxy", editable = true }
 recording-proxy = { git = "ssh://git@github.com/iridl/recording-proxy.git", rev = "a1df94c"}
-
-[tool.pixi.package.host-dependencies]
-setuptools = ">=80,<90"
 
 [tool.pixi.environments]
 default = {features = ["dev"], solve-group = "prod"}
@@ -53,9 +42,10 @@ prod = {features = [], solve-group = "prod"}
 client = {features = ["client"]}
 
 [tool.pixi.tasks]
-#server = "env $(cat .env) python test/server_for_test.py"
 python = "env $(cat .env) python"
 
+
+#### pyright
 
 [tool.pyright]
 typeCheckingMode = "recommended"
