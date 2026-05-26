@@ -32,9 +32,11 @@ UNITS_CONVERSIONS = {
     'degreeC': UNITS_CONVERTER(0, 1, 'degree_Celsius'),
     'K': UNITS_CONVERTER(-273.15, 1, 'degree_Celsius'),
     'Kelvin': UNITS_CONVERTER(-273.15, 1, 'degree_Celsius'),
+    'm': UNITS_CONVERTER(0, 1, 'm'),
     'gpm': UNITS_CONVERTER(0, 1, 'm'),
     # Let's pray there won't be prcp in m s-1
     'm s-1': UNITS_CONVERTER(0, 1, 'm s-1'),
+    'kg/m2': UNITS_CONVERTER(0, 1000 / 1000, 'mm'),
     'kg m**-2 s**-1': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24 / 1000, 'mm/day'),
     'kg m-2 s-1': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24 / 1000, 'mm/day'),
     'kg m^-2 s^-1': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24 / 1000, 'mm/day'),
@@ -44,6 +46,8 @@ UNITS_CONVERSIONS = {
     'm s**-1': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24, 'mm/day'),
     'Pa': UNITS_CONVERTER(0, 1, 'Pa'),
     'hPa': UNITS_CONVERTER(0, 100, 'Pa'),
+    # Volumetric latent heat of vaporization: 2453 MJ m-3
+    'watt/m^2': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24 / 2453000000, 'mm/day'),
 }
 
 # Keys are the conventional names used by pydap-icechunk.
@@ -66,12 +70,18 @@ NAMES = {
     'tas': 'tas',
     'tasmax': 'tasmax',
     'tasmin': 'tasmin',
+    'tmin': 'tmin',
+    'tmax': 'tmax',
     't2m': 't2m',
     'sst': 'sst',
     'psl': 'psl',
     'uas': 'uas',
     'vas': 'vas',
+    'z': 'z',
     'zg': 'zg',
+    'evap': 'evap',
+    'runoff': 'runoff',
+    'sm': 'sm',
 }
 # Change the dictionary values 
 # should you different time encoding throughout your system
@@ -151,6 +161,14 @@ STANDARD_ATTRS = {
         'long_name': 'Air temperature',
         'standard_name': 'air_temperature',
     },
+    'tmax': {
+        'long_name': 'Maximum air temperature',
+        'standard_name': 'air_temperature',
+    },
+    'tmin': {
+        'long_name': 'Minimum air temperature',
+        'standard_name': 'air_temperature',
+    },
     'sst': {
         'long_name': 'Sea surface temperature',
         'standard_name': 'sea_surface_temperature',
@@ -167,9 +185,25 @@ STANDARD_ATTRS = {
         'long_name': '10m northward wind',
         'standard_name': 'northward_wind',
     },
+    'z': {
+        'long_name': 'Geopotential height',
+        'standard_name': 'geopotential_height',
+    },
     'zg': {
         'long_name': 'Geopotential height',
         'standard_name': 'geopotential_height',
+    },
+    'evap': {
+        'long_name': 'Canopy evaporation',
+        'standard_name': 'water_evaporation_flux_from_canopy',
+    },
+    'runoff': {
+        'long_name': 'Runoff',
+        'standard_name': 'runoff_flux',
+    },
+    'sm': {
+        'long_name': 'Soil moisture',
+        'standard_name': 'soil_moisture_content',
     },
 }
 
