@@ -55,9 +55,10 @@ def compare_coords(ds1, ds2):
         if c2 is None:
             print(cname, 'present', 'absent')
             continue
-        if cname == 'target_bnds':
-            compare_targets(c1, c2)
-        else:    
+        else:
+            if cname == "target_bnds":
+                c1 = c1.dt.strftime("%Y%m%dT%H:%M")
+                c2 = c2.dt.strftime("%Y%m%dT%H:%M")
             if np.array_equal(c1.values, c2.values):
                 print('values are the same')
             else:
@@ -77,19 +78,6 @@ def compare_shape(da1, da2):
          print(dims1)
          print(dims2)
          return False
-
-def compare_targets(c1, c2):
-    c2 = c2.convert_calendar('standard', dim='S', align_on='date')
-    c1 = c1.dt.strftime("%Y%m%dT%H:%M").data
-    c2 = c2.dt.strftime("%Y%m%dT%H:%M").data
-    all_same = np.array_equal(c1, c2)
-    if all_same:
-        print(f'target_bnds are the same')
-    else:
-        print('target bounds differ')
-        print(c1)
-        print(c2)
-    return all_same
 
 def compare_data(da1, da2):
     # Accomodating the fact that Ingrid typically has a regular S grid, even if
