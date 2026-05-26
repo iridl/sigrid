@@ -5,7 +5,6 @@ from typing import Mapping, cast
 
 import xarray as xr
 import xarray.conventions
-import xarray.coding.times
 import numpy as np
 import pandas as pd
 from dateutil.relativedelta import relativedelta
@@ -341,7 +340,7 @@ def catalog(
         if ds.sizes[dim] == 1 :
             ds = ds.squeeze(dim, drop=True)
     # Renaming std and dropping non-std
-    for name in (set(ds.variables) | set(ds.sizes)):
+    for name in (set(vars_of(ds)) | set(sizes_of(ds))):
         if name in original_names:
             if name != original_names[name]: 
                 ds = ds.rename({name: NAMES[original_names[name]]})
@@ -397,3 +396,8 @@ def coords_of(ds: xr.Dataset | xr.DataArray):
 def vars_of(ds: xr.Dataset):
     assert all(isinstance(k, str) for k in ds.variables)
     return cast(Mapping[str, xr.Variable], ds.variables)
+
+
+def sizes_of(ds: xr.Dataset | xr.DataArray):
+    assert all(isinstance(k, str) for k in ds.sizes)
+    return cast(Mapping[str, int], ds.sizes)
