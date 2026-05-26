@@ -14,7 +14,7 @@ import numpy as np
 
 from pydap.handlers.lib import BaseHandler
 from pydap.model import BaseType, DatasetType
-from pydap.wsgi.app import alphanum_key
+
 
 
 orig_root = os.environ['PYDAP_ICECHUNK_ORIGINAL_ROOT']
@@ -306,4 +306,27 @@ def load_index(file_path):
     assert spec.loader  
     spec.loader.exec_module(module)
     return module
+
+
+# Vendored from pydap to avoid a spurious dependency on gunicorn
+def alphanum_key(s):
+    """Parse a string, returning a list of string and number chunks.
+
+        >>> alphanum_key("z23a")
+        ['z', 23, 'a']
+
+    Useful for sorting names in a natural way.
+
+    From http://nedbatchelder.com/blog/200712.html#e20071211T054956
+
+    """
+
+    def tryint(s):
+        try:
+            return int(s)
+        except Exception:
+            return s
+
+    return [tryint(c) for c in re.split("([0-9]+)", s)]
+
 
