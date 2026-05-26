@@ -18,10 +18,7 @@ def open(varname) -> xr.Dataset:
     }
     ds = ds.rename({k: v for k, v in rename_map.items() if k in ds})
     original_names = {
-        't2m': '2t',
-        'u10': '10u',
-        'v10': '10v',
-        'd2m': '2dt',
+        'test': 'test',
         }
     # setdefault is used as a check for the value of varname. 
     # If it does not exist in the dictionary, it means that both 
@@ -60,6 +57,14 @@ def open(varname) -> xr.Dataset:
     #Invert Y from N-S to S-N
     if ds['Y'].values[0] > ds['Y'].values[-1]:
         ds = ds.isel(Y=slice(None, None, -1))
+        ds['Y'].attrs['stored_direction'] = 'increasing'
     #Force target as coordinate
     ds[varname].attrs['coordinates'] = "target"
     return ds
+
+def list_vars():
+    return ['gh', 'u', 'v', 't', 'w', 'q', 'pv', 'mswpt300m', 'uoe', 
+            'von', 'zos', 'sos', 't20d', 'sav300', 'sithick', 'mlotst010',
+            't2m', 'd2m', 'sd', 'rsn', 'sm20', 'st20', 'mx2t6', 'mn2t6', 'sp', 
+            'sshf', 'msl', 'slhf', 'u10', 'v10', 'lsm', 'ssrd', 'ssr', 'strd', 
+            'str', 'ttr', 'orog', 'cp', 'sf', 'tp']
