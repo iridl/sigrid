@@ -15,39 +15,39 @@ import pydap_icechunk
 
 
 @dataclass
-class UNITS_CONVERTER:
+class UNIT_CONVERTER:
     offset: float
     scale: float
     name: str
 
 
-UNITS_CONVERSIONS = {
+UNIT_CONVERSIONS = {
     # This may sound silly but is needed as things are written now
     # it does nothing other than redefining units attr to the same value
-    'degree_north': UNITS_CONVERTER(0, 1, 'degree_north'),
-    'degrees_north': UNITS_CONVERTER(0, 1, 'degree_north'),
-    'degree_east': UNITS_CONVERTER(0, 1, 'degree_east'),
-    'degrees_east': UNITS_CONVERTER(0, 1, 'degree_east'),
-    'degree_Celsius': UNITS_CONVERTER(0, 1, 'degree_Celsius'),
-    'degreeC': UNITS_CONVERTER(0, 1, 'degree_Celsius'),
-    'K': UNITS_CONVERTER(-273.15, 1, 'degree_Celsius'),
-    'Kelvin': UNITS_CONVERTER(-273.15, 1, 'degree_Celsius'),
-    'm': UNITS_CONVERTER(0, 1, 'm'),
-    'gpm': UNITS_CONVERTER(0, 1, 'm'),
+    'degree_north': UNIT_CONVERTER(0, 1, 'degree_north'),
+    'degrees_north': UNIT_CONVERTER(0, 1, 'degree_north'),
+    'degree_east': UNIT_CONVERTER(0, 1, 'degree_east'),
+    'degrees_east': UNIT_CONVERTER(0, 1, 'degree_east'),
+    'degree_Celsius': UNIT_CONVERTER(0, 1, 'degree_Celsius'),
+    'degreeC': UNIT_CONVERTER(0, 1, 'degree_Celsius'),
+    'K': UNIT_CONVERTER(-273.15, 1, 'degree_Celsius'),
+    'Kelvin': UNIT_CONVERTER(-273.15, 1, 'degree_Celsius'),
+    'm': UNIT_CONVERTER(0, 1, 'm'),
+    'gpm': UNIT_CONVERTER(0, 1, 'm'),
     # Let's pray there won't be prcp in m s-1
-    'm s-1': UNITS_CONVERTER(0, 1, 'm s-1'),
-    'kg/m2': UNITS_CONVERTER(0, 1000 / 1000, 'mm'),
-    'kg m**-2 s**-1': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24 / 1000, 'mm/day'),
-    'kg m-2 s-1': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24 / 1000, 'mm/day'),
-    'kg m^-2 s^-1': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24 / 1000, 'mm/day'),
-    'mm/day': UNITS_CONVERTER(0, 1, 'mm/day'),
-    'mm/s': UNITS_CONVERTER(0, 60 * 60 * 24, 'mm/day'),
-    'm/s': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24, 'mm/day'),
-    'm s**-1': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24, 'mm/day'),
-    'Pa': UNITS_CONVERTER(0, 1, 'Pa'),
-    'hPa': UNITS_CONVERTER(0, 100, 'Pa'),
+    'm s-1': UNIT_CONVERTER(0, 1, 'm s-1'),
+    'kg/m2': UNIT_CONVERTER(0, 1000 / 1000, 'mm'),
+    'kg m**-2 s**-1': UNIT_CONVERTER(0, 1000 * 60 * 60 * 24 / 1000, 'mm/day'),
+    'kg m-2 s-1': UNIT_CONVERTER(0, 1000 * 60 * 60 * 24 / 1000, 'mm/day'),
+    'kg m^-2 s^-1': UNIT_CONVERTER(0, 1000 * 60 * 60 * 24 / 1000, 'mm/day'),
+    'mm/day': UNIT_CONVERTER(0, 1, 'mm/day'),
+    'mm/s': UNIT_CONVERTER(0, 60 * 60 * 24, 'mm/day'),
+    'm/s': UNIT_CONVERTER(0, 1000 * 60 * 60 * 24, 'mm/day'),
+    'm s**-1': UNIT_CONVERTER(0, 1000 * 60 * 60 * 24, 'mm/day'),
+    'Pa': UNIT_CONVERTER(0, 1, 'Pa'),
+    'hPa': UNIT_CONVERTER(0, 100, 'Pa'),
     # Volumetric latent heat of vaporization: 2453 MJ m-3
-    'watt/m^2': UNITS_CONVERTER(0, 1000 * 60 * 60 * 24 / 2453000000, 'mm/day'),
+    'watt/m^2': UNIT_CONVERTER(0, 1000 * 60 * 60 * 24 / 2453000000, 'mm/day'),
 }
 
 # Keys are the conventional names used by pydap-icechunk.
@@ -251,7 +251,7 @@ def standardize(
         else:
             original_units = original_attrs.get('units')
         if original_units is not None:
-            conversion = UNITS_CONVERSIONS[original_units]
+            conversion = UNIT_CONVERSIONS[original_units]
             if not (conversion.scale == 1 and conversion.offset == 0):
                 var = var * conversion.scale + conversion.offset
             var.attrs['units'] = conversion.name
