@@ -5,6 +5,7 @@ from typing import override
 import dask.array
 import icechunk
 import os
+import re
 import jinja2
 import webob
 from webob.dec import wsgify
