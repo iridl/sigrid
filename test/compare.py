@@ -34,7 +34,7 @@ def compare(url1, url2):
     else:
         var2 = names[0]
 
-    #compare_coords(ds1, ds2)
+    compare_coords(ds1, ds2)
 
     da1 = ds1[var1]
     da2 = ds2[var2]
@@ -59,6 +59,8 @@ def compare_coords(ds1, ds2):
             if cname == "target_bnds":
                 c1 = c1.dt.strftime("%Y%m%dT%H:%M")
                 c2 = c2.dt.strftime("%Y%m%dT%H:%M")
+            if cname == 'L':
+                c2 = c2 - 0.5
             if np.array_equal(c1.values, c2.values):
                 print('values are the same')
             else:
