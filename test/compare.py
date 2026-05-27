@@ -56,9 +56,9 @@ def compare_coords(ds1, ds2):
             print(cname, 'present', 'absent')
             continue
         else:
-            if cname == "target_bnds":
-                c1 = c1.dt.strftime("%Y%m%dT%H:%M")
-                c2 = c2.dt.strftime("%Y%m%dT%H:%M")
+            if cname in ['target_bnds', 'S']:
+                c1 = c1.dt.strftime('%Y%m%dT%H:%M')
+                c2 = c2.dt.strftime('%Y%m%dT%H:%M')
             if cname == 'L':
                 c2 = c2 - 0.5
             if np.array_equal(c1.values, c2.values):
