@@ -19,6 +19,7 @@ def compare(url1, url2, atol):
         print('second failed', e)
         return
 
+    ds2 = ds2.convert_calendar('standard', dim='S', align_on='date')
     compare_ds(ds1, ds2, atol)
 
 def compare_ds(ds1, ds2, atol):
@@ -85,7 +86,6 @@ def compare_data(da1, da2, atol):
     # we have no files for some values of S, whereas pydap's S coordinate only
     # contains values of S for which files are present. Only compare data for dates
     # that exist in both datasets; rely on compare_shape to catch missing dates.
-    da2 = da2.convert_calendar('standard', dim='S', align_on='date')
     s_len = da1.sizes['S']
     all_same = True
     for i in (0, s_len // 2, s_len - 1):
