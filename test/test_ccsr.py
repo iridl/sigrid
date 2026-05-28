@@ -48,10 +48,11 @@ def proxy():
         yield
 
 
-def test_first(proxy, server):
-    print('test starts')
-    path_mapping = compare.parse_listfile('../ccsr-config/test/iridl-vs-ccsr.txt')
-    test_path = 'NMME/COLA-RSMAS/CCSM4/t2m'
+paths = compare.parse_listfile('../ccsr-config/test/iridl-vs-ccsr.txt')
+
+@pytest.mark.parametrize('test_path', paths.keys())
+def test_first(proxy, server, test_path):
+    reference_path = paths[test_path]
     url1 = f'{server}/{test_path}'
-    url2 = f'http://iridl.ldeo.columbia.edu/{path_mapping[test_path]}'
+    url2 = f'http://iridl.ldeo.columbia.edu/{reference_path}'
     assert compare.compare(url1, url2)
