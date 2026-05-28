@@ -38,10 +38,11 @@ def server():
 
 
 @pytest.fixture(scope="session")
-def proxy():
+def proxy(request):
+    is_record = request.config.getoption('--record')
     with recording_proxy.recording_proxy(
             "responses",
-            is_record=False,
+            is_record=is_record,
             prefixes=['http://iridl.ldeo.columbia.edu'],
             verbose=True,
     ):
