@@ -89,7 +89,7 @@ def compare_targets(c1, c2):
     c2 = c2.dt.strftime("%Y%m%dT%H:%M").data
     all_same = np.array_equal(c1, c2)
     if all_same:
-        print(f'target_bnds are the same')
+        print('target_bnds are the same')
     else:
         print('target bounds differ')
         print(c1)
