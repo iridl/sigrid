@@ -6,7 +6,7 @@ import numpy as np
 import recording_proxy
 import xarray as xr
 
-def compare(url1, url2):
+def compare(url1, url2, atol):
     ds1 = fetch(url1)
     ds2 = fetch(url2)
 
@@ -41,7 +41,7 @@ def compare(url1, url2):
 
     all_same = True
     all_same &= compare_shape(da1, da2)
-    all_same &= compare_data(da1, da2)
+    all_same &= compare_data(da1, da2, atol)
     return all_same
 
 def compare_coords(ds1, ds2):
@@ -91,7 +91,7 @@ def compare_targets(c1, c2):
         print(c2)
     return all_same
 
-def compare_data(da1, da2):
+def compare_data(da1, da2, atol):
     # Accomodating the fact that Ingrid typically has a regular S grid, even if
     # we have no files for some values of S, whereas pydap's S coordinate only
     # contains values of S for which files are present. Only compare data for dates
@@ -101,19 +101,19 @@ def compare_data(da1, da2):
     all_same = True
     for i in (0, s_len // 2, s_len - 1):
         s = da1['S'].isel(S=i).values
-        same = compare_slice(da1.sel(S=s), da2.sel(S=s))
+        same = compare_slice(da1.sel(S=s), da2.sel(S=s), atol=atol)
         print(f"S={s}: {same}")
         all_same &= same
     return all_same
 
-def compare_slice(da1, da2):
+def compare_slice(da1, da2, atol):
     start = time.time()
     a1 = da1.values
     print(f'da1 took {time.time() - start}s')
     start = time.time()
     a2 = da2.values
     print(f'da2 took {time.time() - start}s')
-    return np.isclose(a1, a2, equal_nan=True).all()
+    return np.isclose(a1, a2, equal_nan=True, atol=atol).all()
 
 def compare_attrs(da1, da2):
     for a in sorted(set(da1.attrs) | set(da2.attrs)):
@@ -153,6 +153,7 @@ if __name__ == '__main__':
     parser.add_argument("test_path")
     parser.add_argument("--record", action='store_true')
     parser.add_argument("--verbose", action='store_true')
+    parser.add_argument("--atol", type=float, default=1e-8)
     
     args = parser.parse_args()
     path_mapping = parse_listfile(args.listfile)
@@ -164,7 +165,7 @@ if __name__ == '__main__':
             prefixes=[args.reference_root],
             verbose=args.verbose,
     ):
-        all_same = compare(url1, url2)
+        all_same = compare(url1, url2, args.atol)
     print(all_same)
     if all_same:
         sys.exit(0)
