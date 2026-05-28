@@ -7,16 +7,21 @@ import recording_proxy
 import xarray as xr
 
 def compare(url1, url2, atol):
-    ds1 = fetch(url1)
-    ds2 = fetch(url2)
-
-    if isinstance(ds1, Exception):
-        print('first failed', ds1)
-        return
-    if isinstance(ds2, Exception):
-        print('second failed', ds2)
+    try:
+        ds1 = fetch(url1)
+    except Exception as e:
+        print('first failed', e)
         return
     
+    try:
+        ds2 = fetch(url2)
+    except Exception as e:
+        print('second failed', e)
+        return
+
+    compare_ds(ds1, ds2, atol)
+
+def compare_ds(ds1, ds2, atol):
     names = list(ds1.data_vars)
     assert len(names) == 1
     var1 = names[0]
@@ -120,15 +125,12 @@ def compare_attrs(da1, da2):
         print(f"  {a:30.30} {str(da1.attrs.get(a, '')):20.20} {str(da2.attrs.get(a,'')):20.20}")
 
 def fetch(url):
-    try:
-        ds = xr.open_dataset(url, decode_times=False)
-        for name, coord in ds.variables.items():
-            if coord.attrs.get("calendar") == "360":
-                coord.attrs["calendar"] = "360_day"
-        ds = xr.decode_cf(ds)
-        return ds
-    except Exception as e:
-        return e
+    ds = xr.open_dataset(url, decode_times=False)
+    for name, coord in ds.variables.items():
+        if coord.attrs.get("calendar") == "360":
+            coord.attrs["calendar"] = "360_day"
+    ds = xr.decode_cf(ds)
+    return ds
 
 def parse_listfile(filename):
     paths = {}

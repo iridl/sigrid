@@ -56,6 +56,9 @@ def test_one(proxy, server, test_path):
     url1 = f'{server}/{test_path}'
     url2 = f'http://iridl.ldeo.columbia.edu/{reference_path}'
 
+    ds1 = compare.fetch(url1)
+    ds2 = compare.fetch(url2)
+
     # CanSIPS t2m and sst differ in the fifth decimal place.
     # TODO why?
     if (
@@ -65,5 +68,10 @@ def test_one(proxy, server, test_path):
         atol = 1e-4
     else:
         atol=1e-8  # numpy's default
+
+    # CCSM4 sst has a first S value that's non-contiguous with the rest. Ingrid
+    # drops it, so drop it from pydap before comparing.
+    if test_path == 'NMME/COLA-RSMAS/CCSM4/sst':
+        ds1 = ds1.isel(S=slice(1, None))
     
-    assert compare.compare(url1, url2, atol)
+    assert compare.compare_ds(ds1, ds2, atol)
