@@ -28,7 +28,7 @@
 				"type": "debugpy",
 				"request": "launch",
 				"console": "integratedTerminal",
-				"program": "${workspaceFolder:pydap-icechunk}/test/server_for_test.py",
+				"program": "${workspaceFolder:pydap-icechunk}/test/server.py",
 				"args": [
 				],
 				"cwd": "${workspaceFolder:pydap-icechunk}",
