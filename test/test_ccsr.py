@@ -59,7 +59,12 @@ def test_one(proxy, server, test_path):
 
     ds1 = compare.fetch(url1)
     ds2 = compare.fetch(url2)
+
+    # Convert Ingrid's 360_day calendar to standard
     ds2 = ds2.convert_calendar('standard', dim='S', align_on='date')
+
+    # Ingrid's L is to the midpoint of the month, pydap's is to the start.
+    ds2['L'] = ds2['L'] - 0.5
 
     # CanSIPS t2m and sst differ in the fifth decimal place.
     # TODO why?

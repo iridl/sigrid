@@ -39,37 +39,34 @@ def compare_ds(ds1, ds2, atol):
     else:
         var2 = names[0]
 
-    #compare_coords(ds1, ds2)
-
     da1 = ds1[var1]
     da2 = ds2[var2]
 
     all_same = True
     all_same &= compare_shape(da1, da2)
+    all_same &= compare_coords(da1, da2)
     all_same &= compare_data(da1, da2, atol)
     return all_same
 
 def compare_coords(ds1, ds2):
-    for cname in sorted(set(ds1.coords) | set(ds2.coords)):        
+    for cname in sorted(set(ds1.coords) | set(ds2.coords)):
+        if cname == 'target':
+            continue
         c1 = ds1.coords.get(cname)
         c2 = ds2.coords.get(cname)
-        print(cname)
         if c1 is None:
             print(cname, 'absent', 'present')
-            continue
+            return False
         if c2 is None:
             print(cname, 'present', 'absent')
-            continue
-        if cname == 'target_bnds':
-            compare_targets(c1, c2)
-        else:    
-            if np.array_equal(c1.values, c2.values):
-                print('values are the same')
-            else:
-                print('values differ:')
-                print(c1.values)
-                print(c2.values)
-        compare_attrs(c1, c2)
+            return False
+        if not np.array_equal(c1.values, c2.values):
+            print(cname, 'values differ:')
+            print(c1.values)
+            print(c2.values)
+            return False
+        #compare_attrs(c1, c2)
+    return True
 
 def compare_shape(da1, da2):
      dims1 = sorted(list(da1.sizes.items()))
@@ -82,19 +79,6 @@ def compare_shape(da1, da2):
          print(dims1)
          print(dims2)
          return False
-
-def compare_targets(c1, c2):
-    c2 = c2.convert_calendar('standard', dim='S', align_on='date')
-    c1 = c1.dt.strftime("%Y%m%dT%H:%M").data
-    c2 = c2.dt.strftime("%Y%m%dT%H:%M").data
-    all_same = np.array_equal(c1, c2)
-    if all_same:
-        print('target_bnds are the same')
-    else:
-        print('target bounds differ')
-        print(c1)
-        print(c2)
-    return all_same
 
 def compare_data(da1, da2, atol):
     # Accomodating the fact that Ingrid typically has a regular S grid, even if
