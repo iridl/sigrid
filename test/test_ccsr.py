@@ -58,6 +58,7 @@ def test_one(proxy, server, test_path):
 
     ds1 = compare.fetch(url1)
     ds2 = compare.fetch(url2)
+    ds2 = ds2.convert_calendar('standard', dim='S', align_on='date')
 
     # CanSIPS t2m and sst differ in the fifth decimal place.
     # TODO why?
@@ -73,5 +74,12 @@ def test_one(proxy, server, test_path):
     # drops it, so drop it from pydap before comparing.
     if test_path == 'NMME/COLA-RSMAS/CCSM4/sst':
         ds1 = ds1.isel(S=slice(1, None))
-    
+
+    # SPEAR forecasts are missing some starts. Ingrid has a regular grid with
+    # NaNs filled in for the missing forecasts, while pydap has an irregular
+    # coordinate with no entries for the missing forecasts.
+    if 'NMME/NOAA-GFDL/SPEAR/forecast/' in test_path:
+        assert ds1.sizes['S'] >= 58
+        ds2 = ds2.sel(S=ds1['S'])
+
     assert compare.compare_ds(ds1, ds2, atol)
