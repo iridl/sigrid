@@ -319,18 +319,13 @@ def S_L_to_target(S: xr.DataArray, L: xr.DataArray):
 
 
 def catalog(
-    varname: str,
-    varpath: str,
+    ds: xr.Dataset,
     original_names: Mapping[str, str],
     # to define if not define in-file (or to overwrite what's defined in-file)
     # Definition must be a key of UNITS_CONVERSIONS
     units: Mapping[str, str] | None = None,
     lead_is_month: bool = False,
-    ):
-    icechunk_var = [key for key, value in NAMES.items() if value == varname][0]
-    ds = pydap_icechunk.open_icechunk(
-        f'{varpath}/{icechunk_var}',
-    )
+):
     # Some varnames have scalar coordinates that break pydap
     ds = ds.drop_vars(
         [name for name, coord in coords_of(ds).items() if coord.dims == ()]
