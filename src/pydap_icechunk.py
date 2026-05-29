@@ -1,7 +1,7 @@
 import abc
 import importlib.util
 from pathlib import Path
-from typing import override
+from typing import Mapping, cast, override
 import dask.array
 import icechunk
 import os
@@ -11,6 +11,7 @@ import webob
 from webob.dec import wsgify
 from webob.exc import HTTPForbidden, HTTPNotFound
 import xarray as xr
+import xarray.conventions
 import numpy as np
 
 from pydap.handlers.lib import BaseHandler
@@ -299,6 +300,17 @@ class CatalogFileHandler(XarrayHandler):
         for attr, value in ds.attrs.items():
             if '"' in value:
                 del ds.attrs[attr]
+
+        # Apply cf-encoding
+        vars, attrs = cast(
+            tuple[Mapping[str, xr.Variable], Mapping[str, str]],
+            xarray.conventions.cf_encoder(ds.variables, ds.attrs)
+        )
+        ds = xr.Dataset(
+            data_vars={k: v for k, v in vars.items() if k in ds.data_vars},
+            coords={k: v for k, v in vars.items() if k in ds.coords},
+            attrs=attrs,
+        )
 
         return ds
 

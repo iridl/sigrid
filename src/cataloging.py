@@ -276,10 +276,6 @@ def standardize(
     # Keep the provider's remaining dataset-level attributes, and add our own.
     attrs.update(DS_STANDARD_ATTRS)
 
-    vars, attrs = cast(
-        tuple[Mapping[str, xr.Variable], Mapping[str, str]],
-        xarray.conventions.cf_encoder(vars, attrs)
-    )
     ds = xr.Dataset(
         data_vars={k: v for k, v in vars.items() if k in ds.data_vars},
         coords={k: v for k, v in vars.items() if k in ds.coords},
@@ -368,7 +364,7 @@ def catalog(
         ),
     })
 
-    # Convert units, do cf-encoding and standardize attrs
+    # Convert units, standardize attrs
     ds = standardize(ds, lead_is_month, units)
 
     return ds
