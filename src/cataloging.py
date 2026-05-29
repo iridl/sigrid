@@ -4,13 +4,10 @@ from dataclasses import dataclass
 from typing import Mapping, cast
 
 import xarray as xr
-import xarray.conventions
 import numpy as np
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 import datetime
-
-import pydap_icechunk
 
 
 @dataclass
