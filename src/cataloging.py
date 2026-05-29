@@ -1,11 +1,12 @@
 # pyright: strict, reportUnknownMemberType=false
 
 from dataclasses import dataclass
+from enum import StrEnum
 import functools
 import importlib.util
 import os
 from pathlib import Path
-from typing import Callable, Iterable, Mapping, Self, cast
+from typing import Any, Callable, Iterable, Mapping, Self, cast
 
 import icechunk
 import xarray as xr
@@ -68,39 +69,22 @@ UNIT_CONVERSIONS: Mapping[tuple[str, str], UnitConverter] = {
     ('watt/m^2', 'mm/day'): linear_converter(0, 1000 * 60 * 60 * 24 / 2453e6),
 }
 
-# Keys are the conventional names used by pydap-icechunk.
-# They can not be changed and serve as well as identifiers for the different objects.
-# Values are what are going to be shown on, and served, by the pydap server
-# They can be changed to the taste of the Catalog administrator
-NAMES = {
-    'S': 'S',
-    'L': 'L',
-    'Y': 'Y',
-    'X': 'X',
-    'M': 'M',
-    'P': 'P',
-    'target': 'target',
-    # NB target_bnds should be named after target
-    'target_bnds': 'target_bnds',
-    # Additionally, these keys are also the icechunk variables names.
-    'pr': 'pr',
-    'prcp': 'prcp',
-    'tas': 'tas',
-    'tasmax': 'tasmax',
-    'tasmin': 'tasmin',
-    'tmin': 'tmin',
-    'tmax': 'tmax',
-    't2m': 't2m',
-    'sst': 'sst',
-    'psl': 'psl',
-    'uas': 'uas',
-    'vas': 'vas',
-    'z': 'z',
-    'zg': 'zg',
-    'evap': 'evap',
-    'runoff': 'runoff',
-    'sm': 'sm',
-}
+
+class CaseSensitiveStrEnum(StrEnum):
+    """Like StrEnum but it doesn't downcase the names"""
+    @staticmethod
+    def _generate_next_value_(name: str, start: Any, count: Any, last_values: Any) -> str:
+        return name
+
+
+Coords = CaseSensitiveStrEnum(
+    'Coords',
+    ['S', 'L', 'M', 'P', 'Y', 'X', 'target', 'target_bnds', 'nbound']
+    # nbound isn't actually a coord, only a dim. But target isn't a dim, only
+    # a coord, so we can't call this Dims either.
+)
+
+
 # Change the dictionary values 
 # should you different time encoding throughout your system
 DATETIME_ENCODING = {
@@ -115,39 +99,39 @@ TIMEDELTA_ENCODING = {
 
 # Note the time var's units and calendar are dealt with separately
 # as well as variables units conversion and definition
-STANDARD_ATTRS = {
-    'S': {
+STANDARD_ATTRS: dict[str, dict[str, str]] = {
+    Coords.S: {
         'long_name': 'Forecast start time',
         'standard_name': 'forecast_reference_time',
     },
-    'L': {
+    Coords.L: {
         'long_name': 'Lead',
         'standard_name': 'forecast_period',
         # units: implicitly months, but that's not allowed by CF
     },
-    'Y': {
+    Coords.Y: {
         'long_name': 'Latitude',
         'standard_name': 'latitude',
         'units': 'degree_north',
     },
-    'X': {
+    Coords.X: {
         'long_name': 'Longitude',
         'standard_name': 'longitude',
         'units': 'degree_east',
     },
-    'M': {
+    Coords.M: {
         'long_name': 'Ensemble member',
         'standard_name': 'realization',
         # No units. From
         # https://cfconventions.org/Data/cf-conventions/cf-conventions-1.13/cf-conventions.html#dimensionless-units
         # "A variable with no units attribute is assumed to be dimensionless."
     },
-    'P': {
+    Coords.P: {
         'long_name': 'Pressure level',
         'standard_name': 'air_pressure',
         'units': 'Pa',
     },
-    'target': {
+    Coords.target: {
         'long_name': 'Forecast target period',
         # CF Conventions standard names table says:
         # forecast_reference_time: The forecast reference time in NWP
@@ -156,9 +140,10 @@ STANDARD_ATTRS = {
         # is valid; the standard name of time should be used for that time.
         # https://cfconventions.org/Data/cf-standard-names/current/build/cf-standard-name-table.html
         'standard_name': 'time',
-        'bounds': NAMES['target_bnds'],
+        'bounds': Coords.target_bnds,
     },
-    'target_bnds': {},
+    Coords.target_bnds: {},
+    Coords.nbound: {},
     'pr': {
         'long_name': 'Total precipitation',
         'standard_name': 'lwe_precipitation_rate',
@@ -266,15 +251,15 @@ def standardize_ds(
         # but cf_encoder fails to encode that information,
         # so we do it ourselves.
         aux_coords: list[str] = []
-        if NAMES['S'] in da.dims:
-            aux_coords.extend([NAMES['target'], NAMES['target_bnds']])
+        if Coords.S in da.dims:
+            aux_coords.extend([Coords.target, Coords.target_bnds])
         if aux_coords:
             da.attrs['coordinates'] = ' '.join(aux_coords)
 
         if lead_is_month and name == 'prcp':
             target_length = (
-                ds['target_bnds'].isel(nbound=1, drop=True)
-                - ds['target_bnds'].isel(nbound=0, drop=True)
+                ds[Coords.target_bnds].isel({Coords.nbound: 1}, drop=True)
+                - ds[Coords.target_bnds].isel({Coords.nbound: 0}, drop=True)
             ).dt.days
             data_vars[name] = da * target_length.variable
             data_vars[name].attrs['units'] = 'mm'
@@ -336,10 +321,10 @@ def S_L_to_target(S: xr.DataArray, L: xr.DataArray):
             ])
             for s in S
         ],
-        dims=['S', 'L', 'nbound'],
-        coords={'S': S, 'L': L},
+        dims=[Coords.S, Coords.L, Coords.nbound],
+        coords={Coords.S: S, Coords.L: L},
     )
-    return target_bnds.isel(nbound=0, drop=True), target_bnds
+    return target_bnds.isel({Coords.nbound: 0}, drop=True), target_bnds
 
 
 def catalog(
@@ -354,13 +339,13 @@ def catalog(
     for name in (set(vars_of(ds)) | set(sizes_of(ds))):
         if name in original_names:
             if name != original_names[name]: 
-                ds = ds.rename({name: NAMES[original_names[name]]})
-        elif name not in NAMES:
+                ds = ds.rename({name: original_names[name]})
+        elif name not in STANDARD_ATTRS:
             if name in ds.variables:
                 ds = ds.drop_vars(name)
     # Checking everything is standard:
     non_std_names = [
-        name for name in (set(ds.variables) | set(ds.sizes)) if name not in NAMES
+        name for name in (set(ds.variables) | set(ds.sizes)) if name not in STANDARD_ATTRS
     ]
     if len(non_std_names) > 0:
         raise Exception(f'non standard {*non_std_names,} in dataset')
@@ -373,24 +358,24 @@ def catalog(
 
     if lead_is_month:
         # Set lead times
-        leads = np.arange(ds.sizes[NAMES['L']])
+        leads = np.arange(ds.sizes[Coords.L])
         # Set target
         targets, targets_bnds = S_L_to_target(
-            ds[NAMES['S']], ds[NAMES['L']]
+            ds[Coords.S], ds[Coords.L]
         )
         targets_bnds = targets_bnds.data
     else:
-        targets = ds[NAMES["target"]]
+        targets = ds[Coords.target]
         leads = (
-            targets.isel({NAMES['S']: 0}, drop=True)
-            - ds[NAMES['S']].isel({NAMES['S']: 0}, drop=True)
+            targets.isel({Coords.S: 0}, drop=True)
+            - ds[Coords.S].isel({Coords.S: 0}, drop=True)
         )
         targets_bnds = np.stack([targets, targets + np.timedelta64(1, 'D')], axis=2)
     ds = ds.assign_coords({
-        NAMES['L']: leads,
-        NAMES['target']: targets,
-        NAMES['target_bnds']: (
-            (NAMES['S'], NAMES['L'], 'nbound'), targets_bnds
+        Coords.L: leads,
+        Coords.target: targets,
+        Coords.target_bnds: (
+            (Coords.S, Coords.L, Coords.nbound), targets_bnds
         ),
     })
 
