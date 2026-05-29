@@ -322,10 +322,6 @@ def catalog(
     units: Mapping[str, str] | None = None,
     lead_is_month: bool = False,
 ):
-    # Squeeze dims of size 1
-    for dim in ds.dims:
-        if ds.sizes[dim] == 1 :
-            ds = ds.squeeze(dim, drop=True)
     # Renaming std and dropping non-std
     for name in (set(vars_of(ds)) | set(sizes_of(ds))):
         if name in original_names:
