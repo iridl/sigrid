@@ -239,8 +239,8 @@ def standardize_ds(
                 ds['target_bnds'].isel(nbound=1, drop=True)
                 - ds['target_bnds'].isel(nbound=0, drop=True)
             ).dt.days
-            da = da * target_length.variable
-            da.attrs['units'] = 'mm'
+            data_vars[name] = da * target_length.variable
+            data_vars[name].attrs['units'] = 'mm'
 
 
     # Top ds attrs standardization
