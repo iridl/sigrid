@@ -75,13 +75,10 @@ class XarrayHandler(BaseHandler, abc.ABC):
                     **vars[grid].attrs,
                 )
 
-            # TODO deal with groups
-            # if len(source.groups) > 0:
-            #     # start at root level
-            #     path = source.path
-            #     for vdim in source.dimensions:
-            #         fqn_dims.update({path + vdim: vdim})  # fqn is unique
-            #     fqn_dims = group_fqn(self.dataset, source, self.filepath, fqn_dims)
+            if len(source.groups) > 0:
+                raise NotImplementedError("Don't know how to deal with zarr groups")
+                # If we want to address this, there is code in netcdf_handler
+                # to follow.
 
             vdims = [dim for dim in dims if dim in vars]
             for dim in vdims:
