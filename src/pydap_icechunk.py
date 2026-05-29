@@ -1,7 +1,7 @@
 import abc
 import importlib.util
 from pathlib import Path
-from typing import Mapping, cast, override
+from typing import Iterable, Mapping, cast, override
 import dask.array
 import icechunk
 import os
@@ -51,14 +51,19 @@ class XarrayHandler(BaseHandler, abc.ABC):
             #     )
             # )
 
-            # shortcuts
-            vars = source.variables
-            dims = source.dims
+            assert all(isinstance(d, str) for d in source.dims)
+            dims = cast(Iterable[str], source.dims)
+
+            # Apply cf-encoding
+            vars, attrs = cast(
+                tuple[Mapping[str, xr.Variable], Mapping[str, str]],
+                xarray.conventions.cf_encoder(source.variables, source.attrs)
+            )
 
             # build dataset
 
             self.dataset = DatasetType(
-                self.name, attributes=dict(source.attrs)
+                self.name, attributes=attrs
             )
 
             # add grids
@@ -66,7 +71,7 @@ class XarrayHandler(BaseHandler, abc.ABC):
             for grid in grids:
                 # make dimension a fully qualifying name
                 dimensions = ["/" + str(dim) for dim in vars[grid].dims]
-                data = source[grid].data
+                data = vars[grid].data
                 if isinstance(data, dask.array.Array):
                     data = DaskArrayProxy(data)
                 self.dataset[grid] = BaseType(
@@ -243,20 +248,9 @@ class CatalogFileHandler(XarrayHandler):
         if self.extension:
             return super().__call__(environ, start_response)
         request = webob.Request(environ)
-        ds_orig = self.open()
-        ds_decoded = xr.decode_cf(ds_orig)
-        for name, coord in ds_decoded.coords.items():
-            # For some reason, decode_cf causes aux coords (e.g. target)
-            # to get unloaded, so we see "..." instead of values in the UI.
-            # Fix that by explicitly reloading them.
-            coord.load()
-            # Xarray's CF decoding removes the units and calendar attributes.
-            # Put them back for display purposes.
-            if np.issubdtype(coord.dtype, np.datetime64):
-                for attr in ('units', 'calendar'):
-                    coord.attrs[attr] = ds_orig[name].attrs[attr]
+        ds = self.open()
         context = {
-            'ds': ds_decoded,
+            'ds': ds,
             'url': request.url,
         }
         response = webob.Response(body=self.var_template.render(context))
@@ -300,17 +294,6 @@ class CatalogFileHandler(XarrayHandler):
         for attr, value in ds.attrs.items():
             if '"' in value:
                 del ds.attrs[attr]
-
-        # Apply cf-encoding
-        vars, attrs = cast(
-            tuple[Mapping[str, xr.Variable], Mapping[str, str]],
-            xarray.conventions.cf_encoder(ds.variables, ds.attrs)
-        )
-        ds = xr.Dataset(
-            data_vars={k: v for k, v in vars.items() if k in ds.data_vars},
-            coords={k: v for k, v in vars.items() if k in ds.coords},
-            attrs=attrs,
-        )
 
         return ds
 
