@@ -287,6 +287,12 @@ class CatalogFileHandler(XarrayHandler):
     def open(self):
         module = load_index(self.file_path)
         ds: xr.Dataset = module.open(self.varname)
+
+        # Scalar coordinates break pydap. TODO fix pydap.
+        ds = ds.drop_vars(
+            [name for name, coord in ds.coords.items() if coord.dims == ()]
+        )
+
         return ds
 
 

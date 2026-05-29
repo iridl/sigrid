@@ -326,10 +326,6 @@ def catalog(
     units: Mapping[str, str] | None = None,
     lead_is_month: bool = False,
 ):
-    # Some varnames have scalar coordinates that break pydap
-    ds = ds.drop_vars(
-        [name for name, coord in coords_of(ds).items() if coord.dims == ()]
-    )
     # Squeeze dims of size 1
     for dim in ds.dims:
         if ds.sizes[dim] == 1 :
