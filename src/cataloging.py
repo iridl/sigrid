@@ -1,7 +1,6 @@
 # pyright: strict, reportUnknownMemberType=false
 
-from dataclasses import dataclass
-from typing import Mapping, cast
+from typing import Callable, Mapping, cast
 
 import xarray as xr
 import numpy as np
@@ -10,40 +9,48 @@ from dateutil.relativedelta import relativedelta
 import datetime
 
 
-@dataclass
-class UNIT_CONVERTER:
-    offset: float
-    scale: float
-    name: str
+type UnitConverter = Callable[[xr.DataArray], xr.DataArray]
 
+def linear_converter(offset: float, scale: float) -> UnitConverter:
+    def converter(da: xr.DataArray):
+        return da * scale + offset
+    return converter
 
-UNIT_CONVERSIONS = {
-    # This may sound silly but is needed as things are written now
-    # it does nothing other than redefining units attr to the same value
-    'degree_north': UNIT_CONVERTER(0, 1, 'degree_north'),
-    'degrees_north': UNIT_CONVERTER(0, 1, 'degree_north'),
-    'degree_east': UNIT_CONVERTER(0, 1, 'degree_east'),
-    'degrees_east': UNIT_CONVERTER(0, 1, 'degree_east'),
-    'degree_Celsius': UNIT_CONVERTER(0, 1, 'degree_Celsius'),
-    'degreeC': UNIT_CONVERTER(0, 1, 'degree_Celsius'),
-    'K': UNIT_CONVERTER(-273.15, 1, 'degree_Celsius'),
-    'Kelvin': UNIT_CONVERTER(-273.15, 1, 'degree_Celsius'),
-    'm': UNIT_CONVERTER(0, 1, 'm'),
-    'gpm': UNIT_CONVERTER(0, 1, 'm'),
-    # Let's pray there won't be prcp in m s-1
-    'm s-1': UNIT_CONVERTER(0, 1, 'm s-1'),
-    'kg/m2': UNIT_CONVERTER(0, 1000 / 1000, 'mm'),
-    'kg m**-2 s**-1': UNIT_CONVERTER(0, 1000 * 60 * 60 * 24 / 1000, 'mm/day'),
-    'kg m-2 s-1': UNIT_CONVERTER(0, 1000 * 60 * 60 * 24 / 1000, 'mm/day'),
-    'kg m^-2 s^-1': UNIT_CONVERTER(0, 1000 * 60 * 60 * 24 / 1000, 'mm/day'),
-    'mm/day': UNIT_CONVERTER(0, 1, 'mm/day'),
-    'mm/s': UNIT_CONVERTER(0, 60 * 60 * 24, 'mm/day'),
-    'm/s': UNIT_CONVERTER(0, 1000 * 60 * 60 * 24, 'mm/day'),
-    'm s**-1': UNIT_CONVERTER(0, 1000 * 60 * 60 * 24, 'mm/day'),
-    'Pa': UNIT_CONVERTER(0, 1, 'Pa'),
-    'hPa': UNIT_CONVERTER(0, 100, 'Pa'),
+def null_converter(da: xr.DataArray):
+    return da
+
+def convert_units(da: xr.DataArray, new_units: str | None) -> xr.DataArray:
+    original_units = da.attrs.get('units')
+    if new_units == original_units:
+        pass
+    elif original_units is None:
+        # We know that new_units is not None, or they would have been ==
+        raise Exception("Can't convert to {new_units} because I don't know the original units")
+    else:  # original_units is not None
+        if new_units is None:
+            pass  # leave quantities as is, drop the units attr
+        else:  # new_units is not None
+            converter = UNIT_CONVERSIONS[(original_units, new_units)]
+            da = converter(da)
+    return da
+
+UNIT_CONVERSIONS: Mapping[tuple[str, str], UnitConverter] = {
+    ('degrees_north', 'degree_north'): null_converter,
+    ('degrees_east', 'degree_east'): null_converter,
+    ('degreeC', 'degree_Celsius'): null_converter,
+    ('K', 'degree_Celsius'): linear_converter(-273.15, 1),
+    ('Kelvin', 'degree_Celsius'): linear_converter(-273.15, 1),
+    ('gpm', 'm'): null_converter,
+    ('kg/m2', 'mm'): linear_converter(0, 1000 / 1000),
+    ('kg m**-2 s**-1', 'mm/day'): linear_converter(0, 1000 * 60 * 60 * 24 / 1000),
+    ('kg m-2 s-1', 'mm/day'): linear_converter(0, 1000 * 60 * 60 * 24 / 1000),
+    ('kg m^-2 s^-1', 'mm/day'): linear_converter(0, 1000 * 60 * 60 * 24 / 1000),
+    ('mm/s', 'mm/day'): linear_converter(0, 60 * 60 * 24),
+    ('m/s', 'mm/day'): linear_converter(0, 1000 * 60 * 60 * 24),
+    ('m s**-1', 'mm/day'): linear_converter(0, 1000 * 60 * 60 * 24),
+    ('hPa', 'Pa'): linear_converter(0, 100),
     # Volumetric latent heat of vaporization: 2453 MJ m-3
-    'watt/m^2': UNIT_CONVERTER(0, 1000 * 60 * 60 * 24 / 2453000000, 'mm/day'),
+    ('watt/m^2', 'mm/day'): linear_converter(0, 1000 * 60 * 60 * 24 / 2453e6),
 }
 
 # Keys are the conventional names used by pydap-icechunk.
@@ -101,14 +108,17 @@ STANDARD_ATTRS = {
     'L': {
         'long_name': 'Lead',
         'standard_name': 'forecast_period',
+        # units: implicitly months, but that's not allowed by CF
     },
     'Y': {
         'long_name': 'Latitude',
         'standard_name': 'latitude',
+        'units': 'degree_north',
     },
     'X': {
         'long_name': 'Longitude',
         'standard_name': 'longitude',
+        'units': 'degree_east',
     },
     'M': {
         'long_name': 'Ensemble member',
@@ -120,6 +130,7 @@ STANDARD_ATTRS = {
     'P': {
         'long_name': 'Pressure level',
         'standard_name': 'air_pressure',
+        'units': 'Pa',
     },
     'target': {
         'long_name': 'Forecast target period',
@@ -136,62 +147,77 @@ STANDARD_ATTRS = {
     'pr': {
         'long_name': 'Total precipitation',
         'standard_name': 'lwe_precipitation_rate',
+        'units': 'mm/day',
     },
     'prcp': {
         'long_name': 'Total precipitation',
         'standard_name': 'lwe_precipitation_rate',
+        'units': 'mm/day',
     },
     'tas': {
         'long_name': 'Air temperature',
         'standard_name': 'air_temperature',
+        'units': 'degree_Celsius',
     },
     'tasmax': {
         'long_name': 'Maximum air temperature',
         'standard_name': 'air_temperature',
+        'units': 'degree_Celsius',
     },
     'tasmin': {
         'long_name': 'Minimum air temperature',
         'standard_name': 'air_temperature',
+        'units': 'degree_Celsius',
     },
     't2m': {
         'long_name': 'Air temperature',
         'standard_name': 'air_temperature',
+        'units': 'degree_Celsius',
     },
     'tmax': {
         'long_name': 'Maximum air temperature',
         'standard_name': 'air_temperature',
+        'units': 'degree_Celsius',
     },
     'tmin': {
         'long_name': 'Minimum air temperature',
         'standard_name': 'air_temperature',
+        'units': 'degree_Celsius',
     },
     'sst': {
         'long_name': 'Sea surface temperature',
         'standard_name': 'sea_surface_temperature',
+        'units': 'degree_Celsius',
     },
     'psl': {
         'long_name': 'Pressure at sea level',
         'standard_name': 'air_pressure_at_sea_level',
+        'units': 'Pa',
     },
     'uas': {
         'long_name': '10m eastward wind',
         'standard_name': 'eastward_wind',
+        'units': 'm s-1',
     },
     'vas': {
         'long_name': '10m northward wind',
         'standard_name': 'northward_wind',
+        'units': 'm s-1',
     },
     'z': {
         'long_name': 'Geopotential height',
         'standard_name': 'geopotential_height',
+        'units': 'm',
     },
     'zg': {
         'long_name': 'Geopotential height',
         'standard_name': 'geopotential_height',
+        'units': 'm',
     },
     'evap': {
         'long_name': 'Canopy evaporation',
         'standard_name': 'water_evaporation_flux_from_canopy',
+        'units': 'mm/day',
     },
     'runoff': {
         'long_name': 'Runoff',
@@ -211,17 +237,13 @@ DS_STANDARD_ATTRS = {
 def standardize_ds(
     ds: xr.Dataset,
     lead_is_month: bool,
-    units: Mapping[str, str] | None = None,
 ):
-    if units is None:
-        units = {}
-
     coords = {
-        name: standardize_da(name, da, units.get(name))
+        name: standardize_da(name, da)
         for name, da in coords_of(ds).items()
     }
     data_vars = {
-        name: standardize_da(name, da, units.get(name))
+        name: standardize_da(name, da)
         for name, da in data_vars_of(ds).items()
     }
     for name, da in data_vars.items():
@@ -258,11 +280,11 @@ def standardize_ds(
     return ds
 
 
-def standardize_da(name: str, da: xr.DataArray, units: str | None):
-    # TODO copy da?
-    # save the original attributes, then replace them
-    # with standard ones
-    original_attrs = da.attrs
+def standardize_da(name: str, da: xr.DataArray):
+    da = da.copy()
+    new_units = STANDARD_ATTRS[name].get('units')
+    da = convert_units(da, new_units)
+
     da.attrs = dict(STANDARD_ATTRS[name])
 
     # Override provider's encoding for datetimes
@@ -272,16 +294,6 @@ def standardize_da(name: str, da: xr.DataArray, units: str | None):
         da.encoding = dict(TIMEDELTA_ENCODING)
 
     # convert units
-    if units is not None:
-        # provide units explicitly if provider didn't (e.g. GFDL)
-        original_units = units
-    else:
-        original_units = original_attrs.get('units')
-    if original_units is not None:
-        conversion = UNIT_CONVERSIONS[original_units]
-        if not (conversion.scale == 1 and conversion.offset == 0):
-            da = da * conversion.scale + conversion.offset
-        da.attrs['units'] = conversion.name
 
     return da
 
@@ -338,6 +350,12 @@ def catalog(
     if len(non_std_names) > 0:
         raise Exception(f'non standard {*non_std_names,} in dataset')
 
+    # Add missing units
+    if units is not None:
+        for name, units_str in units.items():
+            if name in ds:
+                ds[name].attrs['units'] = units_str
+
     if lead_is_month:
         # Set lead times
         leads = np.arange(ds.sizes[NAMES['L']])
@@ -362,7 +380,7 @@ def catalog(
     })
 
     # Convert units, standardize attrs
-    ds = standardize_ds(ds, lead_is_month, units)
+    ds = standardize_ds(ds, lead_is_month)
 
     return ds
 
