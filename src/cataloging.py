@@ -344,10 +344,6 @@ def catalog(
     ]
     if len(non_std_names) > 0:
         raise Exception(f'non standard {*non_std_names,} in dataset')
-    # Deleting buggy attributes
-    for attr in list(ds.attrs):
-        if str(ds.attrs[attr]).find('"') != -1 :
-            del ds.attrs[attr]
 
     if lead_is_month:
         # Set lead times

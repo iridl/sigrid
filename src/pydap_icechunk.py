@@ -293,6 +293,13 @@ class CatalogFileHandler(XarrayHandler):
             [name for name, coord in ds.coords.items() if coord.dims == ()]
         )
 
+        # Attributes that contain quotes cause pydap to produce an invalid response.
+        # TODO fix pydap, or at least figure out how to escape quotes before
+        # passing them to pydap.
+        for attr, value in ds.attrs.items():
+            if '"' in value:
+                del ds.attrs[attr]
+
         return ds
 
 
