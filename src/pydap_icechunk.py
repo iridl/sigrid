@@ -75,11 +75,6 @@ class XarrayHandler(BaseHandler, abc.ABC):
                     **vars[grid].attrs,
                 )
 
-            if len(source.groups) > 0:
-                raise NotImplementedError("Don't know how to deal with zarr groups")
-                # If we want to address this, there is code in netcdf_handler
-                # to follow.
-
             vdims = [dim for dim in dims if dim in vars]
             for dim in vdims:
                 data = vars[dim].data
