@@ -217,11 +217,11 @@ def standardize_ds(
         units = {}
 
     coords = {
-        name: standardize_da(name, da, units)
+        name: standardize_da(name, da, units.get(name))
         for name, da in coords_of(ds).items()
     }
     data_vars = {
-        name: standardize_da(name, da, units)
+        name: standardize_da(name, da, units.get(name))
         for name, da in data_vars_of(ds).items()
     }
     for name, da in data_vars.items():
@@ -258,7 +258,7 @@ def standardize_ds(
     return ds
 
 
-def standardize_da(name: str, da: xr.DataArray, units: Mapping[str, str]):
+def standardize_da(name: str, da: xr.DataArray, units: str | None):
     # TODO copy da?
     # save the original attributes, then replace them
     # with standard ones
@@ -272,9 +272,9 @@ def standardize_da(name: str, da: xr.DataArray, units: Mapping[str, str]):
         da.encoding = dict(TIMEDELTA_ENCODING)
 
     # convert units
-    if name in units:
+    if units is not None:
         # provide units explicitly if provider didn't (e.g. GFDL)
-        original_units = units[name]
+        original_units = units
     else:
         original_units = original_attrs.get('units')
     if original_units is not None:
