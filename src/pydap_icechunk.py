@@ -8,6 +8,7 @@ import re
 import dask.array
 import icechunk
 import jinja2
+import numpy as np
 from pydap.handlers.lib import BaseHandler
 from pydap.model import BaseType, DatasetType
 import webob
@@ -248,6 +249,14 @@ class CatalogFileHandler(XarrayHandler):
             return super().__call__(environ, start_response)
         request = webob.Request(environ)
         ds = self.open()
+
+        # To help users understand what they will get via opendap, add the units
+        # and calendar attributes that the response will have.
+        for name, coord in ds.coords.items():
+            if np.issubdtype(coord.dtype, np.datetime64):
+                coord.attrs['units'] = coord.encoding['units']
+                coord.attrs['calendar'] = coord.encoding['calendar']
+
         context = {
             'ds': ds,
             'url': request.url,
@@ -290,9 +299,11 @@ class CatalogFileHandler(XarrayHandler):
         # Attributes that contain quotes cause pydap to produce an invalid response.
         # TODO fix pydap, or at least figure out how to escape quotes before
         # passing them to pydap.
-        for attr, value in ds.attrs.items():
-            if '"' in value:
-                del ds.attrs[attr]
+        ds.attrs = {
+            k: v
+            for k, v in ds.attrs.items()
+            if not isinstance(v, str) or '"' not in v
+        }
 
         return ds
 
