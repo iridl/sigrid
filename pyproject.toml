@@ -27,10 +27,12 @@ werkzeug = ">=3.1.8,<4"
 pydap-icechunk = { path = ".", editable = true }
 
 [tool.pixi.feature.client.dependencies]
+# An environment for running test clients. Keeping this environment
+# separate from default/prod prevents the server from accidentally becoming
+# dependent on libs that we don't install in prod.
 netcdf4 = "*"
-# client environment is separate from default, so
-# it doesn't have xarray unless we explicitly add it.
 xarray = "*"
+pytest = ">=9.0.3,<10"
 
 [tool.pixi.feature.client.pypi-dependencies]
 #recording-proxy = { path = "../recording-proxy", editable = true }

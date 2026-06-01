@@ -4,13 +4,10 @@ from dataclasses import dataclass
 from typing import Mapping, cast
 
 import xarray as xr
-import xarray.conventions
 import numpy as np
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 import datetime
-
-import pydap_icechunk
 
 
 @dataclass
@@ -211,7 +208,7 @@ DS_STANDARD_ATTRS = {
 }
 
 
-def standardize(
+def standardize_ds(
     ds: xr.Dataset,
     lead_is_month: bool,
     units: Mapping[str, str] | None = None,
@@ -219,51 +216,31 @@ def standardize(
     if units is None:
         units = {}
 
-    vars: Mapping[str, xr.Variable] = {}
-
-    for name, var in vars_of(ds).items():
-        # save the original attributes, then replace them
-        # with standard ones
-        original_attrs = var.attrs
-        var.attrs = dict(STANDARD_ATTRS[name])
-
-        # Override provider's encoding for datetimes
-        if np.issubdtype(var, np.datetime64):
-            var.encoding = dict(DATETIME_ENCODING)
-        elif np.issubdtype(var, np.timedelta64):
-            var.encoding = dict(TIMEDELTA_ENCODING)
-
-        if name in ds.data_vars:
-            # xarray knows which variables are aux coords,
-            # but cf_encoder fails to encode that information,
-            # so we do it ourselves.
-            aux_coords: list[str] = []
-            if NAMES['S'] in var.dims:
-                aux_coords.extend([NAMES['target'], NAMES['target_bnds']])
-            if aux_coords:
-                var.attrs['coordinates'] = ' '.join(aux_coords)
-
-        # convert units
-        if name in units:
-            # provide units explicitly if provider didn't (e.g. GFDL)
-            original_units = units[name]
-        else:
-            original_units = original_attrs.get('units')
-        if original_units is not None:
-            conversion = UNIT_CONVERSIONS[original_units]
-            if not (conversion.scale == 1 and conversion.offset == 0):
-                var = var * conversion.scale + conversion.offset
-            var.attrs['units'] = conversion.name
+    coords = {
+        name: standardize_da(name, da, units.get(name))
+        for name, da in coords_of(ds).items()
+    }
+    data_vars = {
+        name: standardize_da(name, da, units.get(name))
+        for name, da in data_vars_of(ds).items()
+    }
+    for name, da in data_vars.items():
+        # xarray knows which variables are aux coords,
+        # but cf_encoder fails to encode that information,
+        # so we do it ourselves.
+        aux_coords: list[str] = []
+        if NAMES['S'] in da.dims:
+            aux_coords.extend([NAMES['target'], NAMES['target_bnds']])
+        if aux_coords:
+            da.attrs['coordinates'] = ' '.join(aux_coords)
 
         if lead_is_month and name == 'prcp':
             target_length = (
                 ds['target_bnds'].isel(nbound=1, drop=True)
                 - ds['target_bnds'].isel(nbound=0, drop=True)
             ).dt.days
-            var = var * target_length.variable
-            var.attrs['units'] = 'mm'
-
-        vars[name] = var
+            data_vars[name] = da * target_length.variable
+            data_vars[name].attrs['units'] = 'mm'
 
 
     # Top ds attrs standardization
@@ -276,17 +253,37 @@ def standardize(
     # Keep the provider's remaining dataset-level attributes, and add our own.
     attrs.update(DS_STANDARD_ATTRS)
 
-    vars, attrs = cast(
-        tuple[Mapping[str, xr.Variable], Mapping[str, str]],
-        xarray.conventions.cf_encoder(vars, attrs)
-    )
-    ds = xr.Dataset(
-        data_vars={k: v for k, v in vars.items() if k in ds.data_vars},
-        coords={k: v for k, v in vars.items() if k in ds.coords},
-        attrs=attrs,
-    )
+    ds = xr.Dataset(data_vars=data_vars, coords=coords, attrs=attrs)
 
     return ds
+
+
+def standardize_da(name: str, da: xr.DataArray, units: str | None):
+    # TODO copy da?
+    # save the original attributes, then replace them
+    # with standard ones
+    original_attrs = da.attrs
+    da.attrs = dict(STANDARD_ATTRS[name])
+
+    # Override provider's encoding for datetimes
+    if np.issubdtype(da, np.datetime64):
+        da.encoding = dict(DATETIME_ENCODING)
+    elif np.issubdtype(da, np.timedelta64):
+        da.encoding = dict(TIMEDELTA_ENCODING)
+
+    # convert units
+    if units is not None:
+        # provide units explicitly if provider didn't (e.g. GFDL)
+        original_units = units
+    else:
+        original_units = original_attrs.get('units')
+    if original_units is not None:
+        conversion = UNIT_CONVERSIONS[original_units]
+        if not (conversion.scale == 1 and conversion.offset == 0):
+            da = da * conversion.scale + conversion.offset
+        da.attrs['units'] = conversion.name
+
+    return da
 
 
 def S_L_to_target(S: xr.DataArray, L: xr.DataArray):
@@ -319,26 +316,13 @@ def S_L_to_target(S: xr.DataArray, L: xr.DataArray):
 
 
 def catalog(
-    varname: str,
-    varpath: str,
+    ds: xr.Dataset,
     original_names: Mapping[str, str],
     # to define if not define in-file (or to overwrite what's defined in-file)
     # Definition must be a key of UNITS_CONVERSIONS
     units: Mapping[str, str] | None = None,
     lead_is_month: bool = False,
-    ):
-    icechunk_var = [key for key, value in NAMES.items() if value == varname][0]
-    ds = pydap_icechunk.open_icechunk(
-        f'{varpath}/{icechunk_var}',
-    )
-    # Some varnames have scalar coordinates that break pydap
-    ds = ds.drop_vars(
-        [name for name, coord in coords_of(ds).items() if coord.dims == ()]
-    )
-    # Squeeze dims of size 1
-    for dim in ds.dims:
-        if ds.sizes[dim] == 1 :
-            ds = ds.squeeze(dim, drop=True)
+):
     # Renaming std and dropping non-std
     for name in (set(vars_of(ds)) | set(sizes_of(ds))):
         if name in original_names:
@@ -353,10 +337,6 @@ def catalog(
     ]
     if len(non_std_names) > 0:
         raise Exception(f'non standard {*non_std_names,} in dataset')
-    # Deleting buggy attributes
-    for attr in list(ds.attrs):
-        if str(ds.attrs[attr]).find('"') != -1 :
-            del ds.attrs[attr]
 
     if lead_is_month:
         # Set lead times
@@ -381,8 +361,8 @@ def catalog(
         ),
     })
 
-    # Convert units, do cf-encoding and standardize attrs
-    ds = standardize(ds, lead_is_month, units)
+    # Convert units, standardize attrs
+    ds = standardize_ds(ds, lead_is_month, units)
 
     return ds
 
@@ -396,6 +376,11 @@ def coords_of(ds: xr.Dataset | xr.DataArray):
 def vars_of(ds: xr.Dataset):
     assert all(isinstance(k, str) for k in ds.variables)
     return cast(Mapping[str, xr.Variable], ds.variables)
+
+
+def data_vars_of(ds: xr.Dataset):
+    assert all(isinstance(k, str) for k in ds.data_vars)
+    return cast(Mapping[str, xr.DataArray], ds.data_vars)
 
 
 def sizes_of(ds: xr.Dataset | xr.DataArray):

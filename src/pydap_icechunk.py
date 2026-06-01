@@ -1,7 +1,7 @@
 import abc
 import importlib.util
 from pathlib import Path
-from typing import override
+from typing import Iterable, Mapping, cast, override
 import dask.array
 import icechunk
 import os
@@ -11,6 +11,7 @@ import webob
 from webob.dec import wsgify
 from webob.exc import HTTPForbidden, HTTPNotFound
 import xarray as xr
+import xarray.conventions
 import numpy as np
 
 from pydap.handlers.lib import BaseHandler
@@ -50,14 +51,19 @@ class XarrayHandler(BaseHandler, abc.ABC):
             #     )
             # )
 
-            # shortcuts
-            vars = source.variables
-            dims = source.dims
+            assert all(isinstance(d, str) for d in source.dims)
+            dims = cast(Iterable[str], source.dims)
+
+            # Apply cf-encoding
+            vars, attrs = cast(
+                tuple[Mapping[str, xr.Variable], Mapping[str, str]],
+                xarray.conventions.cf_encoder(source.variables, source.attrs)
+            )
 
             # build dataset
 
             self.dataset = DatasetType(
-                self.name, attributes=dict(source.attrs)
+                self.name, attributes=attrs
             )
 
             # add grids
@@ -65,7 +71,7 @@ class XarrayHandler(BaseHandler, abc.ABC):
             for grid in grids:
                 # make dimension a fully qualifying name
                 dimensions = ["/" + str(dim) for dim in vars[grid].dims]
-                data = source[grid].data
+                data = vars[grid].data
                 if isinstance(data, dask.array.Array):
                     data = DaskArrayProxy(data)
                 self.dataset[grid] = BaseType(
@@ -242,20 +248,9 @@ class CatalogFileHandler(XarrayHandler):
         if self.extension:
             return super().__call__(environ, start_response)
         request = webob.Request(environ)
-        ds_orig = self.open()
-        ds_decoded = xr.decode_cf(ds_orig)
-        for name, coord in ds_decoded.coords.items():
-            # For some reason, decode_cf causes aux coords (e.g. target)
-            # to get unloaded, so we see "..." instead of values in the UI.
-            # Fix that by explicitly reloading them.
-            coord.load()
-            # Xarray's CF decoding removes the units and calendar attributes.
-            # Put them back for display purposes.
-            if np.issubdtype(coord.dtype, np.datetime64):
-                for attr in ('units', 'calendar'):
-                    coord.attrs[attr] = ds_orig[name].attrs[attr]
+        ds = self.open()
         context = {
-            'ds': ds_decoded,
+            'ds': ds,
             'url': request.url,
         }
         response = webob.Response(body=self.var_template.render(context))
@@ -287,6 +282,19 @@ class CatalogFileHandler(XarrayHandler):
     def open(self):
         module = load_index(self.file_path)
         ds: xr.Dataset = module.open(self.varname)
+
+        # Scalar coordinates break pydap. TODO fix pydap.
+        ds = ds.drop_vars(
+            [name for name, coord in ds.coords.items() if coord.dims == ()]
+        )
+
+        # Attributes that contain quotes cause pydap to produce an invalid response.
+        # TODO fix pydap, or at least figure out how to escape quotes before
+        # passing them to pydap.
+        for attr, value in ds.attrs.items():
+            if '"' in value:
+                del ds.attrs[attr]
+
         return ds
 
 
