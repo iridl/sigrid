@@ -2,20 +2,19 @@ import abc
 import importlib.util
 from pathlib import Path
 from typing import Iterable, Mapping, cast, override
-import dask.array
-import icechunk
 import os
 import re
+
+import dask.array
+import icechunk
 import jinja2
+from pydap.handlers.lib import BaseHandler
+from pydap.model import BaseType, DatasetType
 import webob
 from webob.dec import wsgify
 from webob.exc import HTTPForbidden, HTTPNotFound
 import xarray as xr
 import xarray.conventions
-import numpy as np
-
-from pydap.handlers.lib import BaseHandler
-from pydap.model import BaseType, DatasetType
 
 
 
