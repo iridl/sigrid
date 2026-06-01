@@ -60,6 +60,12 @@ def test_one(proxy, server, test_path):
     ds1 = compare.fetch(url1)
     ds2 = compare.fetch(url2)
 
+    # Cut them both off so I don't have tests failing or busting the response cache
+    # because of updates. If we want to check for successful updates, we'll need
+    # to write a separate set of tests for that.
+    ds1 = ds1.sel(S=slice(None, '2026-05-01'))
+    ds2 = ds2.sel(S=slice(None, '2026-05-01'))
+
     # Convert Ingrid's 360_day calendar to standard
     ds2 = ds2.convert_calendar('standard', dim='S', align_on='date')
 
