@@ -8,6 +8,7 @@ import re
 import dask.array
 import icechunk
 import jinja2
+import numpy as np
 from pydap.handlers.lib import BaseHandler
 from pydap.model import BaseType, DatasetType
 import webob
@@ -248,6 +249,14 @@ class CatalogFileHandler(XarrayHandler):
             return super().__call__(environ, start_response)
         request = webob.Request(environ)
         ds = self.open()
+
+        # To help users understand what they will get via opendap, add the units
+        # and calendar attributes that the response will have.
+        for name, coord in ds.coords.items():
+            if np.issubdtype(coord.dtype, np.datetime64):
+                coord.attrs['units'] = coord.encoding['units']
+                coord.attrs['calendar'] = coord.encoding['calendar']
+
         context = {
             'ds': ds,
             'url': request.url,
