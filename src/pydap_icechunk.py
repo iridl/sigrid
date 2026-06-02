@@ -148,8 +148,8 @@ def ensure_trailing(s: str) -> str:
 
 
 class Server:
-    def __init__(self, catalog_path: Path | str):
-        self.catalog_path = Path(catalog_path).resolve()
+    def __init__(self, catalog_root: Path | str):
+        self.catalog_root = Path(catalog_root).resolve()
 
     @wsgify
     def __call__(self, req: webob.Request):
@@ -161,12 +161,12 @@ class Server:
         # Check for trailing slash before Path() strips it
         is_dir = req.path_info[-1] == '/'
 
-        abspath = self.catalog_path / relpath
+        abspath = self.catalog_root / relpath
 
         # Don't allow an attacker to escape from the catalog root
         # by using paths containing ".."
         try:
-            abspath.resolve().relative_to(self.catalog_path)
+            abspath.resolve().relative_to(self.catalog_root)
         except ValueError:
             return HTTPForbidden()
 
