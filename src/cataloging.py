@@ -30,7 +30,11 @@ def convert_units(da: xr.DataArray, new_units: str | None) -> xr.DataArray:
         if new_units is None:
             pass  # leave quantities as is, drop the units attr
         else:  # new_units is not None
-            converter = UNIT_CONVERSIONS[(original_units, new_units)]
+            try:
+                converter = UNIT_CONVERSIONS[(original_units, new_units)]
+            except KeyError as e:
+                e.add_note(f"Don't know how to convert from {original_units} to {new_units}")
+                raise
             da = converter(da)
     return da
 
@@ -41,7 +45,7 @@ UNIT_CONVERSIONS: Mapping[tuple[str, str], UnitConverter] = {
     ('K', 'degree_Celsius'): linear_converter(-273.15, 1),
     ('Kelvin', 'degree_Celsius'): linear_converter(-273.15, 1),
     ('gpm', 'm'): null_converter,
-    ('kg/m2', 'mm'): linear_converter(0, 1000 / 1000),
+    ('kg/m2', 'mm'): null_converter,  # density of water is 1000kg/m3
     ('kg m**-2 s**-1', 'mm/day'): linear_converter(0, 1000 * 60 * 60 * 24 / 1000),
     ('kg m-2 s-1', 'mm/day'): linear_converter(0, 1000 * 60 * 60 * 24 / 1000),
     ('kg m^-2 s^-1', 'mm/day'): linear_converter(0, 1000 * 60 * 60 * 24 / 1000),
