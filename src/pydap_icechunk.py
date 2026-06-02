@@ -2,11 +2,9 @@ import abc
 import importlib.util
 from pathlib import Path
 from typing import Iterable, Mapping, cast, override
-import os
 import re
 
 import dask.array
-import icechunk
 import jinja2
 import numpy as np
 from pydap.handlers.lib import BaseHandler
@@ -16,12 +14,6 @@ from webob.dec import wsgify
 from webob.exc import HTTPForbidden, HTTPFound, HTTPNotFound
 import xarray as xr
 import xarray.conventions
-
-
-
-orig_root = os.environ['PYDAP_ICECHUNK_ORIGINAL_ROOT']
-icechunk_root = os.environ['PYDAP_ICECHUNK_PROCESSED_ROOT']
-# TODO this must be available from the pydap config already?
 
 
 class XarrayHandler(BaseHandler, abc.ABC):
@@ -92,30 +84,6 @@ class XarrayHandler(BaseHandler, abc.ABC):
     
     @abc.abstractmethod
     def open(self) -> xr.Dataset: ...
-
-
-def open_icechunk(rel_path, decode_times=True, drop_variables=None):
-    abspath = Path(icechunk_root) / rel_path
-    storage = icechunk.local_filesystem_storage(abspath)
-    # Workaround for https://github.com/earth-mover/icechunk/issues/2105
-    if not icechunk.Repository.exists(storage):
-        raise Exception(f'No repository exists at {abspath}')
-    try:
-        repo = icechunk.Repository.open(
-            storage,
-            authorize_virtual_chunk_access={f'file://{orig_root}/': None}
-        )
-        session = repo.readonly_session("main")
-        ds = xr.open_zarr(
-            session.store,
-            zarr_format=3,
-            decode_times=decode_times,
-            drop_variables=drop_variables,
-        )
-        return ds
-    except Exception as e:
-        e.add_note(f'When trying to open {abspath}')
-        raise
 
 
 class DaskArrayProxy:

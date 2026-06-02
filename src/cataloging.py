@@ -1,12 +1,19 @@
 # pyright: strict, reportUnknownMemberType=false
 
-from typing import Callable, Mapping, cast
+import os
+from pathlib import Path
+from typing import Callable, Iterable, Mapping, cast
 
+import icechunk
 import xarray as xr
 import numpy as np
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 import datetime
+
+
+ICECHUNK_ROOT = Path(os.environ['PYDAP_ICECHUNK_PROCESSED_ROOT'])
+# TODO this must be available from the pydap config already?
 
 
 type UnitConverter = Callable[[xr.DataArray], xr.DataArray]
@@ -408,3 +415,24 @@ def data_vars_of(ds: xr.Dataset):
 def sizes_of(ds: xr.Dataset | xr.DataArray):
     assert all(isinstance(k, str) for k in ds.sizes)
     return cast(Mapping[str, int], ds.sizes)
+
+
+def open_icechunk(rel_path: str, decode_times: bool = True, drop_variables: Iterable[str] = ()):
+    abspath = ICECHUNK_ROOT / rel_path
+    storage = icechunk.local_filesystem_storage(str(abspath))
+    # Workaround for https://github.com/earth-mover/icechunk/issues/2105
+    if not icechunk.Repository.exists(storage):
+        raise Exception(f'No repository exists at {abspath}')
+    try:
+        repo = icechunk.Repository.open(storage)
+        session = repo.readonly_session("main")
+        ds = xr.open_zarr(
+            session.store,
+            zarr_format=3,
+            decode_times=decode_times,
+            drop_variables=drop_variables,
+        )
+        return ds
+    except Exception as e:
+        e.add_note(f'When trying to open {abspath}')
+        raise
