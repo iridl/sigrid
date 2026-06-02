@@ -156,7 +156,7 @@ class Server:
         # path_info looks like an absolute path. Strip the leading / to
         # make it relative.
         assert req.path_info[0] == '/'
-        relpath = req.path_info[1:]
+        relpath = Path(req.path_info[1:])
 
         # Check for trailing slash before Path() strips it
         trailing_slash = req.path_info[-1] == '/'
@@ -180,13 +180,15 @@ class Server:
                 # Users are not welcome to look at the actual catalog files.
                 return HTTPNotFound()
 
-        file_path = abspath.parent / 'index.py'
-        if file_path.is_file():
-            varname = abspath.stem
-            extension = abspath.suffix
-            return CatalogFileHandler(file_path, varname, extension)
+        varname = abspath.stem
+        extension = abspath.suffix
+        index_files = []
+        for prefix in relpath.parents:
+            file_path = self.catalog_root / prefix / 'index.py'
+            if file_path.is_file():
+                index_files.append(file_path)
+        return CatalogFileHandler(index_files, varname, extension)
 
-        return HTTPNotFound()
 
     def dir(self, dir_path: Path):
         """Return a directory listing."""
@@ -201,8 +203,11 @@ class Server:
         index_path = dir_path / "index.py"
         if index_path.exists():
             module = load_index(index_path)
-            vars = module.list_vars()
-            vars = sorted(vars, key=alphanum_key)
+            if hasattr(module, 'list_vars'):
+                vars = module.list_vars()
+                vars = sorted(vars, key=alphanum_key)
+            else:
+                vars = []
         else:
             vars = []
         
@@ -242,8 +247,8 @@ class Server:
 
 
 class CatalogFileHandler(XarrayHandler):
-    def __init__(self, file_path, varname, extension):
-        self.file_path = file_path
+    def __init__(self, file_paths, varname, extension):
+        self.file_paths = file_paths
         self.varname = varname
         self.extension = extension
         super().__init__(varname)
@@ -293,8 +298,8 @@ class CatalogFileHandler(XarrayHandler):
 
     @override
     def open(self):
-        module = load_index(self.file_path)
-        ds: xr.Dataset = module.open(self.varname)
+        modules = [load_index(p) for p in self.file_paths]
+        ds: xr.Dataset = modules[0].open(self.varname)
 
         # Scalar coordinates break pydap. TODO fix pydap.
         ds = ds.drop_vars(
@@ -309,6 +314,10 @@ class CatalogFileHandler(XarrayHandler):
             for k, v in ds.attrs.items()
             if not isinstance(v, str) or '"' not in v
         }
+
+        for m in modules:
+            if hasattr(m, 'transform'):
+                ds = m.transform(ds)
 
         return ds
 
