@@ -13,7 +13,7 @@ from pydap.handlers.lib import BaseHandler
 from pydap.model import BaseType, DatasetType
 import webob
 from webob.dec import wsgify
-from webob.exc import HTTPForbidden, HTTPNotFound
+from webob.exc import HTTPForbidden, HTTPFound, HTTPNotFound
 import xarray as xr
 import xarray.conventions
 
@@ -159,7 +159,7 @@ class Server:
         relpath = req.path_info[1:]
 
         # Check for trailing slash before Path() strips it
-        is_dir = req.path_info[-1] == '/'
+        trailing_slash = req.path_info[-1] == '/'
 
         abspath = self.catalog_root / relpath
 
@@ -170,10 +170,15 @@ class Server:
         except ValueError:
             return HTTPForbidden()
 
-        if is_dir:
-            if abspath.exists():
-                return self.dir(abspath)
-            return HTTPNotFound()
+        if abspath.exists():
+            if abspath.is_dir():
+                if trailing_slash:
+                    return self.dir(abspath)
+                else:
+                    return HTTPFound(location=req.path + '/')
+            else:
+                # Users are not welcome to look at the actual catalog files.
+                return HTTPNotFound()
 
         file_path = abspath.parent / 'index.py'
         if file_path.is_file():
