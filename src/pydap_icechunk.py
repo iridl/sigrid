@@ -1,8 +1,5 @@
 import abc
-import importlib.util
-from pathlib import Path
 from typing import Iterable, Mapping, cast, override
-import re
 
 import dask.array
 import jinja2
@@ -11,9 +8,11 @@ from pydap.handlers.lib import BaseHandler
 from pydap.model import BaseType, DatasetType
 import webob
 from webob.dec import wsgify
-from webob.exc import HTTPForbidden, HTTPFound, HTTPNotFound
+from webob.exc import HTTPFound, HTTPNotFound
 import xarray as xr
 import xarray.conventions
+
+import cataloging
 
 
 class XarrayHandler(BaseHandler, abc.ABC):
@@ -116,73 +115,60 @@ def ensure_trailing(s: str) -> str:
 
 
 class Server:
-    def __init__(self, catalog_root: Path | str):
-        self.catalog_root = Path(catalog_root).resolve()
+    def __init__(self, root_dataset: cataloging.Dataset) -> None:
+        self.root_dataset = root_dataset
 
     @wsgify
     def __call__(self, req: webob.Request):
         # path_info looks like an absolute path. Strip the leading / to
         # make it relative.
-        assert req.path_info[0] == '/'
-        relpath = Path(req.path_info[1:])
+        assert req.path_info.startswith('/')
+        catalog_path = req.path_info[1:]
 
-        # Check for trailing slash before Path() strips it
-        trailing_slash = req.path_info[-1] == '/'
-
-        abspath = self.catalog_root / relpath
-
-        # Don't allow an attacker to escape from the catalog root
-        # by using paths containing ".."
-        try:
-            abspath.resolve().relative_to(self.catalog_root)
-        except ValueError:
-            return HTTPForbidden()
-
-        if abspath.exists():
-            if abspath.is_dir():
-                if trailing_slash:
-                    return self.dir(abspath)
-                else:
-                    return HTTPFound(location=req.path + '/')
-            else:
-                # Users are not welcome to look at the actual catalog files.
-                return HTTPNotFound()
-
-        varname = abspath.stem
-        extension = abspath.suffix
-        index_files = []
-        for prefix in relpath.parents:
-            file_path = self.catalog_root / prefix / 'index.py'
-            if file_path.is_file():
-                index_files.append(file_path)
-        return CatalogFileHandler(index_files, varname, extension)
-
-
-    def dir(self, dir_path: Path):
-        """Return a directory listing."""
-
-        dirs = [
-            d.name
-            for d in dir_path.iterdir()
-            if d.is_dir() and d.name != '__pycache__' and not (d / 'hidden').exists()
-        ]
-        dirs = sorted(dirs, key=alphanum_key)
-
-        index_path = dir_path / "index.py"
-        if index_path.exists():
-            module = load_index(index_path)
-            if hasattr(module, 'list_vars'):
-                vars = module.list_vars()
-                vars = sorted(vars, key=alphanum_key)
-            else:
-                vars = []
+        # Record whether or not we had a trailing slash, and if so, strip it
+        if req.path_info.endswith('/'):
+            trailing_slash = True
+            catalog_path = catalog_path[:-1]
         else:
-            vars = []
-        
+            trailing_slash = False
+
+        node = self.root_dataset
+        components = catalog_path.split('/')
+        if components == ['']:
+            components = []
+        for i, component in enumerate(components):
+            sub = node.subdatasets.get(component)
+            if sub is None:
+                if i == len(components) - 1:
+                    if '.' in component:
+                        varname, extension = component.rsplit('.', maxsplit=1)
+                    else:
+                        varname = component
+                        extension = None
+                    opener = node.variables.get(varname)
+                    if opener is None:
+                        return HTTPNotFound()
+                    if trailing_slash:
+                        # There should be no trailing slash on a variable name.
+                        return HTTPFound(location=req.path[:-1])
+                    return CatalogFileHandler(opener(), varname, extension)
+                else:
+                    return HTTPNotFound()
+            node = sub
+        else:
+            # Bottomed out at a Dataset
+            if not trailing_slash:
+                return HTTPFound(location=req.path + '/')
+            return self.dir(node)
+
+
+    def dir(self, dataset: cataloging.Dataset):
+        """Return a directory listing."""
+       
 
         context = {
-            "dirs": dirs,
-            "vars": vars,
+            "dirs": [name for name, sub in dataset.subdatasets.items() if not sub.hidden],
+            "vars": list(dataset.variables),
         }
 
         return webob.Response(
@@ -215,9 +201,8 @@ class Server:
 
 
 class CatalogFileHandler(XarrayHandler):
-    def __init__(self, file_paths, varname, extension):
-        self.file_paths = file_paths
-        self.varname = varname
+    def __init__(self, ds, varname, extension):
+        self.ds = ds
         self.extension = extension
         super().__init__(varname)
 
@@ -226,17 +211,16 @@ class CatalogFileHandler(XarrayHandler):
         if self.extension:
             return super().__call__(environ, start_response)
         request = webob.Request(environ)
-        ds = self.open()
 
         # To help users understand what they will get via opendap, add the units
         # and calendar attributes that the response will have.
-        for name, coord in ds.coords.items():
+        for name, coord in self.ds.coords.items():
             if np.issubdtype(coord.dtype, np.datetime64):
                 coord.attrs['units'] = coord.encoding['units']
                 coord.attrs['calendar'] = coord.encoding['calendar']
 
         context = {
-            'ds': ds,
+            'ds': self.ds,
             'url': request.url,
         }
         response = webob.Response(body=self.var_template.render(context))
@@ -266,8 +250,7 @@ class CatalogFileHandler(XarrayHandler):
 
     @override
     def open(self):
-        modules = [load_index(p) for p in self.file_paths]
-        ds: xr.Dataset = modules[0].open(self.varname)
+        ds = self.ds.copy()
 
         # Scalar coordinates break pydap. TODO fix pydap.
         ds = ds.drop_vars(
@@ -283,43 +266,4 @@ class CatalogFileHandler(XarrayHandler):
             if not isinstance(v, str) or '"' not in v
         }
 
-        for m in modules:
-            if hasattr(m, 'transform'):
-                ds = m.transform(ds)
-
         return ds
-
-
-def load_index(file_path):
-    spec = importlib.util.spec_from_file_location('catalog', file_path)
-    assert spec is not None  # we already checked that it exists
-    module = importlib.util.module_from_spec(spec)
-    # Pyright says the loader could be None, but I don't see how that
-    # could happen.
-    assert spec.loader  
-    spec.loader.exec_module(module)
-    return module
-
-
-# Vendored from pydap to avoid a spurious dependency on gunicorn
-def alphanum_key(s):
-    """Parse a string, returning a list of string and number chunks.
-
-        >>> alphanum_key("z23a")
-        ['z', 23, 'a']
-
-    Useful for sorting names in a natural way.
-
-    From http://nedbatchelder.com/blog/200712.html#e20071211T054956
-
-    """
-
-    def tryint(s):
-        try:
-            return int(s)
-        except Exception:
-            return s
-
-    return [tryint(c) for c in re.split("([0-9]+)", s)]
-
-

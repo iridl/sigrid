@@ -1,8 +1,10 @@
 # pyright: strict, reportUnknownMemberType=false
 
+import functools
+import importlib.util
 import os
 from pathlib import Path
-from typing import Callable, Iterable, Mapping, cast
+from typing import Callable, Iterable, Mapping, Protocol, Self, cast, override
 
 import icechunk
 import xarray as xr
@@ -12,8 +14,9 @@ from dateutil.relativedelta import relativedelta
 import datetime
 
 
+# TODO reconcile pydap config vs catalog config
 ICECHUNK_ROOT = Path(os.environ['PYDAP_ICECHUNK_PROCESSED_ROOT'])
-# TODO this must be available from the pydap config already?
+CATALOG_ROOT = Path(os.environ['PYDAP_CATALOG_ROOT'])
 
 
 type UnitConverter = Callable[[xr.DataArray], xr.DataArray]
@@ -109,7 +112,7 @@ TIMEDELTA_ENCODING = {
     'dtype': 'int32',
 }
 
-# Note the time vars' units and calendar are dealt with separately
+# Note the time var's units and calendar are dealt with separately
 # as well as variables units conversion and definition
 STANDARD_ATTRS = {
     'S': {
@@ -436,3 +439,62 @@ def open_icechunk(rel_path: str, decode_times: bool = True, drop_variables: Iter
     except Exception as e:
         e.add_note(f'When trying to open {abspath}')
         raise
+
+
+type Opener = Callable[[], xr.Dataset]
+
+
+class Dataset(Protocol):
+    hidden: bool
+
+    @property
+    def subdatasets(self) -> Mapping[str, Self]: ...
+
+    @property
+    def variables(self) -> Mapping[str, Opener]: ...
+
+
+class DatasetImpl(Dataset):
+    def __init__(self, catalog_path: str) -> None:
+        self.catalog_path = catalog_path
+        self.hidden = (CATALOG_ROOT / catalog_path / 'hidden').exists()
+
+    @property
+    @override
+    def subdatasets(self) -> dict[str, Self]:
+        return {
+            d.name: self.__class__(str(d.relative_to(CATALOG_ROOT)))
+            for d in (CATALOG_ROOT / self.catalog_path).iterdir()
+            if d.is_dir() and d.name != '__pycache__'
+        }
+
+    @property
+    @override
+    def variables(self) -> dict[str, Opener]:
+        index_path = CATALOG_ROOT / self.catalog_path / 'index.py'
+        var_names: Iterable[str]
+
+        if not index_path.exists():
+            return {}
+
+        module = load_index(index_path)
+        if hasattr(module, 'list_vars'):
+            var_names = module.list_vars()
+        else:
+            var_names = []
+
+        return {
+            var: functools.partial(module.open, var)
+            for var in var_names
+        }
+
+
+def load_index(file_path: Path):
+    spec = importlib.util.spec_from_file_location('catalog', file_path)
+    assert spec is not None  # we already checked that it exists
+    module = importlib.util.module_from_spec(spec)
+    # Pyright says the loader could be None, but I don't see how that
+    # could happen.
+    assert spec.loader
+    spec.loader.exec_module(module)
+    return module
