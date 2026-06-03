@@ -455,15 +455,17 @@ class Dataset(Protocol):
 
 
 class DatasetImpl(Dataset):
-    def __init__(self, catalog_path: str) -> None:
+    def __init__(self, catalog_path: str, parent: Self | None) -> None:
         self.catalog_path = catalog_path
+        self.parent = parent
         self.hidden = (CATALOG_ROOT / catalog_path / 'hidden').exists()
+        self._module = None
 
     @property
     @override
     def subdatasets(self) -> dict[str, Self]:
         return {
-            d.name: self.__class__(str(d.relative_to(CATALOG_ROOT)))
+            d.name: self.__class__(str(d.relative_to(CATALOG_ROOT)), self)
             for d in (CATALOG_ROOT / self.catalog_path).iterdir()
             if d.is_dir() and d.name != '__pycache__'
         }
@@ -471,22 +473,43 @@ class DatasetImpl(Dataset):
     @property
     @override
     def variables(self) -> dict[str, Opener]:
-        index_path = CATALOG_ROOT / self.catalog_path / 'index.py'
+        if self.module is None or not hasattr(self.module, 'list_vars'):
+            return {}
+        
         var_names: Iterable[str]
 
-        if not index_path.exists():
-            return {}
-
-        module = load_index(index_path)
-        if hasattr(module, 'list_vars'):
-            var_names = module.list_vars()
+        if hasattr(self.module, 'list_vars'):
+            var_names = self.module.list_vars()
         else:
             var_names = []
 
         return {
-            var: functools.partial(module.open, var)
+            var: functools.partial(self._open, var)
             for var in var_names
         }
+
+    @functools.cached_property
+    def module(self):
+        index_path = CATALOG_ROOT / self.catalog_path / 'index.py'
+        if not index_path.exists():
+            return None
+        return load_index(index_path)
+
+    def _open(self, varname: str) -> xr.Dataset:
+        if self.module is None or not hasattr(self.module, 'open'):
+            # This should never happen. We only call _open with names that
+            # come from variables()
+            assert False
+        ds = self.module.open(varname)
+        ds = self._transform(ds)
+        return ds
+    
+    def _transform(self, ds: xr.Dataset) -> xr.Dataset:
+        if self.module is not None and hasattr(self.module, 'transform'):
+            ds = self.module.transform(ds)
+        if self.parent is not None:
+            ds = self.parent._transform(ds)
+        return ds
 
 
 def load_index(file_path: Path):
