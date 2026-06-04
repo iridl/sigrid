@@ -229,6 +229,9 @@ STANDARD_ATTRS: dict[str, dict[str, str]] = {
     },
 }
 
+# Dims that are allowed not to have a coord with the same name
+BARE_DIMS = ['nbound']
+
 DS_STANDARD_ATTRS = {
     'Conventions': 'CF-1.13',
 }
@@ -251,6 +254,7 @@ class DatasetConfig:
     timedelta_encoding: TimedeltaEncoding
     standard_attrs: Mapping[str, Mapping[str, str]]
     toplevel_standard_attrs: Mapping[str, str]
+    bare_dims: set[str]
 
 
 config = DatasetConfig(
@@ -258,6 +262,7 @@ config = DatasetConfig(
     timedelta_encoding=TimedeltaEncoding(**TIMEDELTA_ENCODING),
     standard_attrs=STANDARD_ATTRS,
     toplevel_standard_attrs=DS_STANDARD_ATTRS,
+    bare_dims=set(BARE_DIMS),
 )
 
 
@@ -359,20 +364,23 @@ def catalog(
     original_names: Mapping[str, str],
     lead_is_month: bool = False,
 ):
-    # Renaming std and dropping non-std
-    for name in (set(vars_of(ds)) | set(sizes_of(ds))):
-        if name in original_names:
-            if name != original_names[name]: 
-                ds = ds.rename({name: original_names[name]})
-        elif name not in config.standard_attrs:
-            if name in ds.variables:
-                ds = ds.drop_vars(name)
-    # Checking everything is standard:
-    non_std_names = [
-        name for name in (set(ds.variables) | set(ds.sizes)) if name not in config.standard_attrs
+    ds = ds.rename({
+        provider_name: standard_name
+        for provider_name, standard_name in original_names.items()
+        if provider_name in set(ds.variables) | set(ds.dims)
+        and provider_name != standard_name
+    })
+
+    ds = ds.drop_vars([
+        name for name in ds.variables
+        if name not in config.standard_attrs
+    ])
+    
+    non_std_dims = [
+        name for name in ds.dims if name not in set(config.bare_dims) | set(config.standard_attrs)
     ]
-    if len(non_std_names) > 0:
-        raise Exception(f'non standard {*non_std_names,} in dataset')
+    if len(non_std_dims) > 0:
+        raise Exception(f'non standard dims {*non_std_dims,} in dataset')
 
     if lead_is_month:
         # Set lead times
