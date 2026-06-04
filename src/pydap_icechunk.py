@@ -148,13 +148,13 @@ class Server:
                 return HTTPNotFound()
             return CatalogFileHandler(ds, varname, extension)  # TODO bad name--only handles variables.
 
-    def dir(self, dataset: cataloging.Dataset):
+    def dir(self, dataset: cataloging.DisplayDataset):
         """Return a directory listing."""
        
 
         context = {
-            "dirs": [name for name, sub in dataset.subdatasets.items() if not sub.hidden],
-            "vars": list(dataset.variables),
+            "dirs": dataset.subdatasets,
+            "vars": dataset.variables,
         }
 
         return webob.Response(

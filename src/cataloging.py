@@ -1,10 +1,11 @@
 # pyright: strict, reportUnknownMemberType=false
 
+from dataclasses import dataclass
 import functools
 import importlib.util
 import os
 from pathlib import Path
-from typing import Callable, Iterable, Mapping, Protocol, Self, cast, override
+from typing import Callable, Iterable, Mapping, Self, cast
 
 import icechunk
 import xarray as xr
@@ -444,26 +445,22 @@ def open_icechunk(rel_path: str, decode_times: bool = True, drop_variables: Iter
 type Opener = Callable[[], xr.Dataset]
 
 
-class Dataset(Protocol):
-    hidden: bool
-
-    @property
-    def subdatasets(self) -> Mapping[str, Self]: ...
-
-    @property
-    def variables(self) -> Mapping[str, Opener]: ...
+@dataclass
+class DisplayDataset:
+    subdatasets: Iterable[str]
+    variables: Iterable[str]
 
 
 class Catalog:
     def __init__(self):
-        self.root_dataset = DatasetImpl('', None)
+        self.root_node = CatalogNode('', None)
 
     def open_variable(self, catalog_path: str) -> xr.Dataset | None:
         if not catalog_path.startswith('/'):
             raise Exception(f'Absolute catalog path was expected; got relative path {catalog_path}')
         if catalog_path.endswith('/'):
             return None  # Variable paths can't end in slash.
-        node = self.root_dataset
+        node = self.root_node
         components = catalog_path[1:].split('/')
         for i, component in enumerate(components):
             sub = node.subdatasets.get(component)
@@ -479,12 +476,12 @@ class Catalog:
         # If we reach here, we bottomed out at a Dataset, not a Variable.
         return None
     
-    def open_dataset(self, catalog_path: str) -> Dataset | None:
+    def open_dataset(self, catalog_path: str) -> DisplayDataset | None:
         if not catalog_path.startswith('/'):
             raise Exception(f'Absolute catalog path was expected; got relative path {catalog_path}')
         if not catalog_path.endswith('/'):
             return None  # Dataset paths must end in slash.
-        node = self.root_dataset
+        node = self.root_node
         components = catalog_path[1:-1].split('/')
         if components == ['']:
             components = []
@@ -493,10 +490,13 @@ class Catalog:
             if sub is None:
                 return None
             node = sub
-        return node
+        return DisplayDataset(
+            [name for name, sub in node.subdatasets.items() if not sub.hidden],
+            list(node.variables)
+        )
 
 
-class DatasetImpl(Dataset):
+class CatalogNode:
     def __init__(self, catalog_path: str, parent: Self | None) -> None:
         self.catalog_path = catalog_path
         self.parent = parent
@@ -504,7 +504,6 @@ class DatasetImpl(Dataset):
         self._module = None
 
     @property
-    @override
     def subdatasets(self) -> dict[str, Self]:
         return {
             d.name: self.__class__(str(d.relative_to(CATALOG_ROOT)), self)
@@ -513,7 +512,6 @@ class DatasetImpl(Dataset):
         }
 
     @property
-    @override
     def variables(self) -> dict[str, Opener]:
         if self.module is None or not hasattr(self.module, 'list_vars'):
             return {}
@@ -526,7 +524,7 @@ class DatasetImpl(Dataset):
             var_names = []
 
         return {
-            var: functools.partial(self._open, var)
+            var: functools.partial(self.open_var, var)
             for var in var_names
         }
 
@@ -537,20 +535,20 @@ class DatasetImpl(Dataset):
             return None
         return load_index(index_path)
 
-    def _open(self, varname: str) -> xr.Dataset:
+    def open_var(self, varname: str) -> xr.Dataset:
         if self.module is None or not hasattr(self.module, 'open'):
             # This should never happen. We only call _open with names that
             # come from variables()
             assert False
         ds = self.module.open(varname)
-        ds = self._transform(ds)
+        ds = self.transform(ds)
         return ds
     
-    def _transform(self, ds: xr.Dataset) -> xr.Dataset:
+    def transform(self, ds: xr.Dataset) -> xr.Dataset:
         if self.module is not None and hasattr(self.module, 'transform'):
             ds = self.module.transform(ds)
         if self.parent is not None:
-            ds = self.parent._transform(ds)
+            ds = self.parent.transform(ds)
         return ds
 
 
