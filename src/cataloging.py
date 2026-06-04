@@ -6,7 +6,7 @@ import functools
 import importlib.util
 import os
 from pathlib import Path
-from typing import Any, Callable, Iterable, Mapping, Self, cast
+from typing import Any, Callable, Iterable, Mapping, Self, TypedDict, cast
 
 import icechunk
 import xarray as xr
@@ -234,6 +234,33 @@ DS_STANDARD_ATTRS = {
 }
 
 
+class DatetimeEncoding(TypedDict):
+    units: str
+    calendar: str
+    dtype: str
+
+
+class TimedeltaEncoding(TypedDict):
+    units: str
+    dtype: str
+
+
+@dataclass
+class DatasetConfig:
+    datetime_encoding: DatetimeEncoding
+    timedelta_encoding: TimedeltaEncoding
+    standard_attrs: Mapping[str, Mapping[str, str]]
+    toplevel_standard_attrs: Mapping[str, str]
+
+
+config = DatasetConfig(
+    datetime_encoding=DatetimeEncoding(**DATETIME_ENCODING),
+    timedelta_encoding=TimedeltaEncoding(**TIMEDELTA_ENCODING),
+    standard_attrs=STANDARD_ATTRS,
+    toplevel_standard_attrs=DS_STANDARD_ATTRS,
+)
+
+
 def standardize_ds(
     ds: xr.Dataset,
     lead_is_month: bool,
@@ -273,7 +300,7 @@ def standardize_ds(
         if not k.startswith('GRIB')
     }
     # Keep the provider's remaining dataset-level attributes, and add our own.
-    attrs.update(DS_STANDARD_ATTRS)
+    attrs.update(config.toplevel_standard_attrs)
 
     ds = xr.Dataset(data_vars=data_vars, coords=coords, attrs=attrs)
 
@@ -282,16 +309,16 @@ def standardize_ds(
 
 def standardize_da(name: str, da: xr.DataArray):
     da = da.copy()
-    new_units = STANDARD_ATTRS[name].get('units')
+    new_units = config.standard_attrs[name].get('units')
     da = convert_units(da, new_units)
 
-    da.attrs = dict(STANDARD_ATTRS[name])
+    da.attrs = dict(config.standard_attrs[name])
 
     # Override provider's encoding for datetimes
     if np.issubdtype(da, np.datetime64):
-        da.encoding = dict(DATETIME_ENCODING)
+        da.encoding = dict(config.datetime_encoding)
     elif np.issubdtype(da, np.timedelta64):
-        da.encoding = dict(TIMEDELTA_ENCODING)
+        da.encoding = dict(config.timedelta_encoding)
 
     # convert units
 
@@ -340,12 +367,12 @@ def catalog(
         if name in original_names:
             if name != original_names[name]: 
                 ds = ds.rename({name: original_names[name]})
-        elif name not in STANDARD_ATTRS:
+        elif name not in config.standard_attrs:
             if name in ds.variables:
                 ds = ds.drop_vars(name)
     # Checking everything is standard:
     non_std_names = [
-        name for name in (set(ds.variables) | set(ds.sizes)) if name not in STANDARD_ATTRS
+        name for name in (set(ds.variables) | set(ds.sizes)) if name not in config.standard_attrs
     ]
     if len(non_std_names) > 0:
         raise Exception(f'non standard {*non_std_names,} in dataset')
