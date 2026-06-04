@@ -454,6 +454,48 @@ class Dataset(Protocol):
     def variables(self) -> Mapping[str, Opener]: ...
 
 
+class Catalog:
+    def __init__(self):
+        self.root_dataset = DatasetImpl('', None)
+
+    def open_variable(self, catalog_path: str) -> xr.Dataset | None:
+        if not catalog_path.startswith('/'):
+            raise Exception(f'Absolute catalog path was expected; got relative path {catalog_path}')
+        if catalog_path.endswith('/'):
+            return None  # Variable paths can't end in slash.
+        node = self.root_dataset
+        components = catalog_path[1:].split('/')
+        for i, component in enumerate(components):
+            sub = node.subdatasets.get(component)
+            if sub is None:
+                if i == len(components) - 1:
+                    opener = node.variables.get(component)
+                    if opener is None:
+                        return None
+                    return opener()
+                else:
+                    return None
+            node = sub
+        # If we reach here, we bottomed out at a Dataset, not a Variable.
+        return None
+    
+    def open_dataset(self, catalog_path: str) -> Dataset | None:
+        if not catalog_path.startswith('/'):
+            raise Exception(f'Absolute catalog path was expected; got relative path {catalog_path}')
+        if not catalog_path.endswith('/'):
+            return None  # Dataset paths must end in slash.
+        node = self.root_dataset
+        components = catalog_path[1:-1].split('/')
+        if components == ['']:
+            components = []
+        for component in components:
+            sub = node.subdatasets.get(component)
+            if sub is None:
+                return None
+            node = sub
+        return node
+
+
 class DatasetImpl(Dataset):
     def __init__(self, catalog_path: str, parent: Self | None) -> None:
         self.catalog_path = catalog_path

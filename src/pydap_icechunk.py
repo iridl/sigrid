@@ -115,52 +115,38 @@ def ensure_trailing(s: str) -> str:
 
 
 class Server:
-    def __init__(self, root_dataset: cataloging.Dataset) -> None:
-        self.root_dataset = root_dataset
+    def __init__(self, catalog: cataloging.Catalog) -> None:
+        self.catalog = catalog
 
     @wsgify
     def __call__(self, req: webob.Request):
-        # path_info looks like an absolute path. Strip the leading / to
-        # make it relative.
-        assert req.path_info.startswith('/')
-        catalog_path = req.path_info[1:]
+        # Note: req.path is the full URL path, including the wsgi app mount point
+        # (e.g. /data), while req.path_info is the part of the path after the
+        # mount point.
 
-        # Record whether or not we had a trailing slash, and if so, strip it
-        if req.path_info.endswith('/'):
-            trailing_slash = True
-            catalog_path = catalog_path[:-1]
-        else:
-            trailing_slash = False
+        url_path = req.path_info
+        assert url_path.startswith('/')
 
-        node = self.root_dataset
-        components = catalog_path.split('/')
-        if components == ['']:
-            components = []
-        for i, component in enumerate(components):
-            sub = node.subdatasets.get(component)
-            if sub is None:
-                if i == len(components) - 1:
-                    if '.' in component:
-                        varname, extension = component.rsplit('.', maxsplit=1)
-                    else:
-                        varname = component
-                        extension = None
-                    opener = node.variables.get(varname)
-                    if opener is None:
-                        return HTTPNotFound()
-                    if trailing_slash:
-                        # There should be no trailing slash on a variable name.
-                        return HTTPFound(location=req.path[:-1])
-                    return CatalogFileHandler(opener(), varname, extension)
-                else:
-                    return HTTPNotFound()
-            node = sub
-        else:
-            # Bottomed out at a Dataset
-            if not trailing_slash:
-                return HTTPFound(location=req.path + '/')
+        if url_path.endswith('/'):
+            node = self.catalog.open_dataset(url_path)
+            if node is None:
+                return HTTPNotFound()
             return self.dir(node)
-
+        else:        
+            parent_path, last_component = url_path.rsplit('/', maxsplit=1)
+            if '.' in last_component:
+                varname, extension = last_component.rsplit('.', maxsplit=1)
+            else:
+                varname = last_component
+                extension = None
+            catalog_path = f'{parent_path}/{varname}'
+            ds = self.catalog.open_variable(catalog_path)
+            if ds is None:
+                # See if it's actually a dir and they just forgot the trailing slash
+                if self.catalog.open_dataset(catalog_path + '/') is not None:
+                    return HTTPFound(location=catalog_path + '/')
+                return HTTPNotFound()
+            return CatalogFileHandler(ds, varname, extension)  # TODO bad name--only handles variables.
 
     def dir(self, dataset: cataloging.Dataset):
         """Return a directory listing."""
