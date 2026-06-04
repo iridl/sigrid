@@ -357,9 +357,6 @@ def S_L_to_target(S: xr.DataArray, L: xr.DataArray):
 def catalog(
     ds: xr.Dataset,
     original_names: Mapping[str, str],
-    # to define if not define in-file (or to overwrite what's defined in-file)
-    # Definition must be a key of UNITS_CONVERSIONS
-    units: Mapping[str, str] | None = None,
     lead_is_month: bool = False,
 ):
     # Renaming std and dropping non-std
@@ -376,12 +373,6 @@ def catalog(
     ]
     if len(non_std_names) > 0:
         raise Exception(f'non standard {*non_std_names,} in dataset')
-
-    # Add missing units
-    if units is not None:
-        for name, units_str in units.items():
-            if name in ds:
-                ds[name].attrs['units'] = units_str
 
     if lead_is_month:
         # Set lead times
