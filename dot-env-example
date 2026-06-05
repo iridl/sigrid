@@ -1,4 +1,12 @@
 PYDAP_ICECHUNK_ORIGINAL_ROOT=/data/original
 PYDAP_ICECHUNK_PROCESSED_ROOT=/data/processed
 PYDAP_CATALOG_ROOT=../ccsr-config/catalog/cooked
+
+
+## Below only used in dev environment
+
+# Dev server port. Prod port/socket is defined in systemd unit.
 PYDAP_PORT=8001
+
+# Where to store cached responses downloaded from iridl for regression tests
+RECORDING_PROXY_DIR=/home/aaron/recorded-responses

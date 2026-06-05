@@ -1,3 +1,4 @@
+import os
 import subprocess
 import pytest
 import re
@@ -40,8 +41,9 @@ def server():
 @pytest.fixture(scope="session")
 def proxy(request):
     is_record = request.config.getoption('--record')
+    response_dir = os.environ.get('RECORDING_PROXY_DIR', "recorded-responses")
     with recording_proxy.recording_proxy(
-            "responses",
+            response_dir,
             is_record=is_record,
             prefixes=['http://iridl.ldeo.columbia.edu'],
             verbose=True,
