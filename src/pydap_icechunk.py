@@ -80,7 +80,7 @@ class XarrayHandler(BaseHandler, abc.ABC):
                 self.dataset[dim] = BaseType(str(dim), data, None, attributes)
                 # TODO deal with the type error when I deal with groups and
                 # understand what's intended.
-                self.dataset[dim].dims = ["/" + str(dim)] # type: ignore
+                self.dataset[dim].dims = ["/" + str(dim)]  # pyright: ignore[reportAttributeAccessIssue]
     
     @abc.abstractmethod
     def open(self) -> xr.Dataset: ...

@@ -1,12 +1,13 @@
 # pyright: strict, reportUnknownMemberType=false
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 import functools
 import importlib.util
 import os
 from pathlib import Path
-from typing import Any, Callable, Iterable, Mapping, Self, TypedDict, cast
+from typing import Any, Callable, Self, TypedDict, cast
 
 import icechunk
 import xarray as xr
