@@ -273,16 +273,10 @@ def catalog(
     lead_is_month: bool = False,
 ):
     ds = rename(ds, original_names)  # do at provider level so ensemble/site can refer to standard names
-
     ds = drop_non_std(ds)            # list is at ensemble level. Logic anywhere.
-
-    ds = convert_units_ds(ds)        # mapping at ensemble level, logic anywhere
-
+    ds = convert_units(ds)        # mapping at ensemble level, logic anywhere
     ds = add_target(ds, lead_is_month)  # ensemble level. Shouldn't be included in standard function. But has to precede standardize_ds.
-
-    # Apply standard attrs and encodings
-    ds = standardize_ds(ds)  # data at ensemble or site level, logic anywhere but has to be after add_target, and probably after convert_units.
-
+    ds = standardize_attrs(ds)  # data at ensemble or site level, logic anywhere but has to be after add_target, and probably after convert_units.
     ds = seasonal_total(ds)           # ensemble level
 
     return ds
@@ -301,7 +295,7 @@ def seasonal_total(ds: xr.Dataset):
     return ds
 
 
-def standardize_ds(
+def standardize_attrs(
     ds: xr.Dataset,
 ):
     coords = {
@@ -340,7 +334,7 @@ def standardize_da(name: str, da: xr.DataArray):
 
     return da
 
-def convert_units_ds(ds: xr.Dataset):
+def convert_units(ds: xr.Dataset):
     data_vars = {
         name: convert_units_da(da, config.standard_attrs[name].get('units'))
         for name, da in data_vars_of(ds).items()
