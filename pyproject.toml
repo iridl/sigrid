@@ -12,6 +12,16 @@ build-backend = "setuptools.build_meta"
 [tool.pixi.workspace]
 channels = ["conda-forge"]
 platforms = ["linux-64"]
+preview = ["pixi-build"]
+
+[tool.pixi.package.build.backend]
+name = "pixi-build-python"
+version = "==0.4.4"
+channels = ["https://prefix.dev/conda-forge"]
+
+#[tool.pixi.package.build.config]
+#ignore-pypi-mapping = false
+>>>>>>> 90a7596 (add ECMF cy49 forecast control on catalog)
 
 [tool.pixi.dependencies]
 pydap = ">=3.5.8,<4"
