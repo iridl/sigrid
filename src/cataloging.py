@@ -31,7 +31,7 @@ def linear_converter(offset: float, scale: float) -> UnitConverter:
 def null_converter(da: xr.DataArray):
     return da
 
-def convert_units(da: xr.DataArray, new_units: str | None) -> xr.DataArray:
+def convert_units_da(da: xr.DataArray, new_units: str | None) -> xr.DataArray:
     original_units = da.attrs.get('units')
     if new_units == original_units:
         pass
@@ -266,9 +266,42 @@ config = DatasetConfig(
 )
 
 
+def catalog(
+    ds: xr.Dataset,
+    original_names: Mapping[str, str],
+    lead_is_month: bool = False,
+):
+    ds = rename(ds, original_names)  # do at provider level so ensemble/site can refer to standard names
+
+    ds = drop_non_std(ds)            # list is at ensemble level. Logic anywhere.
+
+    ds = convert_units_ds(ds)        # mapping at ensemble level, logic anywhere
+
+    ds = add_target(ds, lead_is_month)  # ensemble level. Shouldn't be included in standard function. But has to precede standardize_ds.
+
+    # Apply standard attrs and encodings
+    ds = standardize_ds(ds)  # data at ensemble or site level, logic anywhere but has to be after add_target, and probably after convert_units.
+
+    ds = seasonal_total(ds)           # ensemble level
+
+    return ds
+
+
+def seasonal_total(ds: xr.Dataset):
+    if 'prcp' in ds:
+        da = ds['prcp']
+        target_length = (
+                ds[Coords.target_bnds].isel({Coords.nbound: 1}, drop=True)
+                - ds[Coords.target_bnds].isel({Coords.nbound: 0}, drop=True)
+            ).dt.days
+        da = da * target_length.variable
+        da.attrs['units'] = 'mm'
+        ds['prcp'] = da
+    return ds
+
+
 def standardize_ds(
     ds: xr.Dataset,
-    lead_is_month: bool,
 ):
     coords = {
         name: standardize_da(name, da)
@@ -278,24 +311,6 @@ def standardize_ds(
         name: standardize_da(name, da)
         for name, da in data_vars_of(ds).items()
     }
-    for name, da in data_vars.items():
-        # xarray knows which variables are aux coords,
-        # but cf_encoder fails to encode that information,
-        # so we do it ourselves.
-        aux_coords: list[str] = []
-        if Coords.S in da.dims:
-            aux_coords.extend([Coords.target, Coords.target_bnds])
-        if aux_coords:
-            da.attrs['coordinates'] = ' '.join(aux_coords)
-
-        if lead_is_month and name == 'prcp':
-            target_length = (
-                ds[Coords.target_bnds].isel({Coords.nbound: 1}, drop=True)
-                - ds[Coords.target_bnds].isel({Coords.nbound: 0}, drop=True)
-            ).dt.days
-            data_vars[name] = da * target_length.variable
-            data_vars[name].attrs['units'] = 'mm'
-
 
     # Top ds attrs standardization
     # cfgrib generates a large number of mostly useless attributes. Until
@@ -313,10 +328,7 @@ def standardize_ds(
 
 
 def standardize_da(name: str, da: xr.DataArray):
-    da = da.copy()
-    new_units = config.standard_attrs[name].get('units')
-    da = convert_units(da, new_units)
-
+    # Wipe out provider's attrs and replace with standard ones
     da.attrs = dict(config.standard_attrs[name])
 
     # Override provider's encoding for datetimes
@@ -325,9 +337,14 @@ def standardize_da(name: str, da: xr.DataArray):
     elif np.issubdtype(da, np.timedelta64):
         da.encoding = dict(config.timedelta_encoding)
 
-    # convert units
-
     return da
+
+def convert_units_ds(ds: xr.Dataset):
+    data_vars = {
+        name: convert_units_da(da, config.standard_attrs[name].get('units'))
+        for name, da in data_vars_of(ds).items()
+    }
+    return xr.Dataset(data_vars, coords=ds.coords, attrs=ds.attrs)
 
 
 def S_L_to_target(S: xr.DataArray, L: xr.DataArray):
@@ -359,29 +376,7 @@ def S_L_to_target(S: xr.DataArray, L: xr.DataArray):
     return target_bnds.isel({Coords.nbound: 0}, drop=True), target_bnds
 
 
-def catalog(
-    ds: xr.Dataset,
-    original_names: Mapping[str, str],
-    lead_is_month: bool = False,
-):
-    ds = ds.rename({
-        provider_name: standard_name
-        for provider_name, standard_name in original_names.items()
-        if provider_name in set(ds.variables) | set(ds.dims)
-        and provider_name != standard_name
-    })
-
-    ds = ds.drop_vars([
-        name for name in ds.variables
-        if name not in config.standard_attrs
-    ])
-    
-    non_std_dims = [
-        name for name in ds.dims if name not in set(config.bare_dims) | set(config.standard_attrs)
-    ]
-    if len(non_std_dims) > 0:
-        raise Exception(f'non standard dims {*non_std_dims,} in dataset')
-
+def add_target(ds: xr.Dataset, lead_is_month: bool):
     if lead_is_month:
         # Set lead times
         leads = np.arange(ds.sizes[Coords.L])
@@ -405,8 +400,28 @@ def catalog(
         ),
     })
 
-    # Convert units, standardize attrs
-    ds = standardize_ds(ds, lead_is_month)
+    return ds
+
+def drop_non_std(ds: xr.Dataset):
+    ds = ds.drop_vars([
+        name for name in ds.variables
+        if name not in config.standard_attrs
+    ])
+
+    non_std_dims = [
+        name for name in ds.dims if name not in set(config.bare_dims) | set(config.standard_attrs)
+    ]
+    if len(non_std_dims) > 0:
+        raise Exception(f'non standard dims {*non_std_dims,} in dataset')
+    return ds
+
+def rename(ds: xr.Dataset, original_names: Mapping[str, str]):
+    ds = ds.rename({
+        provider_name: standard_name
+        for provider_name, standard_name in original_names.items()
+        if provider_name in set(ds.variables) | set(ds.dims)
+        and provider_name != standard_name
+    })
 
     return ds
 

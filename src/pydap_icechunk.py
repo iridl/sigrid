@@ -13,6 +13,7 @@ import xarray as xr
 import xarray.conventions
 
 import cataloging
+from cataloging import Coords
 
 
 class XarrayHandler(BaseHandler, abc.ABC):
@@ -146,6 +147,7 @@ class Server:
                 if self.catalog.open_dataset(catalog_path + '/') is not None:
                     return HTTPFound(location=catalog_path + '/')
                 return HTTPNotFound()
+
             return CatalogFileHandler(ds, varname, extension)  # TODO bad name--only handles variables.
 
     def dir(self, dataset: cataloging.DisplayDataset):
@@ -188,6 +190,17 @@ class Server:
 
 class CatalogFileHandler(XarrayHandler):
     def __init__(self, ds, varname, extension):
+        # Populate data variables' "coordinates" attribute, otherwise variables
+        # that xarray considers to be auxiliary vars turn into data vars
+        # in the OPeNDAP response. Doing this here so that the attribute is
+        # present both in OPeNDAP responses and in the web UI.
+        for da in ds.data_vars.values():
+            aux_coords = set(da.attrs.get('coordinates', '').split())
+            if Coords.S in da.dims:
+                aux_coords |= set([Coords.target, Coords.target_bnds])
+            if aux_coords:
+                da.attrs['coordinates'] = ' '.join(aux_coords)
+
         self.ds = ds
         self.extension = extension
         super().__init__(varname)
@@ -199,7 +212,8 @@ class CatalogFileHandler(XarrayHandler):
         request = webob.Request(environ)
 
         # To help users understand what they will get via opendap, add the units
-        # and calendar attributes that the response will have.
+        # and calendar attributes that the response will have when datetimes
+        # get cf-encoded.
         for name, coord in self.ds.coords.items():
             if np.issubdtype(coord.dtype, np.datetime64):
                 coord.attrs['units'] = coord.encoding['units']
