@@ -7,6 +7,7 @@ import functools
 import importlib.util
 import os
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Callable, Self, TypedDict, cast
 
 import icechunk
@@ -32,26 +33,7 @@ def linear_converter(offset: float, scale: float) -> UnitConverter:
 def null_converter(da: xr.DataArray):
     return da
 
-def convert_units_da(da: xr.DataArray, new_units: str | None) -> xr.DataArray:
-    original_units = da.attrs.get('units')
-    if new_units == original_units:
-        pass
-    elif original_units is None:
-        # We know that new_units is not None, or they would have been ==
-        raise Exception("Can't convert to {new_units} because I don't know the original units")
-    else:  # original_units is not None
-        if new_units is None:
-            pass  # leave quantities as is, drop the units attr
-        else:  # new_units is not None
-            try:
-                converter = UNIT_CONVERSIONS[(original_units, new_units)]
-            except KeyError as e:
-                e.add_note(f"Don't know how to convert from {original_units} to {new_units}")
-                raise
-            da = converter(da)
-    return da
-
-UNIT_CONVERSIONS: Mapping[tuple[str, str], UnitConverter] = {
+STANDARD_UNIT_CONVERSIONS: Mapping[tuple[str, str], UnitConverter] = MappingProxyType({
     ('degrees_north', 'degree_north'): null_converter,
     ('degrees_east', 'degree_east'): null_converter,
     ('degreeC', 'degree_Celsius'): null_converter,
@@ -68,7 +50,30 @@ UNIT_CONVERSIONS: Mapping[tuple[str, str], UnitConverter] = {
     ('hPa', 'Pa'): linear_converter(0, 100),
     # Volumetric latent heat of vaporization: 2453 MJ m-3
     ('watt/m^2', 'mm/day'): linear_converter(0, 1000 * 60 * 60 * 24 / 2453e6),
-}
+})
+
+def convert_units_da(
+        da: xr.DataArray,
+        new_units: str | None,
+        conversions: Mapping[tuple[str, str], UnitConverter] = STANDARD_UNIT_CONVERSIONS,
+) -> xr.DataArray:
+    original_units = da.attrs.get('units')
+    if new_units == original_units:
+        pass
+    elif original_units is None:
+        # We know that new_units is not None, or they would have been ==
+        raise Exception("Can't convert to {new_units} because I don't know the original units")
+    else:  # original_units is not None
+        if new_units is None:
+            pass  # leave quantities as is, drop the units attr
+        else:  # new_units is not None
+            try:
+                converter = conversions[(original_units, new_units)]
+            except KeyError as e:
+                e.add_note(f"Don't know how to convert from {original_units} to {new_units}")
+                raise
+            da = converter(da)
+    return da
 
 
 class CaseSensitiveStrEnum(StrEnum):
@@ -86,158 +91,6 @@ Coords = CaseSensitiveStrEnum(
 )
 
 
-# Change the dictionary values 
-# should you different time encoding throughout your system
-DATETIME_ENCODING = {
-    'units': 'hours since 1960-01-01',
-    'calendar': 'standard',
-    'dtype': 'int32',
-}
-TIMEDELTA_ENCODING = {
-    'units': 'hours',
-    'dtype': 'int32',
-}
-
-# Note the time var's units and calendar are dealt with separately
-# as well as variables units conversion and definition
-STANDARD_ATTRS: dict[str, dict[str, str]] = {
-    Coords.S: {
-        'long_name': 'Forecast start time',
-        'standard_name': 'forecast_reference_time',
-    },
-    Coords.L: {
-        'long_name': 'Lead',
-        'standard_name': 'forecast_period',
-        # units: implicitly months, but that's not allowed by CF
-    },
-    Coords.Y: {
-        'long_name': 'Latitude',
-        'standard_name': 'latitude',
-        'units': 'degree_north',
-    },
-    Coords.X: {
-        'long_name': 'Longitude',
-        'standard_name': 'longitude',
-        'units': 'degree_east',
-    },
-    Coords.M: {
-        'long_name': 'Ensemble member',
-        'standard_name': 'realization',
-        # No units. From
-        # https://cfconventions.org/Data/cf-conventions/cf-conventions-1.13/cf-conventions.html#dimensionless-units
-        # "A variable with no units attribute is assumed to be dimensionless."
-    },
-    Coords.P: {
-        'long_name': 'Pressure level',
-        'standard_name': 'air_pressure',
-        'units': 'Pa',
-    },
-    Coords.target: {
-        'long_name': 'Forecast target period',
-        # CF Conventions standard names table says:
-        # forecast_reference_time: The forecast reference time in NWP
-        # is the "data time", the time of the analysis from which the
-        # forecast was made. It is not the time for which the forecast
-        # is valid; the standard name of time should be used for that time.
-        # https://cfconventions.org/Data/cf-standard-names/current/build/cf-standard-name-table.html
-        'standard_name': 'time',
-        'bounds': Coords.target_bnds,
-    },
-    Coords.target_bnds: {},
-    Coords.nbound: {},
-    'pr': {
-        'long_name': 'Total precipitation',
-        'standard_name': 'lwe_precipitation_rate',
-        'units': 'mm/day',
-    },
-    'prcp': {
-        'long_name': 'Total precipitation',
-        'standard_name': 'lwe_precipitation_rate',
-        'units': 'mm/day',
-    },
-    'tas': {
-        'long_name': 'Air temperature',
-        'standard_name': 'air_temperature',
-        'units': 'degree_Celsius',
-    },
-    'tasmax': {
-        'long_name': 'Maximum air temperature',
-        'standard_name': 'air_temperature',
-        'units': 'degree_Celsius',
-    },
-    'tasmin': {
-        'long_name': 'Minimum air temperature',
-        'standard_name': 'air_temperature',
-        'units': 'degree_Celsius',
-    },
-    't2m': {
-        'long_name': 'Air temperature',
-        'standard_name': 'air_temperature',
-        'units': 'degree_Celsius',
-    },
-    'tmax': {
-        'long_name': 'Maximum air temperature',
-        'standard_name': 'air_temperature',
-        'units': 'degree_Celsius',
-    },
-    'tmin': {
-        'long_name': 'Minimum air temperature',
-        'standard_name': 'air_temperature',
-        'units': 'degree_Celsius',
-    },
-    'sst': {
-        'long_name': 'Sea surface temperature',
-        'standard_name': 'sea_surface_temperature',
-        'units': 'degree_Celsius',
-    },
-    'psl': {
-        'long_name': 'Pressure at sea level',
-        'standard_name': 'air_pressure_at_sea_level',
-        'units': 'Pa',
-    },
-    'uas': {
-        'long_name': '10m eastward wind',
-        'standard_name': 'eastward_wind',
-        'units': 'm s-1',
-    },
-    'vas': {
-        'long_name': '10m northward wind',
-        'standard_name': 'northward_wind',
-        'units': 'm s-1',
-    },
-    'z': {
-        'long_name': 'Geopotential height',
-        'standard_name': 'geopotential_height',
-        'units': 'm',
-    },
-    'zg': {
-        'long_name': 'Geopotential height',
-        'standard_name': 'geopotential_height',
-        'units': 'm',
-    },
-    'evap': {
-        'long_name': 'Canopy evaporation',
-        'standard_name': 'water_evaporation_flux_from_canopy',
-        'units': 'mm/day',
-    },
-    'runoff': {
-        'long_name': 'Runoff',
-        'standard_name': 'runoff_flux',
-    },
-    'sm': {
-        'long_name': 'Soil moisture',
-        'standard_name': 'soil_moisture_content',
-    },
-}
-
-# Dims that are allowed not to have a coord with the same name
-BARE_DIMS = ['nbound']
-
-DS_STANDARD_ATTRS = {
-    'Conventions': 'CF-1.13',
-}
-
-
 class DatetimeEncoding(TypedDict):
     units: str
     calendar: str
@@ -251,32 +104,25 @@ class TimedeltaEncoding(TypedDict):
 
 @dataclass
 class DatasetConfig:
-    datetime_encoding: DatetimeEncoding
-    timedelta_encoding: TimedeltaEncoding
     standard_attrs: Mapping[str, Mapping[str, str]]
     toplevel_standard_attrs: Mapping[str, str]
-    bare_dims: set[str]
+    bare_dims: Iterable[str]
+    lead_is_month: bool
+    datetime_encoding: DatetimeEncoding
+    timedelta_encoding: TimedeltaEncoding
 
 
-config = DatasetConfig(
-    datetime_encoding=DatetimeEncoding(**DATETIME_ENCODING),
-    timedelta_encoding=TimedeltaEncoding(**TIMEDELTA_ENCODING),
-    standard_attrs=STANDARD_ATTRS,
-    toplevel_standard_attrs=DS_STANDARD_ATTRS,
-    bare_dims=set(BARE_DIMS),
-)
-
-
-def catalog(
-    ds: xr.Dataset,
-    original_names: Mapping[str, str],
-    lead_is_month: bool = False,
-):
-    ds = rename(ds, original_names)  # do at provider level so ensemble/site can refer to standard names
-    ds = drop_non_std(ds)            # list is at ensemble level. Logic anywhere.
-    ds = convert_units(ds)        # mapping at ensemble level, logic anywhere
-    ds = add_target(ds, lead_is_month)  # ensemble level. Shouldn't be included in standard function. But has to precede standardize_ds.
-    ds = standardize_attrs(ds)  # data at ensemble or site level, logic anywhere but has to be after add_target, and probably after convert_units.
+def standardize(ds: xr.Dataset, config: DatasetConfig):
+    ds = drop_non_std(ds, config.standard_attrs, config.bare_dims)            # list is at ensemble level. Logic anywhere.
+    ds = convert_units(ds, config.standard_attrs)        # mapping at ensemble level, logic anywhere
+    ds = add_target(ds, config.lead_is_month)  # ensemble level. Shouldn't be included in standard function. But has to precede standardize_ds.
+    ds = standardize_attrs(
+        ds,
+        standard_attrs=config.standard_attrs,
+        toplevel_standard_attrs=config.toplevel_standard_attrs,
+        datetime_encoding=config.datetime_encoding,
+        timedelta_encoding=config.timedelta_encoding,
+    )  # data at ensemble or site level, logic anywhere but has to be after add_target, and probably after convert_units.
     ds = seasonal_total(ds)           # ensemble level
 
     return ds
@@ -297,13 +143,17 @@ def seasonal_total(ds: xr.Dataset):
 
 def standardize_attrs(
     ds: xr.Dataset,
+    standard_attrs: Mapping[str, Mapping[str, str]],
+    toplevel_standard_attrs: Mapping[str, str],
+    datetime_encoding: DatetimeEncoding,
+    timedelta_encoding: TimedeltaEncoding,
 ):
     coords = {
-        name: standardize_da(name, da)
+        name: standardize_da(name, da, standard_attrs, datetime_encoding, timedelta_encoding)
         for name, da in coords_of(ds).items()
     }
     data_vars = {
-        name: standardize_da(name, da)
+        name: standardize_da(name, da, standard_attrs, datetime_encoding, timedelta_encoding)
         for name, da in data_vars_of(ds).items()
     }
 
@@ -315,28 +165,34 @@ def standardize_attrs(
         if not k.startswith('GRIB')
     }
     # Keep the provider's remaining dataset-level attributes, and add our own.
-    attrs.update(config.toplevel_standard_attrs)
+    attrs.update(toplevel_standard_attrs)
 
     ds = xr.Dataset(data_vars=data_vars, coords=coords, attrs=attrs)
 
     return ds
 
 
-def standardize_da(name: str, da: xr.DataArray):
+def standardize_da(
+        name: str,
+        da: xr.DataArray,
+        standard_attrs: Mapping[str, Mapping[str, str]],
+        datetime_encoding: DatetimeEncoding,
+        timedelta_encoding: TimedeltaEncoding,
+):
     # Wipe out provider's attrs and replace with standard ones
-    da.attrs = dict(config.standard_attrs[name])
+    da.attrs = dict(standard_attrs[name])
 
     # Override provider's encoding for datetimes
     if np.issubdtype(da, np.datetime64):
-        da.encoding = dict(config.datetime_encoding)
+        da.encoding = dict(datetime_encoding)
     elif np.issubdtype(da, np.timedelta64):
-        da.encoding = dict(config.timedelta_encoding)
+        da.encoding = dict(timedelta_encoding)
 
     return da
 
-def convert_units(ds: xr.Dataset):
+def convert_units(ds: xr.Dataset, standard_attrs: Mapping[str, Mapping[str, str]]):
     data_vars = {
-        name: convert_units_da(da, config.standard_attrs[name].get('units'))
+        name: convert_units_da(da, standard_attrs[name].get('units'))
         for name, da in data_vars_of(ds).items()
     }
     return xr.Dataset(data_vars, coords=ds.coords, attrs=ds.attrs)
@@ -397,23 +253,23 @@ def add_target(ds: xr.Dataset, lead_is_month: bool):
 
     return ds
 
-def drop_non_std(ds: xr.Dataset):
+def drop_non_std(ds: xr.Dataset, standard_attrs: Mapping[str, Mapping[str, str]], bare_dims: Iterable[str]):
     ds = ds.drop_vars([
         name for name in ds.variables
-        if name not in config.standard_attrs
+        if name not in standard_attrs
     ])
 
     non_std_dims = [
-        name for name in ds.dims if name not in set(config.bare_dims) | set(config.standard_attrs)
+        name for name in ds.dims if name not in set(bare_dims) | set(standard_attrs)
     ]
     if len(non_std_dims) > 0:
         raise Exception(f'non standard dims {*non_std_dims,} in dataset')
     return ds
 
-def rename(ds: xr.Dataset, original_names: Mapping[str, str]):
+def rename(ds: xr.Dataset, mapping: Mapping[str, str]):
     ds = ds.rename({
         provider_name: standard_name
-        for provider_name, standard_name in original_names.items()
+        for provider_name, standard_name in mapping.items()
         if provider_name in set(ds.variables) | set(ds.dims)
         and provider_name != standard_name
     })
