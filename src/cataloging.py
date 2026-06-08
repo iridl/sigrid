@@ -113,17 +113,17 @@ class DatasetConfig:
 
 
 def standardize(ds: xr.Dataset, config: DatasetConfig):
-    ds = drop_non_std(ds, config.standard_attrs, config.bare_dims)            # list is at ensemble level. Logic anywhere.
-    ds = convert_units(ds, config.standard_attrs)        # mapping at ensemble level, logic anywhere
-    ds = add_target(ds, config.lead_is_month)  # ensemble level. Shouldn't be included in standard function. But has to precede standardize_ds.
+    ds = drop_non_std(ds, config.standard_attrs, config.bare_dims)
+    ds = convert_units(ds, config.standard_attrs)
+    ds = add_target(ds, config.lead_is_month)
     ds = standardize_attrs(
         ds,
         standard_attrs=config.standard_attrs,
         toplevel_standard_attrs=config.toplevel_standard_attrs,
         datetime_encoding=config.datetime_encoding,
         timedelta_encoding=config.timedelta_encoding,
-    )  # data at ensemble or site level, logic anywhere but has to be after add_target, and probably after convert_units.
-    ds = seasonal_total(ds)           # ensemble level
+    )
+    ds = seasonal_total(ds)
 
     return ds
 
