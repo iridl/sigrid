@@ -22,6 +22,76 @@ ICECHUNK_ROOT = Path(os.environ['PYDAP_ICECHUNK_PROCESSED_ROOT'])
 CATALOG_ROOT = Path(os.environ['PYDAP_CATALOG_ROOT'])
 
 
+class CaseSensitiveStrEnum(StrEnum):
+    """Like StrEnum but it doesn't downcase the names"""
+    @staticmethod
+    def _generate_next_value_(name: str, start: Any, count: Any, last_values: Any) -> str:
+        return name
+
+Coords = CaseSensitiveStrEnum(
+    'Coords',
+    ['S', 'L', 'M', 'P', 'Y', 'X', 'target', 'target_bnds', 'nbound']
+    # nbound isn't actually a coord, only a dim. But target isn't a dim, only
+    # a coord, so we can't call this Dims either.
+)
+
+
+@dataclass
+class DatasetConfig:
+    da_attrs: Mapping[str, Mapping[str, str]]
+    ds_attrs: Mapping[str, str]
+    encodings: Mapping[str, Mapping[str, str]]
+    bare_dims: Iterable[str]
+    lead_is_month: bool
+
+
+def rename(ds: xr.Dataset, mapping: Mapping[str, str]):
+    ds = ds.rename({
+        provider_name: standard_name
+        for provider_name, standard_name in mapping.items()
+        if provider_name in set(ds.variables) | set(ds.dims)
+        and provider_name != standard_name
+    })
+
+    return ds
+
+
+def standardize(ds: xr.Dataset, config: DatasetConfig):
+    ds = drop_non_std(ds, config.da_attrs, config.bare_dims)
+    ds = convert_units(ds, config.da_attrs)
+    ds = add_target(ds, config.lead_is_month)
+    ds = standardize_attrs(
+        ds,
+        da_attrs=config.da_attrs,
+        ds_attrs=config.ds_attrs,
+        encodings=config.encodings,
+    )
+    ds = seasonal_total(ds)
+
+    return ds
+
+
+def drop_non_std(ds: xr.Dataset, standard_attrs: Mapping[str, Mapping[str, str]], bare_dims: Iterable[str]):
+    ds = ds.drop_vars([
+        name for name in ds.variables
+        if name not in standard_attrs
+    ])
+
+    non_std_dims = [
+        name for name in ds.dims if name not in set(bare_dims) | set(standard_attrs)
+    ]
+    if len(non_std_dims) > 0:
+       raise Exception(f'non standard dims {*non_std_dims,} in dataset')
+    return ds
+
+
+def convert_units(ds: xr.Dataset, standard_attrs: Mapping[str, Mapping[str, str]]):
+    data_vars = {
+        name: convert_units_da(da, standard_attrs[name].get('units'))
+        for name, da in data_vars_of(ds).items()
+    }
+    return xr.Dataset(data_vars, coords=ds.coords, attrs=ds.attrs)
+
 type UnitConverter = Callable[[xr.DataArray], xr.DataArray]
 
 def linear_converter(offset: float, scale: float) -> UnitConverter:
@@ -75,58 +145,6 @@ def convert_units_da(
     return da
 
 
-class CaseSensitiveStrEnum(StrEnum):
-    """Like StrEnum but it doesn't downcase the names"""
-    @staticmethod
-    def _generate_next_value_(name: str, start: Any, count: Any, last_values: Any) -> str:
-        return name
-
-
-Coords = CaseSensitiveStrEnum(
-    'Coords',
-    ['S', 'L', 'M', 'P', 'Y', 'X', 'target', 'target_bnds', 'nbound']
-    # nbound isn't actually a coord, only a dim. But target isn't a dim, only
-    # a coord, so we can't call this Dims either.
-)
-
-
-@dataclass
-class DatasetConfig:
-    da_attrs: Mapping[str, Mapping[str, str]]
-    ds_attrs: Mapping[str, str]
-    encodings: Mapping[str, Mapping[str, str]]
-    bare_dims: Iterable[str]
-    lead_is_month: bool
-
-
-def standardize(ds: xr.Dataset, config: DatasetConfig):
-    ds = drop_non_std(ds, config.da_attrs, config.bare_dims)
-    ds = convert_units(ds, config.da_attrs)
-    ds = add_target(ds, config.lead_is_month)
-    ds = standardize_attrs(
-        ds,
-        da_attrs=config.da_attrs,
-        ds_attrs=config.ds_attrs,
-        encodings=config.encodings,
-    )
-    ds = seasonal_total(ds)
-
-    return ds
-
-
-def seasonal_total(ds: xr.Dataset):
-    if 'prcp' in ds:
-        da = ds['prcp']
-        target_length = (
-                ds[Coords.target_bnds].isel({Coords.nbound: 1}, drop=True)
-                - ds[Coords.target_bnds].isel({Coords.nbound: 0}, drop=True)
-            ).dt.days
-        da = da * target_length.variable
-        da.attrs['units'] = 'mm'
-        ds['prcp'] = da
-    return ds
-
-
 def standardize_attrs(
     ds: xr.Dataset,
     da_attrs: Mapping[str, Mapping[str, str]],
@@ -172,13 +190,31 @@ def standardize_attrs_da(
     return da
 
 
-def convert_units(ds: xr.Dataset, standard_attrs: Mapping[str, Mapping[str, str]]):
-    data_vars = {
-        name: convert_units_da(da, standard_attrs[name].get('units'))
-        for name, da in data_vars_of(ds).items()
-    }
-    return xr.Dataset(data_vars, coords=ds.coords, attrs=ds.attrs)
+def add_target(ds: xr.Dataset, lead_is_month: bool):
+    if lead_is_month:
+        # Set lead times
+        leads = np.arange(ds.sizes[Coords.L])
+        # Set target
+        targets, targets_bnds = S_L_to_target(
+            ds[Coords.S], ds[Coords.L]
+        )
+        targets_bnds = targets_bnds.data
+    else:
+        targets = ds[Coords.target]
+        leads = (
+            targets.isel({Coords.S: 0}, drop=True)
+            - ds[Coords.S].isel({Coords.S: 0}, drop=True)
+        )
+        targets_bnds = np.stack([targets, targets + np.timedelta64(1, 'D')], axis=2)
+    ds = ds.assign_coords({
+        Coords.L: leads,
+        Coords.target: targets,
+        Coords.target_bnds: (
+            (Coords.S, Coords.L, Coords.nbound), targets_bnds
+        ),
+    })
 
+    return ds
 
 def S_L_to_target(S: xr.DataArray, L: xr.DataArray):
 
@@ -209,53 +245,16 @@ def S_L_to_target(S: xr.DataArray, L: xr.DataArray):
     return target_bnds.isel({Coords.nbound: 0}, drop=True), target_bnds
 
 
-def add_target(ds: xr.Dataset, lead_is_month: bool):
-    if lead_is_month:
-        # Set lead times
-        leads = np.arange(ds.sizes[Coords.L])
-        # Set target
-        targets, targets_bnds = S_L_to_target(
-            ds[Coords.S], ds[Coords.L]
-        )
-        targets_bnds = targets_bnds.data
-    else:
-        targets = ds[Coords.target]
-        leads = (
-            targets.isel({Coords.S: 0}, drop=True)
-            - ds[Coords.S].isel({Coords.S: 0}, drop=True)
-        )
-        targets_bnds = np.stack([targets, targets + np.timedelta64(1, 'D')], axis=2)
-    ds = ds.assign_coords({
-        Coords.L: leads,
-        Coords.target: targets,
-        Coords.target_bnds: (
-            (Coords.S, Coords.L, Coords.nbound), targets_bnds
-        ),
-    })
-
-    return ds
-
-def drop_non_std(ds: xr.Dataset, standard_attrs: Mapping[str, Mapping[str, str]], bare_dims: Iterable[str]):
-    ds = ds.drop_vars([
-        name for name in ds.variables
-        if name not in standard_attrs
-    ])
-
-    non_std_dims = [
-        name for name in ds.dims if name not in set(bare_dims) | set(standard_attrs)
-    ]
-    if len(non_std_dims) > 0:
-        raise Exception(f'non standard dims {*non_std_dims,} in dataset')
-    return ds
-
-def rename(ds: xr.Dataset, mapping: Mapping[str, str]):
-    ds = ds.rename({
-        provider_name: standard_name
-        for provider_name, standard_name in mapping.items()
-        if provider_name in set(ds.variables) | set(ds.dims)
-        and provider_name != standard_name
-    })
-
+def seasonal_total(ds: xr.Dataset):
+    if 'prcp' in ds:
+        da = ds['prcp']
+        target_length = (
+                ds[Coords.target_bnds].isel({Coords.nbound: 1}, drop=True)
+                - ds[Coords.target_bnds].isel({Coords.nbound: 0}, drop=True)
+            ).dt.days
+        da = da * target_length.variable
+        da.attrs['units'] = 'mm'
+        ds['prcp'] = da
     return ds
 
 
