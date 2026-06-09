@@ -91,37 +91,24 @@ Coords = CaseSensitiveStrEnum(
 )
 
 
-class DatetimeEncoding(TypedDict):
-    units: str
-    calendar: str
-    dtype: str
-
-
-class TimedeltaEncoding(TypedDict):
-    units: str
-    dtype: str
-
-
 @dataclass
 class DatasetConfig:
-    standard_attrs: Mapping[str, Mapping[str, str]]
-    toplevel_standard_attrs: Mapping[str, str]
+    da_attrs: Mapping[str, Mapping[str, str]]
+    ds_attrs: Mapping[str, str]
+    encodings: Mapping[str, Mapping[str, str]]
     bare_dims: Iterable[str]
     lead_is_month: bool
-    datetime_encoding: DatetimeEncoding
-    timedelta_encoding: TimedeltaEncoding
 
 
 def standardize(ds: xr.Dataset, config: DatasetConfig):
-    ds = drop_non_std(ds, config.standard_attrs, config.bare_dims)
-    ds = convert_units(ds, config.standard_attrs)
+    ds = drop_non_std(ds, config.da_attrs, config.bare_dims)
+    ds = convert_units(ds, config.da_attrs)
     ds = add_target(ds, config.lead_is_month)
     ds = standardize_attrs(
         ds,
-        standard_attrs=config.standard_attrs,
-        toplevel_standard_attrs=config.toplevel_standard_attrs,
-        datetime_encoding=config.datetime_encoding,
-        timedelta_encoding=config.timedelta_encoding,
+        da_attrs=config.da_attrs,
+        ds_attrs=config.ds_attrs,
+        encodings=config.encodings,
     )
     ds = seasonal_total(ds)
 
@@ -143,17 +130,16 @@ def seasonal_total(ds: xr.Dataset):
 
 def standardize_attrs(
     ds: xr.Dataset,
-    standard_attrs: Mapping[str, Mapping[str, str]],
-    toplevel_standard_attrs: Mapping[str, str],
-    datetime_encoding: DatetimeEncoding,
-    timedelta_encoding: TimedeltaEncoding,
+    da_attrs: Mapping[str, Mapping[str, str]],
+    ds_attrs: Mapping[str, str],
+    encodings: Mapping[str, Mapping[str, str]],
 ):
     coords = {
-        name: standardize_da(name, da, standard_attrs, datetime_encoding, timedelta_encoding)
+        name: standardize_attrs_da(da, da_attrs, encodings)
         for name, da in coords_of(ds).items()
     }
     data_vars = {
-        name: standardize_da(name, da, standard_attrs, datetime_encoding, timedelta_encoding)
+        name: standardize_attrs_da(da, da_attrs, encodings)
         for name, da in data_vars_of(ds).items()
     }
 
@@ -165,30 +151,27 @@ def standardize_attrs(
         if not k.startswith('GRIB')
     }
     # Keep the provider's remaining dataset-level attributes, and add our own.
-    attrs.update(toplevel_standard_attrs)
+    attrs.update(ds_attrs)
 
     ds = xr.Dataset(data_vars=data_vars, coords=coords, attrs=attrs)
 
     return ds
 
 
-def standardize_da(
-        name: str,
+def standardize_attrs_da(
         da: xr.DataArray,
-        standard_attrs: Mapping[str, Mapping[str, str]],
-        datetime_encoding: DatetimeEncoding,
-        timedelta_encoding: TimedeltaEncoding,
+        attrs: Mapping[str, Mapping[str, str]],
+        encodings: Mapping[str, Mapping[str, str]],
 ):
+    assert isinstance(da.name, str)
     # Wipe out provider's attrs and replace with standard ones
-    da.attrs = dict(standard_attrs[name])
+    da.attrs = dict(attrs[da.name])
 
-    # Override provider's encoding for datetimes
-    if np.issubdtype(da, np.datetime64):
-        da.encoding = dict(datetime_encoding)
-    elif np.issubdtype(da, np.timedelta64):
-        da.encoding = dict(timedelta_encoding)
+    if da.name in encodings:
+        da.encoding = dict(encodings[da.name])
 
     return da
+
 
 def convert_units(ds: xr.Dataset, standard_attrs: Mapping[str, Mapping[str, str]]):
     data_vars = {
