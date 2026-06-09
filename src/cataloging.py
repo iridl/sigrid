@@ -18,8 +18,8 @@ import xarray as xr
 from dateutil.relativedelta import relativedelta
 
 # TODO reconcile pydap config vs catalog config
-ICECHUNK_ROOT = Path(os.environ['PYDAP_ICECHUNK_PROCESSED_ROOT'])
-CATALOG_ROOT = Path(os.environ['PYDAP_CATALOG_ROOT'])
+ICECHUNK_ROOT = Path(os.environ['ICECHUNK_ROOT'])
+CATALOG_ROOT = Path(os.environ['CATALOG_ROOT'])
 
 
 class CaseSensitiveStrEnum(StrEnum):
