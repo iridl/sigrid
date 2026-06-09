@@ -66,8 +66,6 @@ def standardize(ds: xr.Dataset, config: DatasetConfig):
         ds_attrs=config.ds_attrs,
         encodings=config.encodings,
     )
-    ds = seasonal_total(ds)
-
     return ds
 
 
