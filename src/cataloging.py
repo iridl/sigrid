@@ -1,22 +1,21 @@
 # pyright: strict, reportUnknownMemberType=false
 
-from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
-from enum import StrEnum
+import datetime
 import functools
 import importlib.util
 import os
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Callable, Self, TypedDict, cast
+from typing import Any, Callable, Self, cast
 
 import icechunk
-import xarray as xr
 import numpy as np
 import pandas as pd
+import xarray as xr
 from dateutil.relativedelta import relativedelta
-import datetime
-
 
 # TODO reconcile pydap config vs catalog config
 ICECHUNK_ROOT = Path(os.environ['PYDAP_ICECHUNK_PROCESSED_ROOT'])
@@ -335,7 +334,7 @@ class Catalog:
             node = sub
         # If we reach here, we bottomed out at a Dataset, not a Variable.
         return None
-    
+
     def open_dataset(self, catalog_path: str) -> DisplayDataset | None:
         if not catalog_path.startswith('/'):
             raise Exception(f'Absolute catalog path was expected; got relative path {catalog_path}')
@@ -375,7 +374,7 @@ class CatalogNode:
     def variables(self) -> dict[str, Opener]:
         if self.module is None or not hasattr(self.module, 'list_vars'):
             return {}
-        
+
         var_names: Iterable[str]
 
         if hasattr(self.module, 'list_vars'):
