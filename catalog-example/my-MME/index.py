@@ -4,7 +4,7 @@
 # that variable names have already been normalized by transform
 # functions lower in the hierarchy.
 
-import cataloging as cat
+from cataloging import DatasetConfig, standardize
 
 da_attrs = {
     'S': {
@@ -40,7 +40,7 @@ encodings = {
     },
 }
 
-config = cat.DatasetConfig(
+config = DatasetConfig(
     da_attrs=da_attrs,
     ds_attrs = {
         'Conventions': 'CF-1.13',
@@ -51,5 +51,5 @@ config = cat.DatasetConfig(
 )
 
 def transform(ds):
-    ds = cat.standardize(ds, config)
+    ds = standardize(ds, config)
     return ds
