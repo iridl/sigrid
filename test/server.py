@@ -2,7 +2,7 @@ import logging
 import os
 import werkzeug
 
-import app
+import pydap_icechunk.app
 
 if __name__ == "__main__":
     logger = logging.getLogger("werkzeug")
@@ -10,7 +10,7 @@ if __name__ == "__main__":
     werkzeug.serving.run_simple(
         "localhost",
         int(os.environ['PYDAP_PORT']),
-        app.app,
+        pydap_icechunk.app.app,
         #use_reloader=True,
         passthrough_errors=True,
     )
