@@ -243,16 +243,22 @@ def S_L_to_target(S: xr.DataArray, L: xr.DataArray):
     return target_bnds.isel({Coords.nbound: 0}, drop=True), target_bnds
 
 
-def seasonal_total(ds: xr.Dataset):
-    if 'prcp' in ds:
-        da = ds['prcp']
+def monthly_total(ds: xr.Dataset, vars: Iterable[str]):
+    for var in vars:
+        da = ds[var]
+        units = da.attrs.get('units')
+        # Not sure if this .endswith test is robust enough, e.g. might there be
+        # a space between the slash and the d? If this turns out not to work,
+        # maybe it's time to bring in udunits.
+        if not (units and units.endswith('/day')):
+            raise Exception(f'Expected a rate per day but found {units}')
         target_length = (
                 ds[Coords.target_bnds].isel({Coords.nbound: 1}, drop=True)
                 - ds[Coords.target_bnds].isel({Coords.nbound: 0}, drop=True)
             ).dt.days
-        da = da * target_length.variable
-        da.attrs['units'] = 'mm'
-        ds['prcp'] = da
+        da = da * target_length
+        da.attrs['units'] = units[:-len('/day')]
+        ds[var] = da
     return ds
 
 
