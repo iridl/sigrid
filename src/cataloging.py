@@ -1,10 +1,9 @@
 # pyright: strict, reportUnknownMemberType=false
 
-import datetime
 import functools
 import importlib.util
 import os
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -13,9 +12,7 @@ from typing import Any, Callable, Self, cast
 
 import icechunk
 import numpy as np
-import pandas as pd
 import xarray as xr
-from dateutil.relativedelta import relativedelta
 
 # TODO reconcile pydap config vs catalog config
 ICECHUNK_ROOT = Path(os.environ['ICECHUNK_ROOT'])
@@ -191,10 +188,11 @@ def standardize_attrs_da(
 def add_target(ds: xr.Dataset, lead_is_month: bool):
     if lead_is_month:
         # Set lead times
-        leads = np.arange(ds.sizes[Coords.L])
+        leads = range(ds.sizes[Coords.L])
+        ds = ds.assign_coords({Coords.L: leads})
         # Set target
-        targets, targets_bnds = S_L_to_target(
-            ds[Coords.S], ds[Coords.L]
+        targets, targets_bnds = S_L_to_target_monthly(
+            ds[Coords.S], leads
         )
         targets_bnds = targets_bnds.data
     else:
@@ -214,32 +212,21 @@ def add_target(ds: xr.Dataset, lead_is_month: bool):
 
     return ds
 
-def S_L_to_target(S: xr.DataArray, L: xr.DataArray):
-
-    target_bnds = xr.DataArray(
-        data=[
-            np.transpose([
-                # This cast is only valid when using standard calendar
-                cast(pd.DatetimeIndex, xr.date_range(
-                    start=s.item(),
-                    # TODO may not be wise to simply rely on len(L)
-                    periods=len(L),
-                    freq='MS',
-                )),
-                cast(pd.DatetimeIndex, xr.date_range(
-                    start=datetime.datetime(
-                        s.dt.year.item(), s.dt.month.item(), s.dt.day.item()
-                    ) + relativedelta(months=1),
-                    # TODO may not be wise to simply rely on len(L)
-                    periods=len(L),
-                    freq='MS',
-                )),
-            ])
-            for s in S
-        ],
-        dims=[Coords.S, Coords.L, Coords.nbound],
-        coords={Coords.S: S, Coords.L: L},
+def S_L_to_target_monthly(S: xr.DataArray, l_values: Sequence[int]):
+    target_values = (
+        S.values.astype('datetime64[M]')[:, np.newaxis] +
+        np.array(l_values).astype('timedelta64[M]')
     )
+    target_bnds_values = (
+        target_values[:, :, np.newaxis] +
+        np.arange(2).astype('timedelta64[M]')
+    )
+    target_bnds = xr.DataArray(
+        data=target_bnds_values,
+        dims=[Coords.S, Coords.L, Coords.nbound],
+        coords={Coords.S: S, Coords.L: l_values},
+    )
+
     return target_bnds.isel({Coords.nbound: 0}, drop=True), target_bnds
 
 
