@@ -1,27 +1,19 @@
 import abc
-import importlib.util
-from pathlib import Path
 from typing import Iterable, Mapping, cast, override
-import os
-import re
 
 import dask.array
-import icechunk
 import jinja2
 import numpy as np
 from pydap.handlers.lib import BaseHandler
 from pydap.model import BaseType, DatasetType
 import webob
 from webob.dec import wsgify
-from webob.exc import HTTPForbidden, HTTPNotFound
+from webob.exc import HTTPFound, HTTPNotFound
 import xarray as xr
 import xarray.conventions
 
-
-
-orig_root = os.environ['PYDAP_ICECHUNK_ORIGINAL_ROOT']
-icechunk_root = os.environ['PYDAP_ICECHUNK_PROCESSED_ROOT']
-# TODO this must be available from the pydap config already?
+import cataloging
+from cataloging import Coords
 
 
 class XarrayHandler(BaseHandler, abc.ABC):
@@ -88,34 +80,10 @@ class XarrayHandler(BaseHandler, abc.ABC):
                 self.dataset[dim] = BaseType(str(dim), data, None, attributes)
                 # TODO deal with the type error when I deal with groups and
                 # understand what's intended.
-                self.dataset[dim].dims = ["/" + str(dim)] # type: ignore
+                self.dataset[dim].dims = ["/" + str(dim)]  # pyright: ignore[reportAttributeAccessIssue]
     
     @abc.abstractmethod
     def open(self) -> xr.Dataset: ...
-
-
-def open_icechunk(rel_path, decode_times=True, drop_variables=None):
-    abspath = Path(icechunk_root) / rel_path
-    storage = icechunk.local_filesystem_storage(abspath)
-    # Workaround for https://github.com/earth-mover/icechunk/issues/2105
-    if not icechunk.Repository.exists(storage):
-        raise Exception(f'No repository exists at {abspath}')
-    try:
-        repo = icechunk.Repository.open(
-            storage,
-            authorize_virtual_chunk_access={f'file://{orig_root}/': None}
-        )
-        session = repo.readonly_session("main")
-        ds = xr.open_zarr(
-            session.store,
-            zarr_format=3,
-            decode_times=decode_times,
-            drop_variables=drop_variables,
-        )
-        return ds
-    except Exception as e:
-        e.add_note(f'When trying to open {abspath}')
-        raise
 
 
 class DaskArrayProxy:
@@ -148,63 +116,47 @@ def ensure_trailing(s: str) -> str:
 
 
 class Server:
-    def __init__(self, catalog_path: Path | str):
-        self.catalog_path = Path(catalog_path).resolve()
+    def __init__(self, catalog: cataloging.Catalog) -> None:
+        self.catalog = catalog
 
     @wsgify
     def __call__(self, req: webob.Request):
-        # path_info looks like an absolute path. Strip the leading / to
-        # make it relative.
-        assert req.path_info[0] == '/'
-        relpath = req.path_info[1:]
+        # Note: req.path is the full URL path, including the wsgi app mount point
+        # (e.g. /data), while req.path_info is the part of the path after the
+        # mount point.
 
-        # Check for trailing slash before Path() strips it
-        is_dir = req.path_info[-1] == '/'
+        url_path = req.path_info
+        assert url_path.startswith('/')
 
-        abspath = self.catalog_path / relpath
+        if url_path.endswith('/'):
+            node = self.catalog.open_dataset(url_path)
+            if node is None:
+                return HTTPNotFound()
+            return self.dir(node)
+        else:        
+            parent_path, last_component = url_path.rsplit('/', maxsplit=1)
+            if '.' in last_component:
+                varname, extension = last_component.rsplit('.', maxsplit=1)
+            else:
+                varname = last_component
+                extension = None
+            catalog_path = f'{parent_path}/{varname}'
+            ds = self.catalog.open_variable(catalog_path)
+            if ds is None:
+                # See if it's actually a dir and they just forgot the trailing slash
+                if self.catalog.open_dataset(catalog_path + '/') is not None:
+                    return HTTPFound(location=catalog_path + '/')
+                return HTTPNotFound()
 
-        # Don't allow an attacker to escape from the catalog root
-        # by using paths containing ".."
-        try:
-            abspath.resolve().relative_to(self.catalog_path)
-        except ValueError:
-            return HTTPForbidden()
+            return CatalogFileHandler(ds, varname, extension)  # TODO bad name--only handles variables.
 
-        if is_dir:
-            if abspath.exists():
-                return self.dir(abspath)
-            return HTTPNotFound()
-
-        file_path = abspath.parent / 'index.py'
-        if file_path.is_file():
-            varname = abspath.stem
-            extension = abspath.suffix
-            return CatalogFileHandler(file_path, varname, extension)
-
-        return HTTPNotFound()
-
-    def dir(self, dir_path: Path):
+    def dir(self, dataset: cataloging.DisplayDataset):
         """Return a directory listing."""
-
-        dirs = [
-            d.name
-            for d in dir_path.iterdir()
-            if d.is_dir() and d.name != '__pycache__' and not (d / 'hidden').exists()
-        ]
-        dirs = sorted(dirs, key=alphanum_key)
-
-        index_path = dir_path / "index.py"
-        if index_path.exists():
-            module = load_index(index_path)
-            vars = module.list_vars()
-            vars = sorted(vars, key=alphanum_key)
-        else:
-            vars = []
-        
+       
 
         context = {
-            "dirs": dirs,
-            "vars": vars,
+            "dirs": dataset.subdatasets,
+            "vars": dataset.variables,
         }
 
         return webob.Response(
@@ -237,9 +189,19 @@ class Server:
 
 
 class CatalogFileHandler(XarrayHandler):
-    def __init__(self, file_path, varname, extension):
-        self.file_path = file_path
-        self.varname = varname
+    def __init__(self, ds, varname, extension):
+        # Populate data variables' "coordinates" attribute, otherwise variables
+        # that xarray considers to be auxiliary vars turn into data vars
+        # in the OPeNDAP response. Doing this here so that the attribute is
+        # present both in OPeNDAP responses and in the web UI.
+        for da in ds.data_vars.values():
+            aux_coords = set(da.attrs.get('coordinates', '').split())
+            if Coords.S in da.dims:
+                aux_coords |= set([Coords.target, Coords.target_bnds])
+            if aux_coords:
+                da.attrs['coordinates'] = ' '.join(aux_coords)
+
+        self.ds = ds
         self.extension = extension
         super().__init__(varname)
 
@@ -248,17 +210,17 @@ class CatalogFileHandler(XarrayHandler):
         if self.extension:
             return super().__call__(environ, start_response)
         request = webob.Request(environ)
-        ds = self.open()
 
         # To help users understand what they will get via opendap, add the units
-        # and calendar attributes that the response will have.
-        for name, coord in ds.coords.items():
+        # and calendar attributes that the response will have when datetimes
+        # get cf-encoded.
+        for name, coord in self.ds.coords.items():
             if np.issubdtype(coord.dtype, np.datetime64):
                 coord.attrs['units'] = coord.encoding['units']
                 coord.attrs['calendar'] = coord.encoding['calendar']
 
         context = {
-            'ds': ds,
+            'ds': self.ds,
             'url': request.url,
         }
         response = webob.Response(body=self.var_template.render(context))
@@ -288,8 +250,7 @@ class CatalogFileHandler(XarrayHandler):
 
     @override
     def open(self):
-        module = load_index(self.file_path)
-        ds: xr.Dataset = module.open(self.varname)
+        ds = self.ds.copy()
 
         # Scalar coordinates break pydap. TODO fix pydap.
         ds = ds.drop_vars(
@@ -306,38 +267,3 @@ class CatalogFileHandler(XarrayHandler):
         }
 
         return ds
-
-
-def load_index(file_path):
-    spec = importlib.util.spec_from_file_location('catalog', file_path)
-    assert spec is not None  # we already checked that it exists
-    module = importlib.util.module_from_spec(spec)
-    # Pyright says the loader could be None, but I don't see how that
-    # could happen.
-    assert spec.loader  
-    spec.loader.exec_module(module)
-    return module
-
-
-# Vendored from pydap to avoid a spurious dependency on gunicorn
-def alphanum_key(s):
-    """Parse a string, returning a list of string and number chunks.
-
-        >>> alphanum_key("z23a")
-        ['z', 23, 'a']
-
-    Useful for sorting names in a natural way.
-
-    From http://nedbatchelder.com/blog/200712.html#e20071211T054956
-
-    """
-
-    def tryint(s):
-        try:
-            return int(s)
-        except Exception:
-            return s
-
-    return [tryint(c) for c in re.split("([0-9]+)", s)]
-
-
