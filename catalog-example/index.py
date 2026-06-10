@@ -3,4 +3,4 @@
 # new attribute to every dataset.
 
 def transform(ds):
-    ds.attrs['Distributor']: 'my-server.example.com'
+    ds.attrs['Distributor'] = 'my-server.example.com'
