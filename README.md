@@ -1,6 +1,6 @@
 # pydap-icechunk
-An opendap server for icechunk stores, based on pydap and xarray. It supports transforming the
-icechunk data with xarray before sending it to the user.
+An opendap server for icechunk stores, based on pydap and xarray. It supports
+transforming the icechunk data with xarray before sending it to the user.
 
 ## Initial setup
 
@@ -42,35 +42,38 @@ Attributes:
 
 ## Writing a catalog entry
 
-A catalog consists of a set of files named `index.py` arranged in a directory hierarchy, the
-root of which is indicated by the environment variable `CATALOG_ROOT`. For an example, see
-`catalog-example` in this repository.
+A catalog consists of a set of files named `index.py` arranged in a directory
+hierarchy, the root of which is indicated by the environment variable
+`CATALOG_ROOT`. For an example, see `catalog-example` in this repository.
 
-An `index.py` file at the lowest level of the
-hierarchy should define two functions with the signature `open(varname)` and `list_vars()`. `open`
-should take a string (the name of a variable) and return a dataset. `open` typically calls
-`cataloging.open_icechunk` with a path to an icechunk store, which is interpreted relative
-to the value of the
-environment variable `ICECHUNK_ROOT`. `list_vars` should return a list of the variable names
-that are valid to be requested from `open`.
+An `index.py` file at the lowest level of the hierarchy should define two
+functions with the signature `open(varname)` and `list_vars()`. `open` should
+take a string (the name of a variable) and return a dataset. `open` typically
+calls `cataloging.open_icechunk` with a path to an icechunk store, which is
+interpreted relative to the value of the environment variable `ICECHUNK_ROOT`.
+`list_vars` should return a list of the variable names that are valid to be
+requested from `open`.
 
-`index.py` files at higher levels of the hierarchy should define a function with the signature
-`transform(ds)`, which takes an `xarray.Dataset` as its argument, and returns another
-`xarray.Dataset`. The first `transform` function that is found along the path from the leaf
-node up to the root is called on the return value of `open`, and then each successive 
-`transform` function is called on the return value of the previous one, in bottom-up order.
+`index.py` files at higher levels of the hierarchy should define a function with
+the signature `transform(ds)`, which takes an `xarray.Dataset` as its argument,
+and returns another `xarray.Dataset`. The first `transform` function that is
+found along the path from the leaf node up to the root is called on the return
+value of `open`, and then each successive `transform` function is called on the
+return value of the previous one, in bottom-up order.
 
-The purpose of the `transform` functions is to support the joint use of
-datasets from different providers by mapping disparate provider-specific file formats,
-array structures, and metadata conventions into a common structure. `cataloging.py` defines
-a number of utility functions that may be useful for such transformations.
+The purpose of the `transform` functions is to support the joint use of datasets
+from different providers by mapping disparate provider-specific file formats,
+array structures, and metadata conventions into a common structure.
+`cataloging.py` defines a number of utility functions that may be useful for
+such transformations.
 
 ## Manual testing
 ```
 pixi run python test/server.py
 ```
 then visit http://localhost:8081 in a browser; or to test OPeNDAP functionality,
-in another terminal (note that this uses a separate pixi environment called `client`):
+in another terminal (note that this uses a separate pixi environment called
+`client`):
 ```
 > pixi run -e client python
 >>> import xarray as xr
