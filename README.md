@@ -61,11 +61,16 @@ found along the path from the leaf node up to the root is called on the return
 value of `open`, and then each successive `transform` function is called on the
 return value of the previous one, in bottom-up order.
 
-The purpose of the `transform` functions is to support the joint use of datasets
-from different providers by mapping disparate provider-specific file formats,
-array structures, and metadata conventions into a common structure.
+While `open` is mandatory, `transform` is optional: a simple catalog might have
+only an `open` function at the leaf of the catalog hierarchy, and no `index.py`
+files at any other level. But if there is a set of transformations that you want
+to apply to all variables in a collection that spans multiple subdirectories, it
+might be easier and less error-prone to define those transformations once, in
+the parent directory, than to copy-paste them into each leaf node `index.py`.
+This is particularly useful for homogenizing datasets from different providers
+
 `cataloging.py` defines a number of utility functions that may be useful for
-such transformations.
+such transformations. 
 
 ## Manual testing
 ```
