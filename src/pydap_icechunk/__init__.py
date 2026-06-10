@@ -145,7 +145,7 @@ class Server:
             if ds is None:
                 # See if it's actually a dir and they just forgot the trailing slash
                 if self.catalog.open_dataset(catalog_path + '/') is not None:
-                    return HTTPFound(location=catalog_path + '/')
+                    return HTTPFound(location=req.path + '/')
                 return HTTPNotFound()
 
             return CatalogFileHandler(ds, varname, extension)  # TODO bad name--only handles variables.
