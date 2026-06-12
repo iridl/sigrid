@@ -33,19 +33,29 @@ PROGRESS_PERIOD = 1  # How often to print a progress update, in seconds
 type Pathy = str | os.PathLike[str]
 
 class TopConfig:
-    def __init__(self, orig_root: Pathy, icechunk_root: Pathy) -> None:
+    def __init__(
+            self,
+            orig_root: Pathy,
+            icechunk_root: Pathy,
+            catalog_root: Pathy,
+    ) -> None:
         self.orig_root = Path(orig_root)
         self.icechunk_root = Path(icechunk_root)
+        self.catalog_root = Path(catalog_root)
 
 def config_from_env() -> TopConfig:
     config_vars: dict[str, str] = {}
-    with open('.env') as f:
+    with open('../.env') as f:
         for line in f:
             if line.lstrip().startswith('#') or line.strip() == '':
                 continue
             k, v = line.rstrip().split('=', 1)
             config_vars[k] = v
-    config = TopConfig(config_vars['ORIG_DATA_ROOT'], config_vars['ICECHUNK_ROOT'])
+    config = TopConfig(
+        config_vars['ORIG_DATA_ROOT'],
+        config_vars['ICECHUNK_ROOT'],
+        config_vars['ICECHUNK_CATALOG_ROOT']
+    )
     return  config
 
 class FileType(enum.StrEnum):
@@ -613,7 +623,10 @@ def main():
 
     top_config = config_from_env()
 
-    raw_cat = FileSetCatalog(Path.cwd() / 'catalog', top_config.orig_root)
+    raw_cat = FileSetCatalog(
+        top_config.catalog_root,
+        top_config.orig_root
+    )
     descriptor, icechunk_info = raw_cat.get_entry(args.var)
     repo = get_repo(
         icechunk.local_filesystem_storage,

@@ -21,12 +21,11 @@ pytest = ">=9.0.3,<10"
 default = {features = ["dev"], solve-group = "default"}
 prod = {features = [], solve-group = "default"}
 
+[tool.pixi.tasks]
+python = "export $(sed 's/#.*//' ../.env | xargs) && python"
+
 
 [tool.pyright]
 typeCheckingMode = "strict"
 reportUnknownMemberType = false
-
-[[tool.pyright.executionEnvironments]]
-root = "catalog"
-typeCheckingMode = "off"
 

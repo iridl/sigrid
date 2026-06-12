@@ -1,26 +1,23 @@
 # Tools for converting climate forecasts to Icechunk
 
 ## One-time setup
-- Copy `dot-env-example` to `.env`. For running on forecast.ccsr and
-  writing production datasets, no changes are necessary. For test runs
-  you can change `ICECHUNK_ROOT` to point to a directory of your own.
-
-## List existing catalog entries
-```
-find catalog -name index.py
-```
+- Make sure you have a `.env` file in the parent directory.
+  See ../README.md. For running on forecast.ccsr and writing production
+  datasets, no changes are necessary. For test runs you can change
+  `ICECHUNK_ROOT` to point to a directory of your own.
 
 ## Create or update an icechunk store
 ```
 pixi run python update.py NMME/COLA-RSMAS/CCSM4/prec
 ```
-where `NMME/COLA-RSMAS/CCSM4/` is the relative path, below `./catalog`,
-of a directory containing an `index.py` file, and `prec` is the name of
-one of the entries in `dataset['vars']` within that file.
+where `NMME/COLA-RSMAS/CCSM4/` is the relative path, below
+`$CATALOG_ROOT` (defined in ../.env), of a directory containing
+an `index.py` file, and `prec` is the name of one of the entries in
+`dataset['vars']` within that file.
 
 This command creates/updates the icechunk store at
 `$ICECHUNK_ROOT/NMME/COLA-RSMAS/CCSM4/prec`, where `$ICECHUNK_ROOT` is
-defined in `.env`.
+defined in `../.env`.
 
 Use option --parallel n where n is the maximum number of processes to execute tasks 
 asynchronously. This will speedup the icechunking, particularly useful if creating a 
@@ -68,7 +65,7 @@ on S and L in the icechunk store.
 `aux_coords` (optional): list of variables in (nc) files other than the desired `vars` (e.g. TIME_bnds) that will be reset as coordinates.
 
 `dir`: path to the root directory of the file set, relative to `$ORIG_DATA_ROOT`
-(defined in .env).
+(defined in ../.env).
 
 `parse_match` (optional): if the standard mechanism for mapping filenames to coordinates can't handle the patterns, you can override it here. Value is a function that takes a dictionary of named captures from the regex, and returns a `FileCoords` object (see definition in `update.py`). Not usually needed; see NMME/NASA-GMAO/GEOSS2S for an example.
 
