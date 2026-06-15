@@ -1,0 +1,146 @@
+<svg width="100%" viewBox="0 0 920 290" role="img" xmlns="http://www.w3.org/2000/svg">
+  <title>Sigrid Climate Data Library — architecture and data flow diagram</title>
+  <desc>Two-level layout: software on top row, data stores on bottom row, connected by diagonal arrows. Green = ahead-of-time processing; purple = on-the-fly serving. External sources left, scientists right.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <style>
+      text { font-family: sans-serif; fill: #1a1a1a; }
+      .th  { font-size: 14px; font-weight: 500; }
+      .ts  { font-size: 12px; font-weight: 400; fill: #555; }
+      .arr { stroke: #888; stroke-width: 1.5; fill: none; }
+      .c-gray   { fill: #f1efe8; stroke: #5f5e5a; }
+      .c-green  { fill: #eaf3de; stroke: #3b6d11; }
+      .c-blue   { fill: #e6f1fb; stroke: #185fa5; }
+      .c-purple { fill: #eeedfe; stroke: #534ab7; }
+      .boundary { fill: none; stroke: #888780; stroke-width: 1.5; stroke-dasharray: 7 4; }
+      .legend-box { fill: none; stroke: #b4b2a9; stroke-width: 0.5; stroke-dasharray: 4 3; }
+    </style>
+  </defs>
+
+  <!--
+    Software row: y=50, h=56, bottom=106, cy=78
+    Cylinder body: y=188..232, top ellipse cy=188 ry=10 (visual top=178), bottom cy=232
+    Diagonal arrows: software bottom-center ↔ cylinder top-center (y=178)
+
+    Software boxes w=118, gap=18:
+      ingestion:      x=148, cx=207, right=266
+      icechunker:     x=284, cx=343, right=402
+      cooked-catalog: x=420, cx=479, right=538
+      pydap-icechunk: x=556, cx=615, right=674
+
+    Cylinder cx (midpoint of flanking box gap):
+      raw files:      cx=275  (gap: 266..284)
+      icechunk store: cx=411  (gap: 402..420)
+
+    Horizontal arrows (software row, cy=78):
+      cooked-catalog right(538,78) → pydap-icechunk left(556,78)
+      pydap-icechunk right(674,78) → scientists left(758,78)
+
+    Sigrid boundary: x=140..682, y=36..260
+
+    Scientists: x=758, cx=817, w=118, y=50
+    Legend: x=720, y=178, in data-store row area
+  -->
+
+  <!-- Sigrid system boundary -->
+  <rect x="140" y="36" width="542" height="230" rx="16" class="boundary"/>
+  <text class="th" x="411" y="26" text-anchor="middle">sigrid-cdl</text>
+
+  <!-- External: Forecast providers -->
+  <g>
+    <rect x="6" y="44" width="116" height="44" rx="8" class="c-gray" stroke-width="0.5"/>
+    <text class="th" x="64" y="61" text-anchor="middle" dominant-baseline="central">Forecast providers</text>
+    <text class="ts" x="64" y="77" text-anchor="middle" dominant-baseline="central">ECMWF, NCEP, …</text>
+  </g>
+
+  <!-- External: Observations -->
+  <g>
+    <rect x="6" y="112" width="116" height="44" rx="8" class="c-gray" stroke-width="0.5"/>
+    <text class="th" x="64" y="129" text-anchor="middle" dominant-baseline="central">Observations</text>
+    <text class="ts" x="64" y="145" text-anchor="middle" dominant-baseline="central">Validation data</text>
+  </g>
+
+  <!-- Arrows: sources → ingestion -->
+  <line x1="122" y1="66"  x2="146" y2="72" class="arr" marker-end="url(#arrow)"/>
+  <line x1="122" y1="134" x2="146" y2="90" class="arr" marker-end="url(#arrow)"/>
+
+  <!-- ── SOFTWARE ROW ── -->
+
+  <!-- ingestion (green = ahead of time) -->
+  <g>
+    <rect x="148" y="50" width="118" height="56" rx="8" class="c-green" stroke-width="0.5"/>
+    <text class="th" x="207" y="72" text-anchor="middle" dominant-baseline="central" style="fill:#27500a">ingestion</text>
+    <text class="ts" x="207" y="90" text-anchor="middle" dominant-baseline="central" style="fill:#3b6d11">Download &amp; scheduling</text>
+  </g>
+
+  <!-- icechunker (green = ahead of time) -->
+  <g>
+    <rect x="284" y="50" width="118" height="56" rx="8" class="c-green" stroke-width="0.5"/>
+    <text class="th" x="343" y="72" text-anchor="middle" dominant-baseline="central" style="fill:#27500a">icechunker</text>
+    <text class="ts" x="343" y="90" text-anchor="middle" dominant-baseline="central" style="fill:#3b6d11">Combine into icechunk</text>
+  </g>
+
+  <!-- cooked-catalog (purple = on the fly) -->
+  <g>
+    <rect x="420" y="50" width="118" height="56" rx="8" class="c-purple" stroke-width="0.5"/>
+    <text class="th" x="479" y="72" text-anchor="middle" dominant-baseline="central" style="fill:#3c3489">cooked-catalog</text>
+    <text class="ts" x="479" y="90" text-anchor="middle" dominant-baseline="central" style="fill:#534ab7">Harmonize metadata</text>
+  </g>
+
+  <!-- pydap-icechunk (purple = on the fly) -->
+  <g>
+    <rect x="556" y="50" width="118" height="56" rx="8" class="c-purple" stroke-width="0.5"/>
+    <text class="th" x="615" y="72" text-anchor="middle" dominant-baseline="central" style="fill:#3c3489">pydap-icechunk</text>
+    <text class="ts" x="615" y="90" text-anchor="middle" dominant-baseline="central" style="fill:#534ab7">Serve via OPeNDAP</text>
+  </g>
+
+  <!-- ── DATA STORE ROW ── -->
+
+  <!-- Raw files cylinder: cx=275 -->
+  <g>
+    <rect x="225" y="188" width="100" height="44" class="c-blue" stroke-width="0.5"/>
+    <ellipse cx="275" cy="232" rx="50" ry="10" class="c-blue" stroke-width="0.5"/>
+    <ellipse cx="275" cy="188" rx="50" ry="10" class="c-blue" stroke-width="0.5"/>
+    <text class="th" x="275" y="208" text-anchor="middle" dominant-baseline="central" style="fill:#0c447c">Raw files</text>
+    <text class="ts" x="275" y="226" text-anchor="middle" dominant-baseline="central" style="fill:#185fa5">NetCDF / GRIB / TIFF</text>
+  </g>
+
+  <!-- Icechunk store cylinder: cx=411 -->
+  <g>
+    <rect x="361" y="188" width="100" height="44" class="c-blue" stroke-width="0.5"/>
+    <ellipse cx="411" cy="232" rx="50" ry="10" class="c-blue" stroke-width="0.5"/>
+    <ellipse cx="411" cy="188" rx="50" ry="10" class="c-blue" stroke-width="0.5"/>
+    <text class="th" x="411" y="208" text-anchor="middle" dominant-baseline="central" style="fill:#0c447c">Icechunk store</text>
+    <text class="ts" x="411" y="226" text-anchor="middle" dominant-baseline="central" style="fill:#185fa5">Analysis-ready arrays</text>
+  </g>
+
+  <!-- ── DIAGONAL ARROWS ── -->
+  <line x1="207" y1="106" x2="275" y2="178" class="arr" marker-end="url(#arrow)"/>
+  <line x1="275" y1="178" x2="343" y2="106" class="arr" marker-end="url(#arrow)"/>
+  <line x1="343" y1="106" x2="411" y2="178" class="arr" marker-end="url(#arrow)"/>
+  <line x1="411" y1="178" x2="479" y2="106" class="arr" marker-end="url(#arrow)"/>
+
+  <!-- ── HORIZONTAL ARROWS (software row) ── -->
+  <!-- cooked-catalog → pydap-icechunk -->
+  <line x1="538" y1="78" x2="554" y2="78" class="arr" marker-end="url(#arrow)"/>
+  <!-- pydap-icechunk → scientists -->
+  <line x1="674" y1="78" x2="756" y2="78" class="arr" marker-end="url(#arrow)"/>
+  <text class="ts" x="715" y="70" text-anchor="middle">OPeNDAP</text>
+
+  <!-- External: Scientists -->
+  <g>
+    <rect x="758" y="50" width="118" height="56" rx="8" class="c-gray" stroke-width="0.5"/>
+    <text class="th" x="817" y="72" text-anchor="middle" dominant-baseline="central">Scientists</text>
+    <text class="ts" x="817" y="90" text-anchor="middle" dominant-baseline="central">Analysis tools</text>
+  </g>
+
+  <!-- ── LEGEND ── -->
+  <rect x="700" y="170" width="174" height="76" rx="8" class="legend-box"/>
+  <rect x="714" y="188" width="14" height="14" rx="4" class="c-green" stroke-width="0.5"/>
+  <text class="ts" x="734" y="199">Ahead of time</text>
+  <rect x="714" y="214" width="14" height="14" rx="4" class="c-purple" stroke-width="0.5"/>
+  <text class="ts" x="734" y="225">On the fly</text>
+
+</svg>
