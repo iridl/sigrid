@@ -4,9 +4,7 @@ transforming the icechunk data with xarray before sending it to the user.
 
 ## Initial setup
 
-```cp dot-env-example .env```
-
-Change `PYDAP_PORT` so you don't collide with other developers.
+See [../README.md](../README.md)
 
 ## Inspecting an icechunk store
 
