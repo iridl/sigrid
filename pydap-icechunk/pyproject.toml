@@ -45,7 +45,7 @@ prod = {features = [], solve-group = "prod"}
 client = {features = ["client"]}
 
 [tool.pixi.tasks]
-python = "env $(sed 's/#.*//' .env) python"
+python = "env $(sed 's/#.*//' ../.env) python"
 
 
 #### pyright

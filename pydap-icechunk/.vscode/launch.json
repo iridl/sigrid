@@ -12,7 +12,7 @@
 				"program": "${file}",
 				"args": [
 				],
-				"envFile": "${workspaceFolder}/.env"
+				"envFile": "${workspaceFolder}/../.env"
 			},
 			{
 				"name": "pydap server",
@@ -23,7 +23,7 @@
 				"args": [
 				],
 				"cwd": "${workspaceFolder:pydap-icechunk}",
-				"envFile": "${workspaceFolder}/.env"
+				"envFile": "${workspaceFolder}/../.env"
 			},
 			{
 				"name": "temp",
@@ -34,7 +34,7 @@
 				"args": [
 				],
 				"cwd": "${workspaceFolder:pydap-icechunk}",
-				"envFile": "${workspaceFolder}/.env"
+				"envFile": "${workspaceFolder}/../.env"
 			}
     ]
 }

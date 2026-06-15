@@ -1,7 +1,9 @@
 import os
-import subprocess
-import pytest
 import re
+import subprocess
+from pathlib import Path
+
+import pytest
 
 import compare
 import recording_proxy
@@ -50,8 +52,9 @@ def proxy(request):
     ):
         yield
 
-
-paths = compare.parse_listfile('../ccsr-config/test/iridl-vs-ccsr.txt')
+# TODO yuck
+listfile = Path(os.environ['COOKED_CATALOG_ROOT']).parent.parent / 'test/iridl-vs-ccsr.txt'
+paths = compare.parse_listfile(listfile)
 
 @pytest.mark.parametrize('test_path', paths.keys())
 def test_one(proxy, server, test_path):
