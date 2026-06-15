@@ -44,7 +44,8 @@ Attributes:
 
 A catalog consists of a set of files named `index.py` arranged in a directory
 hierarchy, the root of which is indicated by the environment variable
-`CATALOG_ROOT`. For an example, see `catalog-example` in this repository.
+`COOKED_CATALOG_ROOT`. For an example, see `cooked-catalog-example` in this
+directory.
 
 An `index.py` file at the lowest level of the hierarchy should define two
 functions with the signature `open(varname)` and `list_vars()`. `open` should
