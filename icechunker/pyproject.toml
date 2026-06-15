@@ -1,0 +1,31 @@
+[tool.pixi.workspace]
+authors = ["IRI <help@iri.columbia.edu>"]
+channels = ["conda-forge"]
+name = "icechunk-test"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[tool.pixi.dependencies]
+icechunk = ">=2.0.3,<3"
+scipy = ">=1.17.1,<2"
+cftime = ">=1.6.5,<2"
+netcdf4 = ">=1.7.4,<2"
+h5py = ">=3.16.0,<4"
+cfgrib = ">=0.9.15.1,<0.10"
+tqdm = ">=4.67.3,<5"
+
+[tool.pixi.feature.dev.dependencies]
+pytest = ">=9.0.3,<10"
+
+[tool.pixi.environments]
+default = {features = ["dev"], solve-group = "default"}
+prod = {features = [], solve-group = "default"}
+
+[tool.pixi.tasks]
+python = "export $(sed 's/#.*//' ../.env | xargs) && python"
+
+
+[tool.pyright]
+typeCheckingMode = "strict"
+reportUnknownMemberType = false
+

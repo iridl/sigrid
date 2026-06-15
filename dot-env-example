@@ -1,5 +1,7 @@
+ORIG_DATA_ROOT=/data/original
 ICECHUNK_ROOT=/data/processed
-CATALOG_ROOT=../ccsr-config/catalog/cooked
+ICECHUNK_CATALOG_ROOT=/home/aaron/ccsr-config/catalog/raw
+CATALOG_ROOT=/home/aaron/ccsr-config/catalog/cooked
 
 
 ## Below only used in dev environment
