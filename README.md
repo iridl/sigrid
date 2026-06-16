@@ -37,8 +37,8 @@ browsing, and the [OPeNDAP protocol](https://en.wikipedia.org/wiki/OPeNDAP) for
 downloading data.
 
 The Sigrid suite is composed of four Python packages:
-- `sigrid.download`: a library of utilities for use in writing reliable download
-  scripts.
+- `sigrid.download` (coming soon): a library of utilities for use in writing
+  reliable download scripts.
 - `sigrid.raw`: a program that defines the raw catalog format, and does
   ahead-of-time processing to support efficient access to raw datasets.
 - `sigrid.cooked`: a library of array harmonization utilities for use in
@@ -51,13 +51,14 @@ The Sigrid suite is composed of four Python packages:
 ## Initial setup for development/testing
 
 - Check out this repo and your site's catalog repo as sibling directories. In
-the case of forecast.ccsr.columbia.edu, the first Sigrid site, the catalog repo is
-called ccsr-config.
+  the case of forecast.ccsr.columbia.edu, the first Sigrid site, the catalog
+  repo is called ccsr-config.
 - In this repo, copy `dot-env-example` to a new file called `.env`
 
         cp dot-env-example .env
 
-- Edit the paths in `.env` to match your local configuration. Relative
-paths and environment variables are not supported, so use absolute paths. Change
-`PYDAP_PORT` to a unique number so you don't collide with other developers on
-the same server.
+- Edit the paths in `.env` to match your local configuration. Relative paths and
+  environment variables are not supported, so use absolute paths. Change
+  `PYDAP_PORT` to a unique number so you don't collide with other developers on
+  the same server.
+
