@@ -9,6 +9,7 @@
    inkscape:version="1.2.2 (b0a8486541, 2022-12-01)"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
    xmlns="http://www.w3.org/2000/svg"
    xmlns:svg="http://www.w3.org/2000/svg">
   <sodipodi:namedview
@@ -22,14 +23,14 @@
      inkscape:deskcolor="#d1d1d1"
      showgrid="false"
      inkscape:zoom="1.4434783"
-     inkscape:cx="282.6506"
-     inkscape:cy="144.78916"
+     inkscape:cx="259.09638"
+     inkscape:cy="144.78915"
      inkscape:window-width="2560"
      inkscape:window-height="1531"
      inkscape:window-x="0"
      inkscape:window-y="0"
      inkscape:window-maximized="1"
-     inkscape:current-layer="g113-3-7" />
+     inkscape:current-layer="svg125" />
   <title
      id="title2">Sigrid Climate Data Library — architecture and data flow diagram</title>
   <desc
@@ -67,7 +68,137 @@
       .boundary { fill: none; stroke: #888780; stroke-width: 1.5; stroke-dasharray: 7 4; }
       .legend-box { fill: none; stroke: #b4b2a9; stroke-width: 0.5; stroke-dasharray: 4 3; }
     </style>
+    <symbol
+       id="Document">
+      <title
+         id="title665">Document</title>
+      <desc
+         id="desc667">A document or report</desc>
+      <path
+         d="M 15,35 H 135 V 95 C 85,90 65,130 15,105 Z"
+         style="stroke-width:2"
+         id="path669" />
+    </symbol>
+    <marker
+       id="arrow-6"
+       viewBox="0 0 7.4999398 9.5"
+       refX="8"
+       refY="5"
+       markerWidth="4.4999638"
+       markerHeight="5.6999998"
+       orient="auto"
+       preserveAspectRatio="xMidYMid">
+      <path
+         d="M 2,1 8,5 2,9"
+         fill="none"
+         stroke="context-stroke"
+         stroke-width="1.5"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         id="path6-7" />
+    </marker>
+    <marker
+       id="arrow-5"
+       viewBox="0 0 7.4999398 9.5"
+       refX="8"
+       refY="5"
+       markerWidth="4.4999638"
+       markerHeight="5.6999998"
+       orient="auto"
+       preserveAspectRatio="xMidYMid">
+      <path
+         d="M 2,1 8,5 2,9"
+         fill="none"
+         stroke="context-stroke"
+         stroke-width="1.5"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         id="path6-0" />
+    </marker>
+    <marker
+       id="arrow-61"
+       viewBox="0 0 7.4999398 9.5"
+       refX="8"
+       refY="5"
+       markerWidth="4.4999638"
+       markerHeight="5.6999998"
+       orient="auto"
+       preserveAspectRatio="xMidYMid">
+      <path
+         d="M 2,1 8,5 2,9"
+         fill="none"
+         stroke="context-stroke"
+         stroke-width="1.5"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         id="path6-06" />
+    </marker>
+    <marker
+       id="arrow-2"
+       viewBox="0 0 7.4999398 9.5"
+       refX="8"
+       refY="5"
+       markerWidth="4.4999638"
+       markerHeight="5.6999998"
+       orient="auto"
+       preserveAspectRatio="xMidYMid">
+      <path
+         d="M 2,1 8,5 2,9"
+         fill="none"
+         stroke="context-stroke"
+         stroke-width="1.5"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         id="path6-061" />
+    </marker>
   </defs>
+  <g
+     id="g91"
+     style="fill:#c0c0c0;fill-opacity:1">
+    <rect
+       x="361"
+       y="188"
+       width="100"
+       height="44"
+       class="c-blue"
+       stroke-width="0.5"
+       id="rect81"
+       style="fill:#c0c0c0;fill-opacity:1" />
+    <ellipse
+       cx="411"
+       cy="232"
+       rx="50"
+       ry="10"
+       class="c-blue"
+       stroke-width="0.5"
+       id="ellipse83"
+       style="fill:#c0c0c0;fill-opacity:1" />
+    <ellipse
+       cx="411"
+       cy="188"
+       rx="50"
+       ry="10"
+       class="c-blue"
+       stroke-width="0.5"
+       id="ellipse85"
+       style="fill:#c0c0c0;fill-opacity:1" />
+    <text
+       class="th"
+       x="411"
+       y="208"
+       text-anchor="middle"
+       dominant-baseline="central"
+       style="fill:#0c447c;fill-opacity:1"
+       id="text87">Icechunk</text>
+  </g>
+  <path
+     style="font-variation-settings:normal;opacity:1;vector-effect:none;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;-inkscape-stroke:none;marker-end:url(#arrow);stop-color:#000000;stop-opacity:1"
+     d="M 453.25972,182.65548 571.72727,106"
+     id="path1899"
+     inkscape:connector-type="polyline"
+     inkscape:connector-curvature="0"
+     inkscape:connection-start="#g91"
+     inkscape:connection-end="#g67" />
   <!--
     Software row: y=50, h=56, bottom=106, cy=78
     Cylinder body: y=188..232, top ellipse cy=188 ry=10 (visual top=178), bottom cy=232
@@ -163,15 +294,15 @@
        text-anchor="middle"
        dominant-baseline="central"
        style="fill:#27500a"
-       id="text39">ingestion</text>
-    <text
-       class="ts"
-       x="207"
-       y="90"
-       text-anchor="middle"
-       dominant-baseline="central"
-       style="fill:#3b6d11"
-       id="text41">Download</text>
+       id="text39"><tspan
+         sodipodi:role="line"
+         id="tspan444"
+         x="207"
+         y="72">Download</tspan><tspan
+         sodipodi:role="line"
+         id="tspan446"
+         x="207"
+         y="89.5">scripts</tspan></text>
   </g>
   <!-- icechunker (green = ahead of time) -->
   <g
@@ -192,45 +323,13 @@
        text-anchor="middle"
        dominant-baseline="central"
        style="fill:#27500a"
-       id="text47">icechunker</text>
-    <text
-       class="ts"
-       x="343"
-       y="90"
-       text-anchor="middle"
-       dominant-baseline="central"
-       style="fill:#3b6d11"
-       id="text49">Combine</text>
+       id="text47"><tspan
+         sodipodi:role="line"
+         id="tspan552"
+         x="343"
+         y="72">Preprocessing</tspan></text>
   </g>
   <!-- cooked-catalog (purple = on the fly) -->
-  <g
-     id="g59">
-    <rect
-       x="420"
-       y="50"
-       width="118"
-       height="56"
-       rx="8"
-       class="c-purple"
-       stroke-width="0.5"
-       id="rect53" />
-    <text
-       class="th"
-       x="479"
-       y="72"
-       text-anchor="middle"
-       dominant-baseline="central"
-       style="fill:#3c3489"
-       id="text55">cooked-catalog</text>
-    <text
-       class="ts"
-       x="479"
-       y="90"
-       text-anchor="middle"
-       dominant-baseline="central"
-       style="fill:#534ab7"
-       id="text57">Harmonize</text>
-  </g>
   <!-- pydap-icechunk (purple = on the fly) -->
   <g
      id="g67">
@@ -250,15 +349,7 @@
        text-anchor="middle"
        dominant-baseline="central"
        style="fill:#3c3489"
-       id="text63">pydap-icechunk</text>
-    <text
-       class="ts"
-       x="615"
-       y="90"
-       text-anchor="middle"
-       dominant-baseline="central"
-       style="fill:#534ab7"
-       id="text65">Serve</text>
+       id="text63">Server</text>
   </g>
   <!-- ── DATA STORE ROW ── -->
   <!-- Raw files cylinder: cx=275 -->
@@ -271,7 +362,8 @@
        height="44"
        class="c-blue"
        stroke-width="0.5"
-       id="rect69" />
+       id="rect69"
+       style="fill:#c0c0c0;fill-opacity:1" />
     <ellipse
        cx="275"
        cy="232"
@@ -279,7 +371,8 @@
        ry="10"
        class="c-blue"
        stroke-width="0.5"
-       id="ellipse71" />
+       id="ellipse71"
+       style="fill:#c0c0c0;fill-opacity:1" />
     <ellipse
        cx="275"
        cy="188"
@@ -287,7 +380,8 @@
        ry="10"
        class="c-blue"
        stroke-width="0.5"
-       id="ellipse73" />
+       id="ellipse73"
+       style="fill:#c0c0c0;fill-opacity:1" />
     <text
        class="th"
        x="275"
@@ -295,60 +389,25 @@
        text-anchor="middle"
        dominant-baseline="central"
        style="fill:#0c447c"
-       id="text75">Raw files</text>
+       id="text75" />
     <text
        class="ts"
        x="275"
-       y="232"
+       y="212"
        text-anchor="middle"
        dominant-baseline="central"
-       style="fill:#185fa5"
+       style="font-style:normal;font-variant:normal;font-weight:500;font-stretch:normal;font-size:14px;line-height:normal;font-family:sans-serif;font-variant-ligatures:normal;font-variant-position:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-alternates:normal;font-variant-east-asian:normal;font-feature-settings:normal;font-variation-settings:normal;text-indent:0;text-align:start;text-decoration-line:none;text-decoration-style:solid;text-decoration-color:#000000;letter-spacing:normal;word-spacing:normal;text-transform:none;writing-mode:lr-tb;direction:ltr;text-orientation:mixed;dominant-baseline:central;baseline-shift:baseline;white-space:normal;opacity:1;vector-effect:none;fill:#0c447c;fill-opacity:1;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;-inkscape-stroke:none;stop-color:#000000;stop-opacity:1"
        id="text77"><tspan
          sodipodi:role="line"
          id="tspan4976"
          x="275"
-         y="232">NetCDF/GRIB/</tspan><tspan
+         y="212">NetCDF/GRIB/</tspan><tspan
          sodipodi:role="line"
          id="tspan4978"
          x="275"
-         y="247">TIFF</tspan></text>
+         y="229.5">TIFF</tspan></text>
   </g>
   <!-- Icechunk store cylinder: cx=411 -->
-  <g
-     id="g91">
-    <rect
-       x="361"
-       y="188"
-       width="100"
-       height="44"
-       class="c-blue"
-       stroke-width="0.5"
-       id="rect81" />
-    <ellipse
-       cx="411"
-       cy="232"
-       rx="50"
-       ry="10"
-       class="c-blue"
-       stroke-width="0.5"
-       id="ellipse83" />
-    <ellipse
-       cx="411"
-       cy="188"
-       rx="50"
-       ry="10"
-       class="c-blue"
-       stroke-width="0.5"
-       id="ellipse85" />
-    <text
-       class="th"
-       x="411"
-       y="208"
-       text-anchor="middle"
-       dominant-baseline="central"
-       style="fill:#0c447c"
-       id="text87">Icechunk</text>
-  </g>
   <!-- ── DIAGONAL ARROWS ── -->
   <line
      x1="207"
@@ -357,7 +416,8 @@
      y2="178"
      class="arr"
      marker-end="url(#arrow)"
-     id="line93" />
+     id="line93"
+     style="font-variation-settings:normal;opacity:1;vector-effect:none;fill:none;fill-opacity:1;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;-inkscape-stroke:none;marker-end:url(#arrow);stop-color:#000000;stop-opacity:1" />
   <line
      x1="275"
      y1="178"
@@ -365,7 +425,8 @@
      y2="106"
      class="arr"
      marker-end="url(#arrow)"
-     id="line95" />
+     id="line95"
+     style="font-variation-settings:normal;opacity:1;vector-effect:none;fill:none;fill-opacity:1;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;-inkscape-stroke:none;marker-end:url(#arrow);stop-color:#000000;stop-opacity:1" />
   <line
      x1="343"
      y1="106"
@@ -373,46 +434,47 @@
      y2="178"
      class="arr"
      marker-end="url(#arrow)"
-     id="line97" />
-  <line
-     x1="411"
-     y1="178"
-     x2="479"
-     y2="106"
-     class="arr"
-     marker-end="url(#arrow)"
-     id="line99" />
+     id="line97"
+     style="fill:none;fill-opacity:1;font-variation-settings:normal;opacity:1;vector-effect:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;-inkscape-stroke:none;marker-end:url(#arrow);stop-color:#000000;stop-opacity:1" />
   <!-- ── HORIZONTAL ARROWS (software row) ── -->
   <!-- cooked-catalog → pydap-icechunk -->
-  <line
-     x1="538"
-     y1="78"
-     x2="554"
-     y2="78"
-     class="arr"
-     marker-end="url(#arrow)"
-     id="line101" />
   <!-- pydap-icechunk → scientists -->
   <text
      class="ts"
-     x="715"
-     y="70"
+     x="304.97168"
+     y="665.37726"
      text-anchor="middle"
-     id="text105">OPeNDAP</text>
+     id="text105"
+     transform="rotate(-57.679565)">OPeNDAP</text>
+  <text
+     class="ts"
+     x="722.48816"
+     y="174.10324"
+     text-anchor="middle"
+     id="text105-6"
+     style="font-weight:400;font-size:12px;font-family:sans-serif;fill:#555555"><tspan
+       sodipodi:role="line"
+       id="tspan12024"
+       x="722.48816"
+       y="174.10324">HTTP</tspan><tspan
+       sodipodi:role="line"
+       id="tspan12026"
+       x="722.48816"
+       y="189.10324">HTML</tspan></text>
   <!-- External: Scientists -->
   <rect
-     x="758"
-     y="50"
-     width="118"
-     height="56"
-     rx="8"
+     x="757.93518"
+     y="49.935196"
+     width="118.12961"
+     height="30.697329"
+     rx="8.0087872"
      class="c-gray"
-     stroke-width="0.5"
+     stroke-width="0.370395"
      id="rect107" />
   <text
      class="th"
-     x="817"
-     y="76"
+     x="812.43207"
+     y="65.76268"
      text-anchor="middle"
      dominant-baseline="central"
      id="text109">Python</text>
@@ -455,7 +517,7 @@
            sodipodi:role="line"
            id="tspan3030"
            x="59.158863"
-           y="78.534805"></tspan></text>
+           y="78.534805" /></text>
     </g>
     <text
        class="th"
@@ -589,68 +651,81 @@
   </g>
   <path
      style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;marker-end:url(#arrow)"
-     d="m 674,97.768656 83.47402,27.968974"
+     d="m 674,92.284494 85.758,20.762876"
      id="path2722"
      inkscape:connector-type="polyline"
      inkscape:connector-curvature="0"
+     inkscape:connection-start="#g67" />
+  <rect
+     x="759.69122"
+     y="99.26506"
+     width="118.1336"
+     height="30.038317"
+     rx="8.009058"
+     class="c-gray"
+     stroke-width="0.366403"
+     id="rect107-5"
+     style="fill:#f1efe8;stroke:#5f5e5a" />
+  <text
+     class="th"
+     x="814.04932"
+     y="116.89954"
+     text-anchor="middle"
+     dominant-baseline="central"
+     id="text109-6"
+     style="font-weight:500;font-size:14px;font-family:sans-serif;fill:#1a1a1a">R</text>
+  <rect
+     x="758.80304"
+     y="142.71159"
+     width="118.11366"
+     height="33.401058"
+     rx="8.0077057"
+     class="c-gray"
+     stroke-width="0.386336"
+     id="rect107-5-1"
+     style="fill:#f1efe8;stroke:#5f5e5a" />
+  <rect
+     x="764.24744"
+     y="234.9648"
+     width="118.11366"
+     height="33.401058"
+     rx="8.0077057"
+     class="c-gray"
+     stroke-width="0.386336"
+     id="rect107-5-1-5"
+     style="fill:#f1efe8;stroke:#5f5e5a" />
+  <text
+     class="th"
+     x="819.74329"
+     y="160.32733"
+     text-anchor="middle"
+     dominant-baseline="central"
+     id="text109-6-7"
+     style="font-weight:500;font-size:14px;font-family:sans-serif;fill:#1a1a1a"><tspan
+       sodipodi:role="line"
+       id="tspan5876"
+       x="819.74329"
+       y="160.32733">Matlab</tspan></text>
+  <text
+     class="th"
+     x="822.49146"
+     y="250.63196"
+     text-anchor="middle"
+     dominant-baseline="central"
+     id="text109-6-7-4"
+     style="font-weight:500;font-size:14px;font-family:sans-serif;fill:#1a1a1a"><tspan
+       sodipodi:role="line"
+       id="tspan5876-7"
+       x="822.49146"
+       y="250.63196">Browser</tspan></text>
+  <path
+     style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;marker-end:url(#arrow)"
+     d="m 673.25792,101.38018 102.98816,41.33141"
+     id="path5880"
+     inkscape:connector-type="polyline"
+     inkscape:connector-curvature="0"
      inkscape:connection-start="#g67"
-     inkscape:connection-end="#g113-3" />
-  <g
-     id="g113-3"
-     transform="translate(-0.5259787,67.506283)">
-    <rect
-       x="758"
-       y="50"
-       width="118"
-       height="56"
-       rx="8"
-       class="c-gray"
-       stroke-width="0.5"
-       id="rect107-5"
-       style="fill:#f1efe8;stroke:#5f5e5a" />
-    <text
-       class="th"
-       x="817"
-       y="76"
-       text-anchor="middle"
-       dominant-baseline="central"
-       id="text109-6"
-       style="font-weight:500;font-size:14px;font-family:sans-serif;fill:#1a1a1a">R</text>
-  </g>
-  <g
-     id="g113-3-7"
-     transform="translate(0.445783,134.01807)">
-    <rect
-       x="758"
-       y="50"
-       width="118"
-       height="56"
-       rx="8"
-       class="c-gray"
-       stroke-width="0.5"
-       id="rect107-5-1"
-       style="fill:#f1efe8;stroke:#5f5e5a" />
-    <text
-       class="th"
-       x="817"
-       y="76"
-       text-anchor="middle"
-       dominant-baseline="central"
-       id="text109-6-7"
-       style="font-weight:500;font-size:14px;font-family:sans-serif;fill:#1a1a1a"><tspan
-         sodipodi:role="line"
-         id="tspan5876"
-         x="817"
-         y="76">Matlab</tspan></text>
-    <path
-       style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;marker-end:url(#arrow)"
-       d="M 656.85062,-28.01807 774.7036,50"
-       id="path5880"
-       inkscape:connector-type="polyline"
-       inkscape:connector-curvature="0"
-       inkscape:connection-start="#g67"
-       inkscape:connection-end="#rect107-5-1" />
-  </g>
+     inkscape:connection-end="#rect107-5-1" />
   <!-- ── LEGEND ── -->
   <g
      id="g537"
@@ -724,10 +799,51 @@
      inkscape:connection-end="#g43" />
   <path
      style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;marker-end:url(#arrow)"
-     d="m 674,78 h 84"
+     d="m 674,74.28588 83.93518,-5.28382"
      id="path4950"
      inkscape:connector-type="polyline"
      inkscape:connector-curvature="0"
      inkscape:connection-start="#g67"
      inkscape:connection-end="#rect107" />
+  <use
+     xlink:href="#Document"
+     style="fill:#fdecea;fill-opacity:1;stroke:#9c2d20;stroke-opacity:1"
+     id="use1202"
+     transform="matrix(0.7530429,0,0,0.51068739,250.52479,103.76208)" />
+  <use
+     xlink:href="#Document"
+     style="fill:#fdecea;stroke:#9c2d20;fill-opacity:1;stroke-opacity:1"
+     id="use1202-3"
+     transform="matrix(1.0036491,0,0,0.60549478,425.61874,97.080614)" />
+  <text
+     class="th"
+     x="306.37347"
+     y="139.6427"
+     text-anchor="middle"
+     dominant-baseline="central"
+     style="font-weight:500;font-size:14px;font-family:sans-serif;fill:#9c2d20;fill-opacity:1"
+     id="text47-5"><tspan
+       sodipodi:role="line"
+       id="tspan552-2"
+       x="306.37347"
+       y="139.6427">Raw catalog</tspan></text>
+  <text
+     xml:space="preserve"
+     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:medium;line-height:normal;font-family:sans-serif;font-variant-ligatures:normal;font-variant-position:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-alternates:normal;font-variant-east-asian:normal;font-feature-settings:normal;font-variation-settings:normal;text-indent:0;text-align:start;text-decoration-line:none;text-decoration-style:solid;text-decoration-color:#000000;letter-spacing:normal;word-spacing:normal;text-transform:none;writing-mode:lr-tb;direction:ltr;text-orientation:mixed;dominant-baseline:auto;baseline-shift:baseline;white-space:normal;opacity:1;vector-effect:none;fill:#a43c2f;fill-opacity:1;stroke:none;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;-inkscape-stroke:none;stop-color:#000000;stop-opacity:1"
+     x="448.42133"
+     y="140.29442"
+     id="text6035"><tspan
+       sodipodi:role="line"
+       id="tspan6033"
+       x="448.42133"
+       y="140.29442"
+       style="font-style:normal;font-variant:normal;font-weight:500;font-stretch:normal;font-size:14px;line-height:normal;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Medium';font-variant-ligatures:normal;font-variant-position:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-alternates:normal;font-variant-east-asian:normal;text-indent:0;text-align:start;text-decoration-line:none;text-decoration-style:solid;text-decoration-color:#000000;letter-spacing:normal;word-spacing:normal;text-transform:none;writing-mode:lr-tb;direction:ltr;text-orientation:mixed;dominant-baseline:auto;baseline-shift:baseline;white-space:normal;opacity:1;vector-effect:none;fill:#a43c2f;fill-opacity:1;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;-inkscape-stroke:none;stop-color:#000000;stop-opacity:1">Cooked catalog</tspan></text>
+  <path
+     style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;marker-end:url(#arrow)"
+     d="M 648.58482,106 803.27268,234.9648"
+     id="path11771"
+     inkscape:connector-type="polyline"
+     inkscape:connector-curvature="0"
+     inkscape:connection-start="#g67"
+     inkscape:connection-end="#rect107-5-1-5" />
 </svg>
