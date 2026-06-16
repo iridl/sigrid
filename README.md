@@ -36,17 +36,21 @@ access to the dataset in its "cooked" (harmonized) form via a web interface for
 browsing, and the [OPeNDAP protocol](https://en.wikipedia.org/wiki/OPeNDAP) for
 downloading data.
 
-The Sigrid suite is composed of four Python packages:
-- `sigrid.download` (coming soon): a library of utilities for use in writing
-  reliable download scripts.
-- `sigrid.raw`: a program that defines the raw catalog format, and does
+The Sigrid suite has four components:
+- `download` (coming soon): a library of utilities for use in writing reliable
+  download scripts.
+- `preprocess`: a program that defines the raw catalog format, and does
   ahead-of-time processing to support efficient access to raw datasets.
-- `sigrid.cooked`: a library of array harmonization utilities for use in
-  cooked data catalogs.
-- `sigrid.server`: an application that provides the web and OPeNDAP interfaces.
-
+- `harmonize`: a library of array harmonization utilities for use in cooked data
+  catalogs.
+- `serve`: an application that provides the web and OPeNDAP interfaces.
 
 ![architecture diagram](./architecture.svg)
+
+This repository is organized in two subdirectories: `ingestion` contains the
+`download` and `preprocess` packages, which are used for ahead-of-time data
+preparation, and `server` contains the `harmonize` and `serve` packages, which
+are the components involved in on-the-fly processing of user requests.
 
 ## Initial setup for development/testing
 

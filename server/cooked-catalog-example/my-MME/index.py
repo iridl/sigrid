@@ -4,7 +4,7 @@
 # that variable names have already been normalized by transform
 # functions lower in the hierarchy.
 
-from cataloging import DatasetConfig, standardize
+from sigrid.harmonize import DatasetConfig, standardize
 
 da_attrs = {
     'S': {

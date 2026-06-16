@@ -12,8 +12,8 @@ from webob.exc import HTTPFound, HTTPNotFound
 import xarray as xr
 import xarray.conventions
 
-import cataloging
-from cataloging import Coords
+import sigrid.harmonize as harmonize
+from sigrid.harmonize import Coords
 
 
 class XarrayHandler(BaseHandler, abc.ABC):
@@ -116,7 +116,7 @@ def ensure_trailing(s: str) -> str:
 
 
 class Server:
-    def __init__(self, catalog: cataloging.Catalog) -> None:
+    def __init__(self, catalog: harmonize.Catalog) -> None:
         self.catalog = catalog
 
     @wsgify
@@ -150,7 +150,7 @@ class Server:
 
             return CatalogFileHandler(ds, varname, extension)  # TODO bad name--only handles variables.
 
-    def dir(self, dataset: cataloging.DisplayDataset):
+    def dir(self, dataset: harmonize.DisplayDataset):
         """Return a directory listing."""
        
 

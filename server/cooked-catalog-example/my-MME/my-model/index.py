@@ -9,7 +9,7 @@
 # convenient and less error-prone to define it once here, rather than
 # duplicating it in the hindcast and forecast directories.
 
-from cataloging import rename
+from sigrid.harmonize import rename
 
 
 var_names = {
