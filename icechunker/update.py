@@ -37,11 +37,11 @@ class TopConfig:
             self,
             orig_root: Pathy,
             icechunk_root: Pathy,
-            catalog_root: Pathy,
+            raw_catalog_root: Pathy,
     ) -> None:
         self.orig_root = Path(orig_root)
         self.icechunk_root = Path(icechunk_root)
-        self.catalog_root = Path(catalog_root)
+        self.raw_catalog_root = Path(raw_catalog_root)
 
 def config_from_env() -> TopConfig:
     config_vars: dict[str, str] = {}
@@ -54,7 +54,7 @@ def config_from_env() -> TopConfig:
     config = TopConfig(
         config_vars['ORIG_DATA_ROOT'],
         config_vars['ICECHUNK_ROOT'],
-        config_vars['ICECHUNK_CATALOG_ROOT']
+        config_vars['RAW_CATALOG_ROOT']
     )
     return  config
 
@@ -95,13 +95,13 @@ class IcechunkInfo:
 
 @dataclass
 class FileSetCatalog:
-    _catalog_root: Path
+    _raw_catalog_root: Path
     _data_root: Path
 
     def get_entry(self, path_arg: str | URLPath) -> tuple["FileSetDescriptor", IcechunkInfo]:
         path_str = str(path_arg)
         dir, var_name = path_str.rsplit('/', maxsplit=1)
-        index_path = self._catalog_root / dir / 'index.py'
+        index_path = self._raw_catalog_root / dir / 'index.py'
         spec = importlib.util.spec_from_file_location('catalog', index_path)
         assert spec  # TODO
         assert spec.loader  # TODO
@@ -624,7 +624,7 @@ def main():
     top_config = config_from_env()
 
     raw_cat = FileSetCatalog(
-        top_config.catalog_root,
+        top_config.raw_catalog_root,
         top_config.orig_root
     )
     descriptor, icechunk_info = raw_cat.get_entry(args.var)

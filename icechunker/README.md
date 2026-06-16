@@ -11,7 +11,7 @@
 pixi run python update.py NMME/COLA-RSMAS/CCSM4/prec
 ```
 where `NMME/COLA-RSMAS/CCSM4/` is the relative path, below
-`$CATALOG_ROOT` (defined in ../.env), of a directory containing
+`$COOKED_CATALOG_ROOT` (defined in ../.env), of a directory containing
 an `index.py` file, and `prec` is the name of one of the entries in
 `dataset['vars']` within that file.
 

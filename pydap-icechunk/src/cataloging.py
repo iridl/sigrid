@@ -16,7 +16,7 @@ import xarray as xr
 
 # TODO reconcile pydap config vs catalog config
 ICECHUNK_ROOT = Path(os.environ['ICECHUNK_ROOT'])
-CATALOG_ROOT = Path(os.environ['CATALOG_ROOT'])
+COOKED_CATALOG_ROOT = Path(os.environ['COOKED_CATALOG_ROOT'])
 
 
 class CaseSensitiveStrEnum(StrEnum):
@@ -350,14 +350,14 @@ class CatalogNode:
     def __init__(self, catalog_path: str, parent: Self | None) -> None:
         self.catalog_path = catalog_path
         self.parent = parent
-        self.hidden = (CATALOG_ROOT / catalog_path / 'hidden').exists()
+        self.hidden = (COOKED_CATALOG_ROOT / catalog_path / 'hidden').exists()
         self._module = None
 
     @property
     def subdatasets(self) -> dict[str, Self]:
         return {
-            d.name: self.__class__(str(d.relative_to(CATALOG_ROOT)), self)
-            for d in (CATALOG_ROOT / self.catalog_path).iterdir()
+            d.name: self.__class__(str(d.relative_to(COOKED_CATALOG_ROOT)), self)
+            for d in (COOKED_CATALOG_ROOT / self.catalog_path).iterdir()
             if d.is_dir() and d.name != '__pycache__'
         }
 
@@ -380,7 +380,7 @@ class CatalogNode:
 
     @functools.cached_property
     def module(self):
-        index_path = CATALOG_ROOT / self.catalog_path / 'index.py'
+        index_path = COOKED_CATALOG_ROOT / self.catalog_path / 'index.py'
         if not index_path.exists():
             return None
         return load_index(index_path)

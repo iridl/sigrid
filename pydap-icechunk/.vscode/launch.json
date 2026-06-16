@@ -1,0 +1,40 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+			{
+				"name": "current file",
+				"type": "debugpy",
+				"request": "launch",
+				"console": "integratedTerminal",
+				"program": "${file}",
+				"args": [
+				],
+				"envFile": "${workspaceFolder}/../.env"
+			},
+			{
+				"name": "pydap server",
+				"type": "debugpy",
+				"request": "launch",
+				"console": "integratedTerminal",
+				"program": "${workspaceFolder}/test/server.py",
+				"args": [
+				],
+				"cwd": "${workspaceFolder:pydap-icechunk}",
+				"envFile": "${workspaceFolder}/../.env"
+			},
+			{
+				"name": "temp",
+				"type": "debugpy",
+				"request": "launch",
+				"console": "integratedTerminal",
+				"program": "${workspaceFolder}/catalog/NMME/COLA-RSMAS/CCSM4/index.py",
+				"args": [
+				],
+				"cwd": "${workspaceFolder:pydap-icechunk}",
+				"envFile": "${workspaceFolder}/../.env"
+			}
+    ]
+}
