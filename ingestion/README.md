@@ -8,7 +8,7 @@
 
 ## Create or update an icechunk store
 ```
-pixi run python update.py NMME/COLA-RSMAS/CCSM4/prec
+pixi run python preprocess.py NMME/COLA-RSMAS/CCSM4/prec
 ```
 where `NMME/COLA-RSMAS/CCSM4/` is the relative path, below
 `$COOKED_CATALOG_ROOT` (defined in ../.env), of a directory containing
@@ -29,8 +29,8 @@ pixi run python read.py NMME/COLA-RSMAS/CCSM4/prec
 ```
 or in an interactive python session,
 ```
->>> import update
->>> update.open_icechunk('NMME/COLA-RSMAS/CCSM4/prec')
+>>> import preprocess
+>>> preprocess.open_icechunk('NMME/COLA-RSMAS/CCSM4/prec')
 ```
 
 ## Catalog format (index.py)
@@ -67,7 +67,7 @@ on S and L in the icechunk store.
 `dir`: path to the root directory of the file set, relative to `$ORIG_DATA_ROOT`
 (defined in ../.env).
 
-`parse_match` (optional): if the standard mechanism for mapping filenames to coordinates can't handle the patterns, you can override it here. Value is a function that takes a dictionary of named captures from the regex, and returns a `FileCoords` object (see definition in `update.py`). Not usually needed; see NMME/NASA-GMAO/GEOSS2S for an example.
+`parse_match` (optional): if the standard mechanism for mapping filenames to coordinates can't handle the patterns, you can override it here. Value is a function that takes a dictionary of named captures from the regex, and returns a `FileCoords` object (see definition in `preprocess.py`). Not usually needed; see NMME/NASA-GMAO/GEOSS2S for an example.
 
 `vars`: a dictionary where keys are variable names, values are dictionaries
 structured as follows:

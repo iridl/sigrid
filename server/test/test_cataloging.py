@@ -1,7 +1,7 @@
 import numpy as np
 import xarray as xr
 
-import cataloging
+import sigrid.harmonize as harmonize
 
 
 def test_S_L_to_target():
@@ -13,7 +13,7 @@ def test_S_L_to_target():
     s = xr.DataArray(s_vals, coords={'S': s_vals})
     l_vals = range(12)
 
-    target, target_bnds = cataloging.S_L_to_target_monthly(s, l_vals)
+    target, target_bnds = harmonize.S_L_to_target_monthly(s, l_vals)
     print(target_bnds)
     assert target_bnds.shape == (534, 12, 2)
     assert target_bnds.isel(S=0, L=0, nbound=0) == np.datetime64('1980-01-01')

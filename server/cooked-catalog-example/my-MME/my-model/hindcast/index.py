@@ -2,7 +2,7 @@
 # the lowest-level file in the hierarchy, it defines the functions
 # open(varname) and list_vars().
 
-import cataloging
+import sigrid.harmonize as harmonize
 
 # Maps user-visible variable name (the ensemble's standard name) to a path
 # component that is used in the file path below.
@@ -21,5 +21,5 @@ def list_vars():
 def open(varname):
     # The file path is relative to the value of the environment variable
     # ICECHUNK_ROOT
-    return cataloging.open_icechunk(f'my-MME/my-model/hindcast/{store_names[varname]}')
+    return harmonize.open_icechunk(f'my-MME/my-model/hindcast/{store_names[varname]}')
 

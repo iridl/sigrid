@@ -17,7 +17,7 @@ def server():
             # I guess because the parent process is running in a
             # different environment (client).
             "pixi", "run", "-e", "default", "python", "-c",
-            'from werkzeug.serving import run_simple; from pydap_icechunk.app import app; run_simple("127.0.0.1", 0, app)'
+            'from werkzeug.serving import run_simple; from sigrid.serve.app import app; run_simple("127.0.0.1", 0, app)'
         ],
         stderr=subprocess.PIPE,
         text=True,

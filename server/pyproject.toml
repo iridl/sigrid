@@ -1,5 +1,5 @@
 [project]
-name = "pydap-icechunk"
+name = "sigrid-server"
 version = "0"
 
 [build-system]
@@ -25,7 +25,7 @@ werkzeug = ">=3.1.8,<4"
 pytest = "*"
 
 [tool.pixi.feature.dev.pypi-dependencies]
-pydap-icechunk = { path = ".", editable = true }
+sigrid-server = { path = ".", editable = true }
 
 [tool.pixi.feature.client.dependencies]
 # An environment for running test clients. Keeping this environment

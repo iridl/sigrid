@@ -17,6 +17,6 @@ vars=(prcp t2m sst)
 for ds in ${datasets[@]}; do
   for v in ${vars[@]}; do
     echo $ds/$v
-    python update.py --parallel=0 $ds/$v
+    python preprocess.py --parallel=0 $ds/$v
   done
 done

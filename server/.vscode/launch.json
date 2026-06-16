@@ -22,7 +22,7 @@
 				"program": "${workspaceFolder}/test/server.py",
 				"args": [
 				],
-				"cwd": "${workspaceFolder:pydap-icechunk}",
+				"cwd": "${workspaceFolder}",
 				"envFile": "${workspaceFolder}/../.env"
 			},
 			{
@@ -33,7 +33,7 @@
 				"program": "${workspaceFolder}/catalog/NMME/COLA-RSMAS/CCSM4/index.py",
 				"args": [
 				],
-				"cwd": "${workspaceFolder:pydap-icechunk}",
+				"cwd": "${workspaceFolder}",
 				"envFile": "${workspaceFolder}/../.env"
 			}
     ]
