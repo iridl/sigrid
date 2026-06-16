@@ -1,4 +1,4 @@
-# sigrid-cdl: the Sigrid Climate Data Library suite
+# The Sigrid Climate Data Library suite
 
 Sigrid is a collection of software components for building and operating a
 library of analysis-ready climate data. The current focus is on seasonal and
