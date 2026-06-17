@@ -85,7 +85,11 @@ def convert_units(ds: xr.Dataset, standard_attrs: Mapping[str, Mapping[str, str]
         name: convert_units_da(da, standard_attrs[name].get('units'))
         for name, da in data_vars_of(ds).items()
     }
-    return xr.Dataset(data_vars, coords=ds.coords, attrs=ds.attrs)
+    coords = {
+        name: convert_units_da(da, standard_attrs[name].get('units'))
+        for name, da in coords_of(ds).items()
+    }
+    return xr.Dataset(data_vars, coords=coords, attrs=ds.attrs)
 
 type UnitConverter = Callable[[xr.DataArray], xr.DataArray]
 
@@ -111,6 +115,7 @@ STANDARD_UNIT_CONVERSIONS: Mapping[tuple[str, str], UnitConverter] = MappingProx
     ('mm/s', 'mm/day'): linear_converter(0, 60 * 60 * 24),
     ('m/s', 'mm/day'): linear_converter(0, 1000 * 60 * 60 * 24),
     ('m s**-1', 'mm/day'): linear_converter(0, 1000 * 60 * 60 * 24),
+    ('m/s', 'm s-1'): null_converter,
     ('hPa', 'Pa'): linear_converter(0, 100),
     # Volumetric latent heat of vaporization: 2453 MJ m-3
     ('watt/m^2', 'mm/day'): linear_converter(0, 1000 * 60 * 60 * 24 / 2453e6),
