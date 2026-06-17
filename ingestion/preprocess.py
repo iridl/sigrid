@@ -529,7 +529,18 @@ def initialize(session: icechunk.session.Session, descriptor: FileSetDescriptor,
 
 def open_one_file(path: Path) -> xr.Dataset:
     try:
-        result = xr.open_dataset(path, decode_cf=False)
+        result = xr.open_dataset(
+            path,
+            # Pass CF _FillValue and datetime/timedelta attributes through to
+            # icechunk unchanged.
+            mask_and_scale=False,
+            decode_times=False,
+            # Note: decode_coords doesn't control decoding of coordinate values,
+            # it controls which variables become coordinates as opposed to data
+            # variables. That's important because expand_dims affects data vars
+            # only.
+            decode_coords=True,
+        )
         return result
     except Exception as e:
         e.add_note(f'While attempting to open {path}')
