@@ -263,7 +263,7 @@ def open_one_file_slice(path: Path, descriptor: FileSetDescriptor, file_coords: 
 
     t_dim = descriptor.original_time_dim
     if t_dim is None:
-        ds = expand(ds, 'IRIDL_time', descriptor)
+        ds = expand(ds, 'IRIDL_time', descriptor.expand_coords)
     else:
         if t_dim in ds.dims:
             for v in ds.data_vars.values():
@@ -272,7 +272,7 @@ def open_one_file_slice(path: Path, descriptor: FileSetDescriptor, file_coords: 
         elif t_dim in ds.coords:
             # promote scalar coordinate to a dimension coordinate
             assert ds.coords[t_dim].shape == ()
-            ds = expand(ds, t_dim, descriptor)
+            ds = expand(ds, t_dim, descriptor.expand_coords)
         else:
             raise Exception(f'No dimension named "{t_dim}" is present')
 
@@ -317,9 +317,9 @@ def open_one_file_slice(path: Path, descriptor: FileSetDescriptor, file_coords: 
 
     return ds
 
-def expand(ds: xr.Dataset, dim: str, descriptor: FileSetDescriptor) -> xr.Dataset:
+def expand(ds: xr.Dataset, dim: str, expand_coords: Iterable[str]) -> xr.Dataset:
     ds = ds.expand_dims(dim)
-    for c in descriptor.expand_coords:
+    for c in expand_coords:
         expanded = ds[c].expand_dims(dim)
         new_name = f'{c}_expanded'
         ds = ds.assign_coords({new_name: expanded})
