@@ -149,34 +149,117 @@ class FileSetDescriptor:
             original_time_dim: str | None = None,
             parse_match : Callable[[dict[str, str]],FileCoords] | None = None,
             backend_kwargs: dict[str, dict[str, str]] | None = None,
-            drop_vars: Sequence[str] = (),
-            expand_coords: Sequence[str] = (),
-            aux_coords: Sequence[str] = (),
+            drop_vars: str | Sequence[str] = (),
+            expand_coords: str | Sequence[str] = (),
+            aux_coords: str | Sequence[str] = (),
     ) -> None:
         # TODO constructor args need to be validated
         self.name = name
         self.dir = dir
         self.catalog_path = catalog_path
         self._matcher = re.compile(pattern)
-        self.original_time_dim = original_time_dim
         self.parse_match = parse_match or default_parse_match
         self.backend_kwargs = backend_kwargs
+
         if isinstance(drop_vars, str):
-            self.drop_vars = [drop_vars]
-        else:
-            self.drop_vars = drop_vars
+            drop_vars = [drop_vars]
         if isinstance(expand_coords, str):
-            self.expand_coords = [expand_coords]
-        else:
-            self.expand_coords = expand_coords
-        self.aux_coords = aux_coords
+            expand_coords = [expand_coords]
+        if isinstance(aux_coords, str):
+            aux_coords = [aux_coords]
+        self.opener = _FileOpener(
+            original_time_dim, drop_vars, expand_coords, aux_coords
+        )
 
     def parse_path(self, path: str | Path) -> FileCoords | None:
         match = self._matcher.search(str(path))
         if not match:
             return None
         return self.parse_match(match.groupdict())
-    
+
+
+@dataclass
+class _FileOpener:
+    original_time_dim: str | None
+    drop_vars: Sequence[str]
+    expand_coords: Sequence[str]
+    aux_coords: Sequence[str]
+
+    def open(self, path: Path, file_coords: FileCoords) -> xr.Dataset:
+        """Use as a context manager or call close() on the dataset when finished with it."""
+        ds = open_one_file(path)
+
+        if self.drop_vars:
+            ds = ds.drop_vars(self.drop_vars)
+
+        # Data vars get expanded along IRIDL_time, coords don't unless they're
+        # explicitly listed in expand_coords.
+        # Note: this has no effect on which variables appear as coordinates
+        # in the pydap response. That's controlled by the data vars' "coordinates"
+        # attributes, which we set elsewhere.
+        if self.aux_coords:
+            ds = ds.set_coords(self.aux_coords)
+
+        if file_coords.p is not None:
+            ds = ds.expand_dims(P=[file_coords.p])
+        if file_coords.m is not None:
+            ds = ds.expand_dims(M=[file_coords.m])
+
+        t_dim = self.original_time_dim
+        if t_dim is None:
+            ds = expand(ds, 'IRIDL_time', self.expand_coords)
+        else:
+            if t_dim in ds.dims:
+                for v in ds.data_vars.values():
+                    if v.dims[0] != t_dim:
+                        raise Exception(f'{t_dim} is not the outermost dimension')
+            elif t_dim in ds.coords:
+                # promote scalar coordinate to a dimension coordinate
+                assert ds.coords[t_dim].shape == ()
+                ds = expand(ds, t_dim, self.expand_coords)
+            else:
+                raise Exception(f'No dimension named "{t_dim}" is present')
+
+            # It's conceivable that someone might put multiple starts in a file,
+            # but I haven't encountered that yet.
+            assert len(ds[t_dim]) == 1, "Don't know how to handle multiple initializations in a single file."
+
+            # Rename the dimension, but not the existing coordinate variable.
+            ds = ds.rename_dims({t_dim: 'IRIDL_time'})
+
+        # Now the IRIDL_time dimension is guaranteed to exist. Give it a coordinate variable.
+        ds = ds.assign_coords({'IRIDL_time': ('IRIDL_time', [file_coords.t])})
+
+        # The presence of a scalar coordinate causes to_zarr with region= to fail
+        # TODO scalar coordinates that vary from file to file should be converted
+        # into array coordinates with the appropriate dimensions; scalar coordinates
+        # that are constant across the datasets should become scalar coordinates on
+        # the dataset.
+        ds = ds.drop_vars([c for c in ds.coords if ds.coords[c].dims == ()])
+
+        # Make sure there's only one index for the IRIDL_time dimension. Having multiple
+        # indexes on the same dimension causes problems with region=
+        ds = ds.drop_indexes(
+            (
+                name for name, coord in coords_of(ds).items()
+                if 'IRIDL_time' in coord.dims and coord.name != 'IRIDL_time'
+            ),
+            errors='ignore',
+        )
+
+        # No GMAO, we're not going to waste our disk space and bandwidth
+        # storing your forecasts to nine decimal digits of precision.
+        # TODO this goes against our general policy of sticking as closely
+        # as possible to the provider's representation. If most providers
+        # provide 32-bit data, how much does it really harm us if one uses
+        # 64 bits? Pydap responses should be 32-bit, but we could do the
+        # rounding in pydap instead?
+        # Caution: this causes the data variables to be loaded into memory.
+        for varname in ds.data_vars:
+            if ds[varname].dtype == np.dtype('float64'):
+                ds[varname] = ds[varname].astype(np.float32)
+
+        return ds
 
 class FileSetListing:
     def __init__(self, descriptor: FileSetDescriptor) -> None:
@@ -241,82 +324,6 @@ def assemble_coords(coords: Iterable[FileCoords]) -> DatasetCoords:
         return sorted(cast(set[T], x), reverse=reverse)
     return DatasetCoords(sorted(t_vals), helper(m_vals), helper(p_vals, reverse=True))
 
-def open_one_file_slice(path: Path, descriptor: FileSetDescriptor, file_coords: FileCoords) -> xr.Dataset:
-    """Use as a context manager or call close() on the dataset when finished with it."""
-    ds = open_one_file(path)
-
-    if descriptor.drop_vars:
-        ds = ds.drop_vars(descriptor.drop_vars)
-
-    # Data vars get expanded along IRIDL_time, coords don't unless they're
-    # explicitly listed in expand_coords.
-    # Note: this has no effect on which variables appear as coordinates
-    # in the pydap response. That's controlled by the data vars' "coordinates"
-    # attributes, which we set elsewhere.
-    if descriptor.aux_coords:
-        ds = ds.set_coords(descriptor.aux_coords)
-
-    if file_coords.p is not None:
-        ds = ds.expand_dims(P=[file_coords.p])
-    if file_coords.m is not None:
-        ds = ds.expand_dims(M=[file_coords.m])
-
-    t_dim = descriptor.original_time_dim
-    if t_dim is None:
-        ds = expand(ds, 'IRIDL_time', descriptor.expand_coords)
-    else:
-        if t_dim in ds.dims:
-            for v in ds.data_vars.values():
-                if v.dims[0] != t_dim:
-                    raise Exception(f'{t_dim} is not the outermost dimension')
-        elif t_dim in ds.coords:
-            # promote scalar coordinate to a dimension coordinate
-            assert ds.coords[t_dim].shape == ()
-            ds = expand(ds, t_dim, descriptor.expand_coords)
-        else:
-            raise Exception(f'No dimension named "{t_dim}" is present')
-
-        # It's conceivable that someone might put multiple starts in a file,
-        # but I haven't encountered that yet.
-        assert len(ds[t_dim]) == 1, "Don't know how to handle multiple initializations in a single file."
-
-        # Rename the dimension, but not the existing coordinate variable.
-        ds = ds.rename_dims({t_dim: 'IRIDL_time'})
-
-    # Now the IRIDL_time dimension is guaranteed to exist. Give it a coordinate variable.
-    ds = ds.assign_coords({'IRIDL_time': ('IRIDL_time', [file_coords.t])})
-
-    # The presence of a scalar coordinate causes to_zarr with region= to fail
-    # TODO scalar coordinates that vary from file to file should be converted
-    # into array coordinates with the appropriate dimensions; scalar coordinates
-    # that are constant across the datasets should become scalar coordinates on
-    # the dataset.
-    ds = ds.drop_vars([c for c in ds.coords if ds.coords[c].dims == ()])
-
-    # Make sure there's only one index for the IRIDL_time dimension. Having multiple
-    # indexes on the same dimension causes problems with region=
-    ds = ds.drop_indexes(
-        (
-            name for name, coord in coords_of(ds).items()
-            if 'IRIDL_time' in coord.dims and coord.name != 'IRIDL_time'
-        ),
-        errors='ignore',
-    )
-
-    # No GMAO, we're not going to waste our disk space and bandwidth
-    # storing your forecasts to nine decimal digits of precision.
-    # TODO this goes against our general policy of sticking as closely
-    # as possible to the provider's representation. If most providers
-    # provide 32-bit data, how much does it really harm us if one uses
-    # 64 bits? Pydap responses should be 32-bit, but we could do the
-    # rounding in pydap instead?
-    # Caution: this causes the data variables to be loaded into memory.
-    for varname in ds.data_vars:
-        if ds[varname].dtype == np.dtype('float64'):
-            ds[varname] = ds[varname].astype(np.float32)
-
-    return ds
-
 def expand(ds: xr.Dataset, dim: str, expand_coords: Iterable[str]) -> xr.Dataset:
     ds = ds.expand_dims(dim)
     for c in expand_coords:
@@ -347,7 +354,7 @@ def update(
         existing = None
 
     if existing is None:
-        initialize(session, descriptor, listing)
+        initialize(session, descriptor.opener, listing)
         existing = xr.open_zarr(session.store, zarr_format=3)
 
     times_to_fetch = (
@@ -405,7 +412,7 @@ def update(
             executor.submit(
                 write_one_file_slice,
                 fork_session,
-                descriptor,
+                descriptor.opener,
                 auto_detect_region(file_coords, existing),
                 file_coords,
                 path,
@@ -469,8 +476,8 @@ class SyncExecutor(Executor):
         pass
 
 
-def write_one_file_slice(session: icechunk.session.ForkSession, descriptor: FileSetDescriptor, region: Mapping[str, slice], file_coords: FileCoords, path: Path):
-    with open_one_file_slice(path, descriptor, file_coords) as ds:
+def write_one_file_slice(session: icechunk.session.ForkSession, opener: _FileOpener, region: Mapping[str, slice], file_coords: FileCoords, path: Path):
+    with opener.open(path, file_coords) as ds:
         # Working around an xarray bug: when updating an existing zarr store, it
         # uses the _FillValue it finds in the store, and doesn't tolerate the ds
         # having one even if it's the same as the one in the store. So we keep this
@@ -483,7 +490,7 @@ def write_one_file_slice(session: icechunk.session.ForkSession, descriptor: File
     return session
 
 
-def initialize(session: icechunk.session.Session, descriptor: FileSetDescriptor, listing: FileSetListing) -> None:
+def initialize(session: icechunk.session.Session, opener: _FileOpener, listing: FileSetListing) -> None:
     t = next(iter(listing.coords.T))
     file_slices: list[list[xr.Dataset]] = [
         [
@@ -491,12 +498,11 @@ def initialize(session: icechunk.session.Session, descriptor: FileSetDescriptor,
             # t slice has no missing files. If we need to deal with
             # that situation, we can insert empty slices, or move to
             # filling in values one file at a time.
-            open_one_file_slice(
+            opener.open(
                 raise_if_null(
                     listing.get_path(FileCoords(t, m, p)),
                     'Missing file in initial time slice',
                 ),
-                descriptor,
                 FileCoords(t, m, p)
             )            
             for p in listing.coords.P or [None]
