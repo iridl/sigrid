@@ -173,8 +173,12 @@ class FileSetDescriptor:
             self.drop_vars = [drop_vars]
         else:
             self.drop_vars = drop_vars
-        if any([keep in self.drop_vars for keep in self.keep_vars]):
-            raise Exception('Keep or drop: one must choose')
+        keep_and_drop = set(self.drop_vars).intersection(self.keep_vars)
+        #[keep in self.drop_vars for keep in self.keep_vars]
+        if len(keep_and_drop) > 0:
+            raise Exception(
+                f'{keep_and_drop} listed as to keep and to drop: one must choose'
+            )
         if isinstance(expand_coords, str):
             expand_coords = [expand_coords]
         if isinstance(aux_coords, str):
