@@ -15,7 +15,6 @@ import warnings
 import icechunk
 import icechunk.session
 import numpy as np
-from datetime import datetime
 import tqdm
 import xarray as xr
 import xarray.conventions
