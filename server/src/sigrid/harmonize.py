@@ -111,6 +111,7 @@ STANDARD_UNIT_CONVERSIONS: Mapping[tuple[str, str], UnitConverter] = MappingProx
     ('mm/s', 'mm/day'): linear_converter(0, 60 * 60 * 24),
     ('m/s', 'mm/day'): linear_converter(0, 1000 * 60 * 60 * 24),
     ('m s**-1', 'mm/day'): linear_converter(0, 1000 * 60 * 60 * 24),
+    ('m/s', 'm s-1'): null_converter,
     ('hPa', 'Pa'): linear_converter(0, 100),
     # Volumetric latent heat of vaporization: 2453 MJ m-3
     ('watt/m^2', 'mm/day'): linear_converter(0, 1000 * 60 * 60 * 24 / 2453e6),
