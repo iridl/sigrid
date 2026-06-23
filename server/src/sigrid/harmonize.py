@@ -14,10 +14,6 @@ import icechunk
 import numpy as np
 import xarray as xr
 
-# TODO reconcile pydap config vs catalog config
-ICECHUNK_ROOT = Path(os.environ['ICECHUNK_ROOT'])
-COOKED_CATALOG_ROOT = Path(os.environ['COOKED_CATALOG_ROOT'])
-
 
 class CaseSensitiveStrEnum(StrEnum):
     """Like StrEnum but it doesn't downcase the names"""
@@ -274,7 +270,7 @@ def sizes_of(ds: xr.Dataset | xr.DataArray):
 
 
 def open_icechunk(rel_path: str, decode_times: bool = True, drop_variables: Iterable[str] = ()):
-    abspath = ICECHUNK_ROOT / rel_path
+    abspath = Path(os.environ['ICECHUNK_ROOT']) / rel_path
     storage = icechunk.local_filesystem_storage(str(abspath))
     # Workaround for https://github.com/earth-mover/icechunk/issues/2105
     if not icechunk.Repository.exists(storage):
@@ -304,8 +300,9 @@ class DisplayDataset:
 
 
 class Catalog:
-    def __init__(self):
-        self.root_node = CatalogNode('', None)
+    def __init__(self, root_dir: Path):
+        self.root_dir = root_dir
+        self.root_node = CatalogNode(self, '', None)
 
     def open_variable(self, catalog_path: str) -> xr.Dataset | None:
         if not catalog_path.startswith('/'):
@@ -349,17 +346,19 @@ class Catalog:
 
 
 class CatalogNode:
-    def __init__(self, catalog_path: str, parent: Self | None) -> None:
+    def __init__(self, catalog: Catalog, catalog_path: str, parent: Self | None) -> None:
+        self.catalog = catalog
         self.catalog_path = catalog_path
         self.parent = parent
-        self.hidden = (COOKED_CATALOG_ROOT / catalog_path / 'hidden').exists()
+        self.hidden = (catalog.root_dir / catalog_path / 'hidden').exists()
         self._module = None
 
     @property
     def subdatasets(self) -> dict[str, Self]:
+        root = self.catalog.root_dir
         return {
-            d.name: self.__class__(str(d.relative_to(COOKED_CATALOG_ROOT)), self)
-            for d in (COOKED_CATALOG_ROOT / self.catalog_path).iterdir()
+            d.name: self.__class__(self.catalog, str(d.relative_to(root)), self)
+            for d in (root / self.catalog_path).iterdir()
             if d.is_dir() and d.name != '__pycache__'
         }
 
@@ -382,7 +381,7 @@ class CatalogNode:
 
     @functools.cached_property
     def module(self):
-        index_path = COOKED_CATALOG_ROOT / self.catalog_path / 'index.py'
+        index_path = self.catalog.root_dir / self.catalog_path / 'index.py'
         if not index_path.exists():
             return None
         return load_index(index_path)
