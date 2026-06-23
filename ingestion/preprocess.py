@@ -161,10 +161,10 @@ class FileSetDescriptor:
         self.dir = dir
         self.catalog_path = catalog_path
         self._matcher = re.compile(pattern)
+        self.time_res = 'hours' if 'hour' in self._matcher.groupindex else None
+        self.original_time_dim = original_time_dim
         self.parse_match = parse_match or default_parse_match
         self.backend_kwargs = backend_kwargs
-        self.time_res = 'hours' if 'P<hour>' in pattern else None
-        self.original_time_dim = original_time_dim
         if isinstance(keep_vars, str):
             self.keep_vars = [keep_vars]
         else:
