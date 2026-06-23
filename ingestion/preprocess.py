@@ -183,7 +183,12 @@ class FileSetDescriptor:
         if isinstance(aux_coords, str):
             aux_coords = [aux_coords]
         self.opener = _FileOpener(
-            original_time_dim, drop_vars, expand_coords, aux_coords
+            original_time_dim,
+            keep_vars,
+            drop_vars,
+            expand_coords,
+            aux_coords,
+            backend_kwargs,
         )
 
     def parse_path(self, path: str | Path) -> FileCoords | None:
@@ -196,16 +201,28 @@ class FileSetDescriptor:
 @dataclass
 class _FileOpener:
     original_time_dim: str | None
+    keep_vars: Sequence[str]
     drop_vars: Sequence[str]
     expand_coords: Sequence[str]
     aux_coords: Sequence[str]
+    backend_kwargs: dict[str, dict[str, str]] | None
 
-    def open(self, path: Path, file_coords: FileCoords) -> xr.Dataset:
+    def open(
+        self,
+        path: Path,
+        file_coords: FileCoords,
+    ) -> xr.Dataset:
         """Use as a context manager or call close() on the dataset when finished with it."""
-        ds = open_one_file(path)
+        ds = open_one_file(path, backend_kwargs=self.backend_kwargs)
 
         if self.drop_vars:
             ds = ds.drop_vars(self.drop_vars)
+
+        if descriptor.drop_vars:
+        ds = ds.drop_vars(descriptor.drop_vars)
+
+        if self.keep_vars:
+        ds = ds.drop_vars([var for var in ds if not var in descriptor.keep_vars])
 
         # Data vars get expanded along IRIDL_time, coords don't unless they're
         # explicitly listed in expand_coords.
@@ -475,7 +492,7 @@ def update(
         existing = None
 
     if existing is None:
-        initialize(session, descriptor.opener, listing)
+        initialize(session, descriptor.opener, descriptor.time_res, listing)
         existing = xr.open_zarr(session.store, zarr_format=3)
 
     times_to_fetch = (
@@ -614,15 +631,19 @@ def write_one_file_slice(session: icechunk.session.ForkSession, opener: _FileOpe
     return session
 
 
-def initialize(session: icechunk.session.Session, opener: _FileOpener, listing: FileSetListing) -> None:
+def initialize(
+    session: icechunk.session.Session,
+    opener: _FileOpener,
+    time_res: str | None,
+    listing: FileSetListing,
+) -> None:
     t = next(iter(listing.coords.T))
     file_slices = [
-        open_one_file_slice(
+        opener.open(
             raise_if_null(
                 listing.get_path(FileCoords(t, *mpl)),
                 'Missing file in initial time slice',
             ),
-            descriptor,
             FileCoords(t, *mpl),
         )
         for mpl in itertools.product(
@@ -646,9 +667,9 @@ def initialize(session: icechunk.session.Session, opener: _FileOpener, listing: 
     # at midnight, xarray incorrectly chooses daily resolution, what subsequently 
     # breaks the appending of new six-hourly initializations which would need to be 
     # represented as floats (fractions of days) instead of integers (count of hours).
-    if descriptor.time_res is not None:
+    if time_res is not None:
         encoding.update({'IRIDL_time': {'units': (
-            f'{descriptor.time_res} since '
+            f'{time_res} since '
             f'{one_file_slice['IRIDL_time'].dt.strftime("%Y%m%dT%H:%M").values[0]}'
         )}})
     t_slice.to_zarr(session.store, consolidated=False, encoding=encoding)
