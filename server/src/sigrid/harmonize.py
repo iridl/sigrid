@@ -40,7 +40,6 @@ class DatasetConfig:
     encodings: Mapping[str, Mapping[str, str]]
     bare_dims: Iterable[str]
     lead_is_month: bool
-    needs_target: bool
 
 
 def rename(ds: xr.Dataset, mapping: Mapping[str, str]):
@@ -57,7 +56,7 @@ def rename(ds: xr.Dataset, mapping: Mapping[str, str]):
 def standardize(ds: xr.Dataset, config: DatasetConfig):
     ds = drop_non_std(ds, config.da_attrs, config.bare_dims)
     ds = convert_units(ds, config.da_attrs)
-    if config.needs_target:
+    if 'L' in ds.dims:
         ds = add_target(ds, config.lead_is_month)
     ds = standardize_attrs(
         ds,
