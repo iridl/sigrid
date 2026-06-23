@@ -127,7 +127,7 @@ def convert_units_da(
         raise Exception("Can't convert to {new_units} because I don't know the original units")
     else:  # original_units is not None
         if new_units is None:
-            pass  # leave quantities as is, drop the units attr
+            del da.attrs['units']  # leave quantities as is; drop the units attr
         else:  # new_units is not None
             try:
                 converter = conversions[(original_units, new_units)]
@@ -229,9 +229,10 @@ def S_L_to_target_monthly(S: xr.DataArray, l_values: Sequence[int]):
 
 
 def monthly_total(ds: xr.Dataset, vars: Iterable[str]):
+    new_ds = ds.copy()
     for var in vars:
         if var in ds:
-            da = ds[var]
+            da = ds[var].copy()
             units = da.attrs.get('units')
             # Not sure if this .endswith test is robust enough, e.g. might there be
             # a space between the slash and the d? If this turns out not to work,
@@ -244,8 +245,8 @@ def monthly_total(ds: xr.Dataset, vars: Iterable[str]):
                 ).dt.days
             da = da * target_length
             da.attrs['units'] = units[:-len('/day')]
-            ds[var] = da
-    return ds
+            new_ds[var] = da
+    return new_ds
 
 
 def coords_of(ds: xr.Dataset | xr.DataArray):
