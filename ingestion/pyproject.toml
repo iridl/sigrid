@@ -13,6 +13,7 @@ netcdf4 = ">=1.7.4,<2"
 h5py = ">=3.16.0,<4"
 cfgrib = ">=0.9.15.1,<0.10"
 tqdm = ">=4.67.3,<5"
+rioxarray = ">=0.22.0,<0.23"
 
 [tool.pixi.feature.dev.dependencies]
 pytest = ">=9.0.3,<10"

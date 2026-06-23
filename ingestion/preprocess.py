@@ -534,18 +534,26 @@ def initialize(session: icechunk.session.Session, opener: _FileOpener, listing: 
 
 
 def open_one_file(path: Path) -> xr.Dataset:
+    decode_coords_opt = True
+    mask_and_scale_opt = False
+    kwargs = {}
+    if path.suffix == '.tif':
+        decode_coords_opt = 'all'
+        mask_and_scale_opt = True
+        kwargs.update({'band_as_variable': True})
     try:
         result = xr.open_dataset(
             path,
             # Pass CF _FillValue and datetime/timedelta attributes through to
             # icechunk unchanged.
-            mask_and_scale=False,
+            mask_and_scale=mask_and_scale_opt,
             decode_times=False,
             # Note: decode_coords doesn't control decoding of coordinate values,
             # it controls which variables become coordinates as opposed to data
             # variables. That's important because expand_dims affects data vars
             # only.
-            decode_coords=True,
+            decode_coords=decode_coords_opt,
+            **kwargs,
         )
         return result
     except Exception as e:
