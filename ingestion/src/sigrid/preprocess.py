@@ -135,6 +135,7 @@ class FileCoords(NamedTuple):
     t: np.datetime64
     m: int | None
     p: int | None
+    l: int | None
 
 
 class DatasetCoords(NamedTuple):
@@ -144,6 +145,7 @@ class DatasetCoords(NamedTuple):
     T: Iterable[np.datetime64]
     M: Sequence[int] | None
     P: Sequence[int] | None
+    L: Sequence[int] | None
 
 T = TypeVar('T')
 
@@ -161,6 +163,7 @@ class FileSetDescriptor:
             original_time_dim: str | None = None,
             parse_match : Callable[[dict[str, str]],FileCoords] | None = None,
             backend_kwargs: dict[str, dict[str, str]] | None = None,
+            keep_vars: str | Sequence[str] = (),
             drop_vars: str | Sequence[str] = (),
             expand_coords: str | Sequence[str] = (),
             aux_coords: str | Sequence[str] = (),
@@ -171,16 +174,28 @@ class FileSetDescriptor:
         self.catalog_path = catalog_path
         self._matcher = re.compile(pattern)
         self.parse_match = parse_match or default_parse_match
+        self.time_res = 'hours' if 'hour' in self._matcher.groupindex else None
+        self.original_time_dim = original_time_dim
         self.backend_kwargs = backend_kwargs
 
-        if isinstance(drop_vars, str):
-            drop_vars = [drop_vars]
+        self.keep_vars = [keep_vars] if isinstance(keep_vars, str) else keep_vars
+        self.drop_vars = [drop_vars] if isinstance(drop_vars, str) else drop_vars
+        keep_and_drop = set(self.drop_vars).intersection(self.keep_vars)
+        if len(keep_and_drop) > 0:
+            raise Exception(
+                f'{keep_and_drop} listed as to keep and to drop: one must choose'
+            )
         if isinstance(expand_coords, str):
             expand_coords = [expand_coords]
         if isinstance(aux_coords, str):
             aux_coords = [aux_coords]
         self.opener = _FileOpener(
-            original_time_dim, drop_vars, expand_coords, aux_coords
+            original_time_dim,
+            backend_kwargs,
+            keep_vars,
+            drop_vars,
+            expand_coords,
+            aux_coords,
         )
 
     def parse_path(self, path: str | Path) -> FileCoords | None:
@@ -193,16 +208,21 @@ class FileSetDescriptor:
 @dataclass
 class _FileOpener:
     original_time_dim: str | None
+    backend_kwargs: dict[str, dict[str, str]] | None
+    keep_vars: Sequence[str]
     drop_vars: Sequence[str]
     expand_coords: Sequence[str]
     aux_coords: Sequence[str]
 
     def open(self, path: Path, file_coords: FileCoords) -> xr.Dataset:
         """Use as a context manager or call close() on the dataset when finished with it."""
-        ds = open_one_file(path)
+        ds = open_one_file(path, backend_kwargs=self.backend_kwargs)
 
         if self.drop_vars:
             ds = ds.drop_vars(self.drop_vars)
+
+        if self.keep_vars:
+            ds = ds.drop_vars([var for var in ds if not var in self.keep_vars])
 
         # Data vars get expanded along IRIDL_time, coords don't unless they're
         # explicitly listed in expand_coords.
@@ -216,6 +236,8 @@ class _FileOpener:
             ds = ds.expand_dims(P=[file_coords.p])
         if file_coords.m is not None:
             ds = ds.expand_dims(M=[file_coords.m])
+        if file_coords.l is not None:
+            ds = ds.expand_dims(L=[file_coords.l])
 
         t_dim = self.original_time_dim
         if t_dim is None:
@@ -298,8 +320,8 @@ class FileSetListing:
 
 
 def default_parse_match(values: dict[str, str]) -> FileCoords:
-    t = m = p = None
-    if 'year' in values or 'month' in values or 'day' in values:
+    t = m = p = l = None
+    if 'year' in values or 'month' in values or 'day' in values or 'hour' in values:
         if not ('year' in values and 'month' in values):
             raise Exception('Path contains only a partial date')
         year = int(values['year'])
@@ -311,30 +333,65 @@ def default_parse_match(values: dict[str, str]) -> FileCoords:
             day = int(values['day'])
         else:
             day = 1
-        t = np.datetime64(f'{year}-{month:02}-{day:02}')
+        if 'hour' in values:
+            hour = int(values['hour'])
+        else:
+            hour = 0
+        t = np.datetime64(f'{year}-{month:02}-{day:02}T{hour:02}:00')
     else:
         raise Exception('No date was retrieved from path')
     if 'member' in values:
         m = int(values['member'])
     if 'pressure' in values:
         p = int(values['pressure'])
-    return FileCoords(t, m, p)
+    if 'targety' in values or 'targetm' in values or 'targetd' in values or 'targeth' in values:
+        if not ('targety' in values and 'targetm' in values):
+            raise Exception('Path contains only a partial date')
+        year = int(values['targety'])
+        try:
+            month = int(values['targetm'])
+        except ValueError:
+            month = ABBREV_MONTH.index(values['targetm'].lower())
+        if 'targetd' in values:
+            day = int(values['targetd'])
+        else:
+            day = 1
+        if 'targeth' in values:
+            hour = int(values['targeth'])
+        else:
+            hour = 0
+        # Technically we have target in the file name
+        # but I didn't dare here try to have both target of IRIDL_time and L
+        # and L istelf set up at the same time
+        # This is only valid for the NMME CFSv2 case, which is peculiar,
+        # but also the only one so far.
+        l = (
+            xr.DataArray(
+                data=np.datetime64(f'{year}-{month:02}-{day:02}T{hour:02}:00')
+                ).dt.month
+            - xr.DataArray(data=t).dt.month 
+        ).values % 12
+    return FileCoords(t, m, p, l)
     
 
 def assemble_coords(coords: Iterable[FileCoords]) -> DatasetCoords:
     t_vals: set[np.datetime64] = set()
     m_vals: set[int | None] = set()
     p_vals: set[int | None] = set()
+    l_vals: set[int | None] = set()
     for coord in coords:
         t_vals.add(coord.t)
         m_vals.add(coord.m)
         p_vals.add(coord.p)
+        l_vals.add(coord.l)
     def helper[T: (int, str)](x: set[T | None], reverse: bool = False) -> list[T] | None:
         if None in x:
             assert x == {None}
             return None
         return sorted(cast(set[T], x), reverse=reverse)
-    return DatasetCoords(sorted(t_vals), helper(m_vals), helper(p_vals, reverse=True))
+    return DatasetCoords(
+        sorted(t_vals), helper(m_vals), helper(p_vals, reverse=True), helper(l_vals)
+    )
 
 def expand(ds: xr.Dataset, dim: str, expand_coords: Iterable[str]) -> xr.Dataset:
     ds = ds.expand_dims(dim)
@@ -366,7 +423,7 @@ def update(
         existing = None
 
     if existing is None:
-        initialize(session, descriptor.opener, listing)
+        initialize(session, descriptor.opener, descriptor.time_res, listing)
         existing = xr.open_zarr(session.store, zarr_format=3)
         if limit is not None:
             limit -= 1  # We already wrote the first slice
@@ -434,7 +491,10 @@ def update(
             for t in times_to_fetch
             for m in listing.coords.M or [None]
             for p in listing.coords.P or [None]
-            if (path := listing.get_path(file_coords := FileCoords(t, m, p))) is not None
+            for l in listing.coords.L or [None]
+            if (
+                path := listing.get_path(file_coords := FileCoords(t, m, p, l))
+            ) is not None
         ]
         total_count = len(futures)
         success_count = 0
@@ -503,50 +563,54 @@ def write_one_file_slice(session: icechunk.session.ForkSession, opener: _FileOpe
     return session
 
 
-def initialize(session: icechunk.session.Session, opener: _FileOpener, listing: FileSetListing) -> None:
+def initialize(
+    session: icechunk.session.Session,
+    opener: _FileOpener,
+    time_res: str | None,
+    listing: FileSetListing,
+) -> None:
     t = next(iter(listing.coords.T))
-    file_slices: list[list[xr.Dataset]] = [
-        [
-            # Out of laziness, I'm assuming for now that the initial
-            # t slice has no missing files. If we need to deal with
-            # that situation, we can insert empty slices, or move to
-            # filling in values one file at a time.
-            opener.open(
-                raise_if_null(
-                    listing.get_path(FileCoords(t, m, p)),
-                    'Missing file in initial time slice',
-                ),
-                FileCoords(t, m, p)
-            )            
-            for p in listing.coords.P or [None]
-        ]
-        for m in listing.coords.M or [None]
+    file_slices = [
+        opener.open(
+            raise_if_null(
+                listing.get_path(FileCoords(t, *mpl)),
+                'Missing file in initial time slice',
+            ),
+            FileCoords(t, *mpl),
+        )
+        for mpl in itertools.product(
+            listing.coords.M or [None],
+            listing.coords.P or [None],
+            listing.coords.L or [None],
+        )
     ]
-    # Combine a list of lists of (m, p) slices into a single t slice.
-    # Note that we test for coord is None, not for len(slice) == 1,
-    # because there are cases where we want to keep a dimension that has
-    # length 1 (e.g. SubC GEFSv12 zg).
-    if listing.coords.P is None:
-        m_slices = [m_slice[0] for m_slice in file_slices]
-    else:
-        m_slices = [
-            xr.concat(m_slice, dim='P', coords='minimal')
-            for m_slice in file_slices
-        ]
-    if listing.coords.M is None:
-        t_slice = m_slices[0]
-    else:
-        t_slice = xr.concat(m_slices, dim='M', coords='minimal')
+    # The following also works with merge(join='outer')
+    # The combine_attrs option likely rids of useless attrs
+    t_slice = xr.combine_by_coords(file_slices, combine_attrs='drop_conflicts')
 
-    one_file_slice = file_slices[0][0]
+    one_file_slice = file_slices[0]
     encoding = {
         varname: {'chunks': tuple(da.sizes[dim] for dim in da.dims)}
         for varname, da in one_file_slice.data_vars.items()
     }
+    # By default, xarray chooses CF time units based on the values it finds in the 
+    # dataset. That doesn't always work well here because we're only writing a 
+    # single time slice, so xarray doesn't have enough information to make the 
+    # choice we need. If a model has six-hourly initializations but the first one is 
+    # at midnight, xarray incorrectly chooses daily resolution, what subsequently 
+    # breaks the appending of new six-hourly initializations which would need to be 
+    # represented as floats (fractions of days) instead of integers (count of hours).
+    if time_res is not None:
+        encoding.update({'IRIDL_time': {'units': (
+            f'{time_res} since '
+            f'{one_file_slice['IRIDL_time'].dt.strftime("%Y%m%dT%H:%M").values[0]}'
+        )}})
     t_slice.to_zarr(session.store, consolidated=False, encoding=encoding)
 
 
-def open_one_file(path: Path) -> xr.Dataset:
+def open_one_file(
+    path: Path, backend_kwargs: dict[str, dict[str, str]] | None = None
+) -> xr.Dataset:
 
     # decode_coords doesn't control decoding of coordinate values, it controls
     # which variables become coordinates as opposed to data variables. That's
@@ -565,7 +629,6 @@ def open_one_file(path: Path) -> xr.Dataset:
         decode_coords = 'all'
     else:
         decode_coords = True
-
     try:
         result = xr.open_dataset(
             path,
@@ -573,6 +636,7 @@ def open_one_file(path: Path) -> xr.Dataset:
             mask_and_scale=False,
             decode_times=False,
             decode_coords=decode_coords,
+            backend_kwargs=backend_kwargs,
         )
         return result
     except Exception as e:
@@ -610,7 +674,12 @@ def raise_if_null(x: T | None, message: str) -> T:
 def auto_detect_region(slice_coords: FileCoords, dest: xr.Dataset):
     # Adapted from xarray's implementation of region='auto', but this is much faster
     # for the cases we encounter.
-    externals = {'IRIDL_time': slice_coords.t, 'M': slice_coords.m, 'P': slice_coords.p}
+    externals = {
+        'IRIDL_time': slice_coords.t,
+        'M': slice_coords.m,
+        'P': slice_coords.p,
+        'L': slice_coords.l,
+    }
     region: Mapping[str, slice] = {}
     for dim in dest.dims:
         # Xarray's type hints are inconsistent. Keys of Dataset.dims are Hashable,
