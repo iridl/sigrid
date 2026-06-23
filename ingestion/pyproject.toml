@@ -45,3 +45,8 @@ preprocess = "export $(sed 's/#.*//' ../.env | xargs) && python -m sigrid.prepro
 typeCheckingMode = "recommended"
 reportUnknownMemberType = false
 
+[tool.ruff.lint]
+# E741 doesn't like "l" as a variable name because it's easy to misread, but
+# that's the name we conventionally use for a variable that represents forecast
+# lead time.
+ignore = ["E741"]

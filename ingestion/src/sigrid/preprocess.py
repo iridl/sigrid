@@ -135,6 +135,7 @@ class FileCoords(NamedTuple):
     t: np.datetime64
     m: int | None
     p: int | None
+    l: int | None
 
 
 class DatasetCoords(NamedTuple):
@@ -144,6 +145,7 @@ class DatasetCoords(NamedTuple):
     T: Iterable[np.datetime64]
     M: Sequence[int] | None
     P: Sequence[int] | None
+    L: Sequence[int] | None
 
 T = TypeVar('T')
 
@@ -244,6 +246,8 @@ class _FileOpener:
             ds = ds.expand_dims(P=[file_coords.p])
         if file_coords.m is not None:
             ds = ds.expand_dims(M=[file_coords.m])
+        if file_coords.l is not None:
+            ds = ds.expand_dims(L=[file_coords.l])
 
         t_dim = self.original_time_dim
         if t_dim is None:
@@ -326,8 +330,8 @@ class FileSetListing:
 
 
 def default_parse_match(values: dict[str, str]) -> FileCoords:
-    t = m = p = None
-    if 'year' in values or 'month' in values or 'day' in values:
+    t = m = p = l = None
+    if 'year' in values or 'month' in values or 'day' in values or 'hour' in values:
         if not ('year' in values and 'month' in values):
             raise Exception('Path contains only a partial date')
         year = int(values['year'])
@@ -339,30 +343,38 @@ def default_parse_match(values: dict[str, str]) -> FileCoords:
             day = int(values['day'])
         else:
             day = 1
-        t = np.datetime64(f'{year}-{month:02}-{day:02}')
+        if 'hour' in values:
+            hour = int(values['hour'])
+        else:
+            hour = 0
+        t = np.datetime64(f'{year}-{month:02}-{day:02}T{hour:02}:00')
     else:
         raise Exception('No date was retrieved from path')
     if 'member' in values:
         m = int(values['member'])
     if 'pressure' in values:
         p = int(values['pressure'])
-    return FileCoords(t, m, p)
+    return FileCoords(t, m, p, l)
     
 
 def assemble_coords(coords: Iterable[FileCoords]) -> DatasetCoords:
     t_vals: set[np.datetime64] = set()
     m_vals: set[int | None] = set()
     p_vals: set[int | None] = set()
+    l_vals: set[int | None] = set()
     for coord in coords:
         t_vals.add(coord.t)
         m_vals.add(coord.m)
         p_vals.add(coord.p)
+        l_vals.add(coord.l)
     def helper[T: (int, str)](x: set[T | None], reverse: bool = False) -> list[T] | None:
         if None in x:
             assert x == {None}
             return None
         return sorted(cast(set[T], x), reverse=reverse)
-    return DatasetCoords(sorted(t_vals), helper(m_vals), helper(p_vals, reverse=True))
+    return DatasetCoords(
+        sorted(t_vals), helper(m_vals), helper(p_vals, reverse=True), helper(l_vals)
+    )
 
 def expand(ds: xr.Dataset, dim: str, expand_coords: Iterable[str]) -> xr.Dataset:
     ds = ds.expand_dims(dim)
@@ -464,7 +476,10 @@ def update(
             for t in times_to_fetch
             for m in listing.coords.M or [None]
             for p in listing.coords.P or [None]
-            if (path := listing.get_path(file_coords := FileCoords(t, m, p))) is not None
+            for l in listing.coords.L or [None]
+            if (
+                path := listing.get_path(file_coords := FileCoords(t, m, p, l))
+            ) is not None
         ]
         total_count = len(futures)
         success_count = 0
@@ -542,24 +557,31 @@ def initialize(
     t = next(iter(listing.coords.T))
     file_coords = [
         [
-            FileCoords(t, m, p)
+            [
+                FileCoords(t, m, p, l)
+                for l in listing.coords.L or [None]
+            ]
             for p in listing.coords.P or [None]
         ]
         for m in listing.coords.M or [None]
     ]
     file_slices_some_missing = [
         [
-            None if (path := listing.get_path(coords)) is None
-            else opener.open(path, coords)
-            for coords in coords_row
+            [
+                None if (path := listing.get_path(mpl_coords)) is None
+                else opener.open(path, mpl_coords)
+                for mpl_coords in mp_coords
+            ]
+            for mp_coords in m_coords
         ]
-        for coords_row in file_coords
+        for m_coords in file_coords
     ]
     example_ds = next(
-        ds
-        for row in file_slices_some_missing
-        for ds in row
-        if ds is not None
+        mpl_ds
+        for m_slices in file_slices_some_missing
+        for mp_slices in m_slices
+        for mpl_ds in mp_slices
+        if mpl_ds is not None
     )
 
     def empty_slice(c: FileCoords) -> xr.Dataset:
@@ -568,6 +590,8 @@ def initialize(
             result['M'] = [c.m]
         if c.p is not None:
             result['P'] = [c.p]
+        if c.l is not None:
+            result['L'] = [c.l]
         return result
 
     # Replace missing files with an all-NaN slice.
@@ -578,23 +602,39 @@ def initialize(
     # API and create an xarray-compatible Zarr structure by hand.
     file_slices_all = [
         [
-            empty_slice(file_coords[i][j]) if ds is None else ds
-            for j, ds in enumerate(row)
+            [
+                empty_slice(file_coords[i][j][k]) if ds is None else ds
+                for k, ds in enumerate(mpl_slices)
+            ]
+            for j, mpl_slices in enumerate(mp_slices)
         ]
-        for i, row in enumerate(file_slices_some_missing)
+        for i, mp_slices in enumerate(file_slices_some_missing)
     ]
 
 
-    # Combine a list of lists of (m, p) slices into a single t slice.
+    # Combine a list of lists of (m, p, l) slices into a single t slice.
     # Note that we test for coord is None, not for len(slice) == 1,
     # because there are cases where we want to keep a dimension that has
     # length 1 (e.g. SubC GEFSv12 zg).
+    if listing.coords.L is None:
+        mp_slices = [
+            [mp_slice[0] for mp_slice in p_slice]
+            for p_slice in file_slices_all
+        ]
+    else:
+        mp_slices = [
+            [
+                xr.concat(mp_slice, dim='L', coords='minimal')
+                for mp_slice in p_slice
+            ]
+            for p_slice in file_slices_all
+        ]
     if listing.coords.P is None:
-        m_slices = [m_slice[0] for m_slice in file_slices_all]
+        m_slices = [m_slice[0] for m_slice in mp_slices]
     else:
         m_slices = [
             xr.concat(m_slice, dim='P', coords='minimal')
-            for m_slice in file_slices_all
+            for m_slice in mp_slices
         ]
     if listing.coords.M is None:
         t_slice = m_slices[0]
@@ -641,7 +681,6 @@ def open_one_file(
         decode_coords = 'all'
     else:
         decode_coords = True
-
     try:
         result = xr.open_dataset(
             path,
@@ -687,7 +726,12 @@ def raise_if_null(x: T | None, message: str) -> T:
 def auto_detect_region(slice_coords: FileCoords, dest: xr.Dataset):
     # Adapted from xarray's implementation of region='auto', but this is much faster
     # for the cases we encounter.
-    externals = {'IRIDL_time': slice_coords.t, 'M': slice_coords.m, 'P': slice_coords.p}
+    externals = {
+        'IRIDL_time': slice_coords.t,
+        'M': slice_coords.m,
+        'P': slice_coords.p,
+        'L': slice_coords.l,
+    }
     region: Mapping[str, slice] = {}
     for dim in dest.dims:
         # Xarray's type hints are inconsistent. Keys of Dataset.dims are Hashable,
