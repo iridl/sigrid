@@ -535,10 +535,8 @@ def initialize(session: icechunk.session.Session, opener: _FileOpener, listing: 
 
 def open_one_file(path: Path) -> xr.Dataset:
     mask_and_scale_opt = False
-    kwargs = {}
     if path.suffix == '.tif':
         mask_and_scale_opt = True
-        kwargs.update({'band_as_variable': True})
     try:
         result = xr.open_dataset(
             path,
@@ -551,7 +549,6 @@ def open_one_file(path: Path) -> xr.Dataset:
             # variables. That's important because expand_dims affects data vars
             # only.
             decode_coords='all',
-            **kwargs,
         )
         return result
     except Exception as e:
