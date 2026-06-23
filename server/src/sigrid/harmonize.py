@@ -27,7 +27,7 @@ class CaseSensitiveStrEnum(StrEnum):
 
 Coords = CaseSensitiveStrEnum(
     'Coords',
-    ['S', 'L', 'M', 'P', 'Y', 'X', 'target', 'target_bnds', 'nbound']
+    ['T', 'S', 'L', 'M', 'P', 'Y', 'X', 'target', 'target_bnds', 'nbound']
     # nbound isn't actually a coord, only a dim. But target isn't a dim, only
     # a coord, so we can't call this Dims either.
 )
@@ -56,7 +56,8 @@ def rename(ds: xr.Dataset, mapping: Mapping[str, str]):
 def standardize(ds: xr.Dataset, config: DatasetConfig):
     ds = drop_non_std(ds, config.da_attrs, config.bare_dims)
     ds = convert_units(ds, config.da_attrs)
-    ds = add_target(ds, config.lead_is_month)
+    if 'L' in ds.dims:
+        ds = add_target(ds, config.lead_is_month)
     ds = standardize_attrs(
         ds,
         da_attrs=config.da_attrs,

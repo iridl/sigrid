@@ -479,13 +479,15 @@ class SyncExecutor(Executor):
 def write_one_file_slice(session: icechunk.session.ForkSession, opener: _FileOpener, region: Mapping[str, slice], file_coords: FileCoords, path: Path):
     with opener.open(path, file_coords) as ds:
         # Working around an xarray bug: when updating an existing zarr store, it
-        # uses the _FillValue it finds in the store, and doesn't tolerate the ds
-        # having one even if it's the same as the one in the store. So we keep this
-        # attribute in initialize, which creates the store, but drop it here when
-        # updating.
+        # uses the _FillValue, scale_factor, and add_offset it finds in the
+        # store, and doesn't tolerate the ds having one even if it's the same as
+        # the one in the store. So we keep these attributes in initialize, which
+        # creates the store, but drop them here when updating.
         for v in ds.variables:
             ds[v].attrs.pop('_FillValue', None)
             ds[v].attrs.pop('missing_value', None)
+            ds[v].attrs.pop('scale_factor', None)
+            ds[v].attrs.pop('add_offset', None)
         ds.to_zarr(session.store, region=region, zarr_format=3, consolidated=False)
     return session
 
@@ -537,15 +539,14 @@ def open_one_file(path: Path) -> xr.Dataset:
     try:
         result = xr.open_dataset(
             path,
-            # Pass CF _FillValue and datetime/timedelta attributes through to
-            # icechunk unchanged.
+            # Pass CF attributes attributes through to icechunk unchanged.
             mask_and_scale=False,
             decode_times=False,
             # Note: decode_coords doesn't control decoding of coordinate values,
             # it controls which variables become coordinates as opposed to data
             # variables. That's important because expand_dims affects data vars
             # only.
-            decode_coords=True,
+            decode_coords='all',
         )
         return result
     except Exception as e:
