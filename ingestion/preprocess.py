@@ -174,7 +174,6 @@ class FileSetDescriptor:
         else:
             self.drop_vars = drop_vars
         keep_and_drop = set(self.drop_vars).intersection(self.keep_vars)
-        #[keep in self.drop_vars for keep in self.keep_vars]
         if len(keep_and_drop) > 0:
             raise Exception(
                 f'{keep_and_drop} listed as to keep and to drop: one must choose'
@@ -640,6 +639,13 @@ def initialize(session: icechunk.session.Session, opener: _FileOpener, listing: 
         varname: {'chunks': tuple(da.sizes[dim] for dim in da.dims)}
         for varname, da in one_file_slice.data_vars.items()
     }
+    # By default, xarray chooses CF time units based on the values it finds in the 
+    # dataset. That doesn't always work well here because we're only writing a 
+    # single time slice, so xarray doesn't have enough information to make the 
+    # choice we need. If a model has six-hourly initializations but the first one is 
+    # at midnight, xarray incorrectly chooses daily resolution, what subsequently 
+    # breaks the appending of new six-hourly initializations which would need to be 
+    # represented as floats (fractions of days) instead of integers (count of hours).
     if descriptor.time_res is not None:
         encoding.update({'IRIDL_time': {'units': (
             f'{descriptor.time_res} since '
