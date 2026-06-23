@@ -344,33 +344,6 @@ def default_parse_match(values: dict[str, str]) -> FileCoords:
         m = int(values['member'])
     if 'pressure' in values:
         p = int(values['pressure'])
-    if 'targety' in values or 'targetm' in values or 'targetd' in values or 'targeth' in values:
-        if not ('targety' in values and 'targetm' in values):
-            raise Exception('Path contains only a partial date')
-        year = int(values['targety'])
-        try:
-            month = int(values['targetm'])
-        except ValueError:
-            month = ABBREV_MONTH.index(values['targetm'].lower())
-        if 'targetd' in values:
-            day = int(values['targetd'])
-        else:
-            day = 1
-        if 'targeth' in values:
-            hour = int(values['targeth'])
-        else:
-            hour = 0
-        # Technically we have target in the file name
-        # but I didn't dare here try to have both target of IRIDL_time and L
-        # and L istelf set up at the same time
-        # This is only valid for the NMME CFSv2 case, which is peculiar,
-        # but also the only one so far.
-        l = (
-            xr.DataArray(
-                data=np.datetime64(f'{year}-{month:02}-{day:02}T{hour:02}:00')
-                ).dt.month
-            - xr.DataArray(data=t).dt.month 
-        ).values % 12
     return FileCoords(t, m, p, l)
     
 
