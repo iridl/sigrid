@@ -534,11 +534,9 @@ def initialize(session: icechunk.session.Session, opener: _FileOpener, listing: 
 
 
 def open_one_file(path: Path) -> xr.Dataset:
-    decode_coords_opt = True
     mask_and_scale_opt = False
     kwargs = {}
     if path.suffix == '.tif':
-        decode_coords_opt = 'all'
         mask_and_scale_opt = True
         kwargs.update({'band_as_variable': True})
     try:
@@ -552,7 +550,7 @@ def open_one_file(path: Path) -> xr.Dataset:
             # it controls which variables become coordinates as opposed to data
             # variables. That's important because expand_dims affects data vars
             # only.
-            decode_coords=decode_coords_opt,
+            decode_coords='all',
             **kwargs,
         )
         return result
