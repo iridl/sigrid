@@ -118,3 +118,12 @@ are set appropriately in ../.env.
 ```
 pixi run client-test  # only when forecast.cssr data are present
 ```
+To run only some of the tests, add `-k` and a pattern, e.g.
+```
+pixi run client-test -k NMME/COLA-RSMAS/CCSM4/prcp
+```
+tests a single variable, and
+```
+pixi run client-test -k NMME/COLA-RSMAS/CCSM4
+```
+tests all the variables from CCSM4.
