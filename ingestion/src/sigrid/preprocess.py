@@ -457,13 +457,10 @@ class SyncExecutor(Executor):
         **kwargs: P.kwargs
     ) -> Future[T]:
         future: Future[T] = Future()
-        try:
-            print(fn, args, kwargs)
-            # Executes immediately in the current thread
-            result = fn(*args, **kwargs)
-            future.set_result(result)
-        except Exception as e:
-            future.set_exception(e)
+        print(fn, args, kwargs)
+        # Executes immediately in the current thread
+        result = fn(*args, **kwargs)
+        future.set_result(result)
         return future
 
     def __enter__(self) -> "SyncExecutor":
