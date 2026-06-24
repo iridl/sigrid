@@ -102,3 +102,19 @@ Attributes:
     References:   Ben P. Kirtman, Dughong Min. (2009) Multimodel Ensemble ENS...
     Title:        CCSM4.0 National Multi-Model Ensembles(NMME) project
 ```
+
+## Automated tests
+
+The tests are separated into two groups. One runs in the default pixi
+environment and consists of normal unit tests, which can be run anywhere
+(e.g. on a laptop):
+```
+pixi run test
+```
+The other launches a sigrid server in the background, then runs tests in which
+an OPeNDAP makes requests to the server. These tests only work when run on
+the forecast.ccsr server, and when COOKED_CATALOG_ROOT and ICECHUNK_ROOT
+are set appropriately in ../.env.
+```
+pixi run client-test  # only when forecast.cssr data are present
+```
