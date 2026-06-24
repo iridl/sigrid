@@ -574,10 +574,9 @@ def initialize(
     # breaks the appending of new six-hourly initializations which would need to be 
     # represented as floats (fractions of days) instead of integers (count of hours).
     if time_res is not None:
-        encoding.update({'IRIDL_time': {'units': (
-            f'{time_res} since '
-            f'{one_file_slice['IRIDL_time'].dt.strftime("%Y%m%dT%H:%M").values[0]}'
-        )}})
+        encoding.update({
+            'IRIDL_time': {'units': f'{time_res} since 1960-01-01T00:00'}
+        })
     t_slice.to_zarr(session.store, consolidated=False, encoding=encoding)
 
 
