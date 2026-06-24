@@ -46,7 +46,8 @@ client = {features = ["client"]}
 
 [tool.pixi.tasks]
 python = "env $(sed 's/#.*//' ../.env) python"
-
+test = "pytest test"
+client-test = {cmd = "env $(sed 's/#.*//' ../.env) pytest client-test", default-environment = "client"}
 
 #### pyright
 
