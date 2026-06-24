@@ -6,22 +6,6 @@ import numpy as np
 import recording_proxy
 import xarray as xr
 
-def compare(url1, url2, atol):
-    try:
-        ds1 = fetch(url1)
-    except Exception as e:
-        print('first failed', e)
-        return
-    
-    try:
-        ds2 = fetch(url2)
-    except Exception as e:
-        print('second failed', e)
-        return
-
-    ds2 = ds2.convert_calendar('standard', dim='S', align_on='date')
-    compare_ds(ds1, ds2, atol)
-
 def compare_ds(ds1, ds2, atol):
     names = list(ds1.data_vars)
     assert len(names) == 1
@@ -66,7 +50,6 @@ def compare_coords(ds1, ds2):
             print(c1.values)
             print(c2.values)
             return False
-        #compare_attrs(c1, c2)
     return True
 
 def compare_shape(da1, da2):
@@ -104,10 +87,6 @@ def compare_slice(da1, da2, atol):
     print(f'da2 took {time.time() - start}s')
     return np.isclose(a1, a2, equal_nan=True, atol=atol).all()
 
-def compare_attrs(da1, da2):
-    for a in sorted(set(da1.attrs) | set(da2.attrs)):
-        print(f"  {a:30.30} {str(da1.attrs.get(a, '')):20.20} {str(da2.attrs.get(a,'')):20.20}")
-
 def fetch(url):
     ds = xr.open_dataset(url, decode_times=False)
     for name, coord in ds.variables.items():
@@ -130,30 +109,3 @@ def parse_listfile(filename):
                 paths[url1] = line
                 url1 = None
     return paths
-                
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("test_root")
-    parser.add_argument("reference_root")
-    parser.add_argument("listfile")
-    parser.add_argument("test_path")
-    parser.add_argument("--record", action='store_true')
-    parser.add_argument("--verbose", action='store_true')
-    parser.add_argument("--atol", type=float, default=1e-8)
-    
-    args = parser.parse_args()
-    path_mapping = parse_listfile(args.listfile)
-    url1 = f'{args.test_root}/{args.test_path}'
-    url2 = f'{args.reference_root}/{path_mapping[args.test_path]}'
-    with recording_proxy.recording_proxy(
-            "responses",
-            args.record,
-            prefixes=[args.reference_root],
-            verbose=args.verbose,
-    ):
-        all_same = compare(url1, url2, args.atol)
-    print(all_same)
-    if all_same:
-        sys.exit(0)
-    else:
-        sys.exit(1)
