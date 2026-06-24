@@ -112,7 +112,7 @@ environment and consists of normal unit tests, which can be run anywhere
 pixi run test
 ```
 The other launches a sigrid server in the background, then runs tests in which
-an OPeNDAP makes requests to the server. These tests only work when run on
+an OPeNDAP client makes requests to the server. These tests only work when run on
 the forecast.ccsr server, and when COOKED_CATALOG_ROOT and ICECHUNK_ROOT
 are set appropriately in ../.env.
 ```
