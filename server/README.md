@@ -112,12 +112,20 @@ environment and consists of normal unit tests, which can be run anywhere
 pixi run test
 ```
 The other launches a sigrid server in the background, then runs tests in which
-an OPeNDAP client makes requests to the server. These tests only work when run on
-the forecast.ccsr server, and when COOKED_CATALOG_ROOT and ICECHUNK_ROOT
-are set appropriately in ../.env.
+an OPeNDAP client makes requests to the sigrid server. These tests only work
+when run on the forecast.ccsr server, and
+when COOKED_CATALOG_ROOT and ICECHUNK_ROOT are set appropriately in ../.env.
 ```
 pixi run client-test  # only when forecast.cssr data are present
 ```
+The first time you run client-test, add the option `--record`:
+```
+pixi run client-test --record
+```
+which will cause it to download reference data from the IRIDL for comparison.
+On subsequent runs, omit `--record` and it will compare against the
+previously-downloaded local copy.
+
 To run only some of the tests, add `-k` and a pattern, e.g.
 ```
 pixi run client-test -k NMME/COLA-RSMAS/CCSM4/prcp
