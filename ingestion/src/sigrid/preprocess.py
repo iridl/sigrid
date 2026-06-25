@@ -457,7 +457,7 @@ class SyncExecutor(Executor):
         **kwargs: P.kwargs
     ) -> Future[T]:
         future: Future[T] = Future()
-        print(fn, args, kwargs)
+        #print(fn, args, kwargs)
         # Executes immediately in the current thread
         result = fn(*args, **kwargs)
         future.set_result(result)
