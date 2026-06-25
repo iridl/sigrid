@@ -70,8 +70,8 @@ function that takes a dictionary of named captures from the regex, and returns a
 `FileCoords` object (see definition in `preprocess.py`). Not usually needed; see
 NMME/NASA-GMAO/GEOSS2S for an example.
 
-`vars`: a dictionary where keys are variable names, values are dictionaries
-structured as follows:
+`vars`: a dictionary where keys (left of the colon) are icechunk internal variable names,
+values (right of the colon) are dictionaries structured as follows:
 
 - `pattern`: a regex pattern containing named capture groups for the
   parts of the filename that should be used to determine coordinate values.
