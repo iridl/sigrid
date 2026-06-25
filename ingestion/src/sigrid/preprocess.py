@@ -368,6 +368,8 @@ def update(
     if existing is None:
         initialize(session, descriptor.opener, listing)
         existing = xr.open_zarr(session.store, zarr_format=3)
+        if limit is not None:
+            limit -= 1  # We already wrote the first slice
 
     times_to_fetch = (
         t for t in listing.list_times(first=first)
