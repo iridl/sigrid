@@ -550,7 +550,7 @@ def open_one_file(path: Path) -> xr.Dataset:
     try:
         result = xr.open_dataset(
             path,
-            # Pass CF attributes attributes through to icechunk unchanged.
+            # Pass CF attributes through to icechunk unchanged.
             mask_and_scale=False,
             decode_times=False,
             # decode_coords doesn't control decoding of coordinate values, it

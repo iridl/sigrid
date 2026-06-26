@@ -1,5 +1,4 @@
 from collections.abc import Mapping
-import itertools
 from typing import Any, cast
 
 import icechunk
