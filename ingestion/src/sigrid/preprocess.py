@@ -553,11 +553,20 @@ def open_one_file(path: Path) -> xr.Dataset:
             # Pass CF attributes attributes through to icechunk unchanged.
             mask_and_scale=False,
             decode_times=False,
-            # Note: decode_coords doesn't control decoding of coordinate values,
-            # it controls which variables become coordinates as opposed to data
+            # decode_coords doesn't control decoding of coordinate values, it
+            # controls which variables become coordinates as opposed to data
             # variables. That's important because expand_dims affects data vars
             # only.
-            decode_coords='all',
+            #
+            # decode_coords='all' initially seemed like the behavior we want
+            # (automatically interpret bounds variables as coords instead of
+            # data vars), but as of xarray 2026.2.0 it's badly implemented: it
+            # removes the `bounds` attribute, so the relationship between the
+            # main coordinate and its bounds coordinate is lost. So we use
+            # decode_coords=True, and if bounds variables are present, we use
+            # the explicit aux_coords option in the raw catalog to indicate that
+            # they should be turned into coordinates.
+            decode_coords=True,
         )
         return result
     except Exception as e:
