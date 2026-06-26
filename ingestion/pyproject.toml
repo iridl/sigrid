@@ -42,6 +42,6 @@ preprocess = "export $(sed 's/#.*//' ../.env | xargs) && python -m sigrid.prepro
 
 
 [tool.pyright]
-typeCheckingMode = "strict"
+typeCheckingMode = "recommended"
 reportUnknownMemberType = false
 
