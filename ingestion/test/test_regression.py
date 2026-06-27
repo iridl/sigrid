@@ -16,11 +16,6 @@ raw_cat = preprocess.FileSetCatalog(
 )
 
 to_fix = (
-    'SEAS51',
-    'CanSIPS',
-    'SPEAR',
-    'CCSM4',
-    'CESM1',
     'SubC/EMC/GEFSv12/forecast/psl',
     'SubC/EMC/GEFSv12/forecast/tas',
     'SubC/EMC/GEFSv12/forecast/tasmax',
