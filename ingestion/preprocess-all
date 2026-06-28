@@ -1,17 +1,17 @@
 #!/bin/bash
 
 datasets=(
-  NMME/COLA-RSMAS/CCSM4 
-  NMME/COLA-RSMAS/CESM1
+#  NMME/COLA-RSMAS/CCSM4 
+#  NMME/COLA-RSMAS/CESM1
   # NMME/ECCC/CanSIPS-IC4/hindcast 
   NMME/ECCC/CanSIPS-IC4/forecast
   # NMME/NASA-GMAO/GEOSS2S/hindcast 
-  NMME/NASA-GMAO/GEOSS2S/forecast
+  # NMME/NASA-GMAO/GEOSS2S/forecast
   # NMME/NOAA-GFDL/SPEAR/hindcast
   NMME/NOAA-GFDL/SPEAR/forecast
 )
 
-vars=(prcp t2m sst)
+vars=(PRATE_SFC WTMP_SFC TMP_TGL_2m UGRD_ISBL VGRD_ISBL HGT_ISBL)
 
 
 for ds in ${datasets[@]}; do
