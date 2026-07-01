@@ -365,8 +365,10 @@ def update(
         # new store here.
         existing = None
 
+    initialized = False
     if existing is None:
         initialize(session, descriptor.opener, listing)
+        initialized = True
         existing = xr.open_zarr(session.store, zarr_format=3)
         if limit is not None:
             limit -= 1  # We already wrote the first slice
@@ -379,7 +381,7 @@ def update(
     times_to_fetch = list(itertools.islice(times_to_fetch, limit))
 
     if len(times_to_fetch) == 0:
-        return 0
+        return 1 if initialized else 0
         
     if len(existing['IRIDL_time']) > 0:
         last_old = existing['IRIDL_time'][-1]
@@ -680,7 +682,8 @@ def main():
     session = repo.writable_session('main')
     new_count = update(session, descriptor, limit=args.limit, first=args.first, parallel=args.parallel)
     if new_count:
-        session.commit(f'update from {descriptor.dir}')
+        snapshot_id = session.commit(f'update from {descriptor.dir}')
+        print(f'Committed snapshot: {snapshot_id}')
     print(xr.open_zarr(session.store))
 
 
