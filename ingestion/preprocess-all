@@ -11,7 +11,7 @@ datasets=(
   NMME/NOAA-GFDL/SPEAR/forecast
 )
 
-vars=(PRATE_SFC WTMP_SFC TMP_TGL_2m UGRD_ISBL VGRD_ISBL HGT_ISBL)
+vars=(prcp t2m sst)
 
 
 for ds in ${datasets[@]}; do

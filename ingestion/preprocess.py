@@ -655,7 +655,6 @@ def main():
     )
     session = repo.writable_session('main')
     new_count = update(session, descriptor, limit=args.limit, first=args.first, parallel=args.parallel)
-    print(f'has_uncommitted_changes: {session.has_uncommitted_changes}')
     if new_count:
         snapshot_id = session.commit(f'update from {descriptor.dir}')
         print(f'Committed snapshot: {snapshot_id}')
