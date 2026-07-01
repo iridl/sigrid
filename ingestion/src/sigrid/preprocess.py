@@ -102,13 +102,7 @@ class FileSetCatalog:
         path_str = str(path_arg)
         dir, var_name = path_str.rsplit('/', maxsplit=1)
         index_path = self._raw_catalog_root / dir / 'index.py'
-        spec = importlib.util.spec_from_file_location('catalog', index_path)
-        assert spec  # TODO
-        assert spec.loader  # TODO
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        defaults = dict(module.dataset)
-        vars = defaults.pop('vars')
+        defaults, vars = self._load_index(index_path)
         var_dict = defaults | vars[var_name]
         kwargs = dict(
             var_dict,
@@ -117,6 +111,24 @@ class FileSetCatalog:
             catalog_path = URLPath(path_str)
         )
         return FileSetDescriptor(**kwargs), IcechunkInfo(path_str)
+
+    def _load_index(self, index_path: Path):
+        spec = importlib.util.spec_from_file_location('catalog', index_path)
+        assert spec
+        assert spec.loader
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        defaults = dict(module.dataset)
+        vars = defaults.pop('vars')
+        return defaults, vars
+
+    def list_all(self):
+        for index_path in Path(self._raw_catalog_root).rglob('index.py'):
+            rel_path = index_path.parent.relative_to(self._raw_catalog_root)
+            _, vars = self._load_index(index_path)
+            for var_name in vars:
+                path_str = str(rel_path / var_name)
+                yield path_str
 
 
 class FileCoords(NamedTuple):
@@ -358,6 +370,8 @@ def update(
         initialize(session, descriptor.opener, listing)
         initialized = True
         existing = xr.open_zarr(session.store, zarr_format=3)
+        if limit is not None:
+            limit -= 1  # We already wrote the first slice
 
     times_to_fetch = (
         t for t in listing.list_times(first=first)
@@ -459,13 +473,10 @@ class SyncExecutor(Executor):
         **kwargs: P.kwargs
     ) -> Future[T]:
         future: Future[T] = Future()
-        try:
-            print(fn, args, kwargs)
-            # Executes immediately in the current thread
-            result = fn(*args, **kwargs)
-            future.set_result(result)
-        except Exception as e:
-            future.set_exception(e)
+        #print(fn, args, kwargs)
+        # Executes immediately in the current thread
+        result = fn(*args, **kwargs)
+        future.set_result(result)
         return future
 
     def __enter__(self) -> "SyncExecutor":
@@ -538,17 +549,32 @@ def initialize(session: icechunk.session.Session, opener: _FileOpener, listing: 
 
 
 def open_one_file(path: Path) -> xr.Dataset:
+
+    # decode_coords doesn't control decoding of coordinate values, it controls
+    # which variables become coordinates as opposed to data variables. That's
+    # important because expand_dims affects data vars only.
+    #
+    # rioxarray only accepts decode_coords='all'. Initially 'all' sounded like
+    # the behavior we wanted for all file types (automatically interpret bounds
+    # variables as coords instead of data vars), but as of xarray 2026.2.0 it's
+    # badly implemented: it removes the `bounds` attribute, so the relationship
+    # between the main coordinate and its bounds coordinate is lost. So now for
+    # every file type except .tif, we use decode_coords=True, and if bounds
+    # variables are present, we use the explicit aux_coords option in the raw
+    # catalog to indicate that they should be turned into coordinates. If we
+    # ever get a .tif file with a bounds variable in it, we're in trouble.
+    if path.suffix == '.tif':
+        decode_coords = 'all'
+    else:
+        decode_coords = True
+
     try:
         result = xr.open_dataset(
             path,
-            # Pass CF attributes attributes through to icechunk unchanged.
+            # Pass CF attributes through to icechunk unchanged.
             mask_and_scale=False,
             decode_times=False,
-            # Note: decode_coords doesn't control decoding of coordinate values,
-            # it controls which variables become coordinates as opposed to data
-            # variables. That's important because expand_dims affects data vars
-            # only.
-            decode_coords='all',
+            decode_coords=decode_coords,
         )
         return result
     except Exception as e:

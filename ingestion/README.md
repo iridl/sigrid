@@ -8,7 +8,7 @@
 
 ## Create or update an icechunk store
 ```
-pixi run python preprocess.py NMME/COLA-RSMAS/CCSM4/PRATE_SFC
+pixi run preprocess NMME/COLA-RSMAS/CCSM4/PRATE_SFC
 ```
 where `NMME/COLA-RSMAS/CCSM4/` is the relative path, below
 `$COOKED_CATALOG_ROOT` (defined in ../.env), of a directory containing an
@@ -25,7 +25,7 @@ creating a large new set.
 
 To inspect an existing store, in an interactive python session,
 ```
->>> import preprocess
+>>> from sigrid import preprocess
 >>> preprocess.open_icechunk('NMME/COLA-RSMAS/CCSM4/PRATE_SFC')
 ```
 
@@ -67,7 +67,7 @@ store.
 `parse_match` (optional): if the standard mechanism for mapping filenames to
 coordinates can't handle the patterns, you can override it here. Value is a
 function that takes a dictionary of named captures from the regex, and returns a
-`FileCoords` object (see definition in `preprocess.py`). Not usually needed; see
+`FileCoords` object (see definition in `src/sigrid/preprocess.py`). Not usually needed; see
 NMME/NASA-GMAO/GEOSS2S for an example.
 
 `vars`: a dictionary where keys (left of the colon) are icechunk internal variable names,

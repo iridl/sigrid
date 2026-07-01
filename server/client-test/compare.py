@@ -1,9 +1,6 @@
-import argparse
-import sys
 import time
 
 import numpy as np
-import recording_proxy
 import xarray as xr
 
 def compare_ds(ds1, ds2, atol):
