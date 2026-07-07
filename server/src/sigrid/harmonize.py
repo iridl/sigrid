@@ -36,6 +36,7 @@ class DatasetConfig:
     encodings: Mapping[str, Mapping[str, str]]
     bare_dims: Iterable[str]
     lead_is_month: bool
+    y_increasing: bool
 
 
 def rename(ds: xr.Dataset, mapping: Mapping[str, str]):
@@ -54,6 +55,12 @@ def standardize(ds: xr.Dataset, config: DatasetConfig):
     ds = convert_units(ds, config.da_attrs)
     if 'L' in ds.dims:
         ds = add_target(ds, config.lead_is_month)
+    
+    # Invert Y from N-S to S-N
+    if getattr(config, "y_increasing", False):
+        if ds["Y"].values[0] > ds["Y"].values[-1]:
+            ds = ds.isel(Y=slice(None, None, -1))
+
     ds = standardize_attrs(
         ds,
         da_attrs=config.da_attrs,
