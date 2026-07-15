@@ -355,7 +355,7 @@ def update(
         limit: int | None,
         first: np.datetime64 | None,
         parallel: int
-) -> int:
+) -> bool:
     listing = FileSetListing(descriptor)
     try:
         existing = xr.open_zarr(session.store, zarr_format=3)
@@ -365,8 +365,10 @@ def update(
         # new store here.
         existing = None
 
+    initialized = False
     if existing is None:
         initialize(session, descriptor.opener, listing)
+        initialized = True
         existing = xr.open_zarr(session.store, zarr_format=3)
         if limit is not None:
             limit -= 1  # We already wrote the first slice
@@ -379,7 +381,7 @@ def update(
     times_to_fetch = list(itertools.islice(times_to_fetch, limit))
 
     if len(times_to_fetch) == 0:
-        return 0
+        return initialized
         
     if len(existing['IRIDL_time']) > 0:
         last_old = existing['IRIDL_time'][-1]
@@ -460,7 +462,7 @@ def update(
 
     finally:
         executor.shutdown(cancel_futures=True, wait=False)
-    return success_count
+    return initialized or success_count > 0
 
 
 class SyncExecutor(Executor):
@@ -678,9 +680,10 @@ def main():
         top_config.orig_root
     )
     session = repo.writable_session('main')
-    new_count = update(session, descriptor, limit=args.limit, first=args.first, parallel=args.parallel)
-    if new_count:
-        session.commit(f'update from {descriptor.dir}')
+    modified = update(session, descriptor, limit=args.limit, first=args.first, parallel=args.parallel)
+    if modified:
+        snapshot_id = session.commit(f'update from {descriptor.dir}')
+        print(f'Committed snapshot: {snapshot_id}')
     print(xr.open_zarr(session.store))
 
 

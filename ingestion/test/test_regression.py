@@ -45,14 +45,14 @@ def test_it(var_path: str):
     repo_config = icechunk.RepositoryConfig.default()
     repo = icechunk.Repository.create(storage, repo_config)
     session = repo.writable_session('main')
-    new_count = preprocess.update(
+    modified = preprocess.update(
         # Looks like in_memory_storage doesn't handle parallel writes, so we
         # have to either use parallel=0 or write to disk.
         # TODO is parallel with local storage faster?
         # TODO fix in_memory_storage?
         session, descriptor, limit=2, first=None, parallel=0
     )
-    assert new_count
+    assert modified
     session.commit(f'update from {descriptor.dir}')
     ds_new = remove_irrelevant(xr.open_zarr(session.store))
     ds_old = remove_irrelevant(
