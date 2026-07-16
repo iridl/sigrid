@@ -318,7 +318,7 @@ class FileSetListing:
     def list_times(self, first: np.datetime64 | None = None) -> Iterable[np.datetime64]:
         vals = self.coords.T
         if first is not None:
-            vals = [v for v in vals if v >= first]
+            vals = (v for v in vals if v >= first)
         return vals
     
     def get_path(self, coords: FileCoords) -> Path | None:
@@ -540,43 +540,70 @@ def initialize(
         listing: FileSetListing
 ) -> None:
     t = next(iter(listing.coords.T))
-    file_slices: list[list[xr.Dataset]] = [
+    file_coords = [
         [
-            # Out of laziness, I'm assuming for now that the initial
-            # t slice has no missing files. If we need to deal with
-            # that situation, we can insert empty slices, or move to
-            # filling in values one file at a time.
-            opener.open(
-                raise_if_null(
-                    listing.get_path(FileCoords(t, m, p)),
-                    'Missing file in initial time slice',
-                ),
-                FileCoords(t, m, p)
-            )            
+            FileCoords(t, m, p)
             for p in listing.coords.P or [None]
         ]
         for m in listing.coords.M or [None]
     ]
+    file_slices_some_missing = [
+        [
+            None if (path := listing.get_path(coords)) is None
+            else opener.open(path, coords)
+            for coords in coords_row
+        ]
+        for coords_row in file_coords
+    ]
+    example_ds = next(
+        ds
+        for row in file_slices_some_missing
+        for ds in row
+        if ds is not None
+    )
+
+    def empty_slice(c: FileCoords) -> xr.Dataset:
+        result = xr.full_like(example_ds, np.nan)
+        if c.m is not None:
+            result['M'] = [c.m]
+        if c.p is not None:
+            result['P'] = [c.p]
+        return result
+
+    # Replace missing files with an all-NaN slice.
+    # TODO this isn't entirely desirable, because it means we can't detect
+    # missing chunks in the initial slice just by reading zarr metadata, whereas
+    # we can do that in other the other time slices. The alternatives are to use
+    # to_zarr with compute=False (requires dask), or to drop down to the Zarr
+    # API and create an xarray-compatible Zarr structure by hand.
+    file_slices_all = [
+        [
+            empty_slice(file_coords[i][j]) if ds is None else ds
+            for j, ds in enumerate(row)
+        ]
+        for i, row in enumerate(file_slices_some_missing)
+    ]
+
+
     # Combine a list of lists of (m, p) slices into a single t slice.
     # Note that we test for coord is None, not for len(slice) == 1,
     # because there are cases where we want to keep a dimension that has
     # length 1 (e.g. SubC GEFSv12 zg).
     if listing.coords.P is None:
-        m_slices = [m_slice[0] for m_slice in file_slices]
+        m_slices = [m_slice[0] for m_slice in file_slices_all]
     else:
         m_slices = [
             xr.concat(m_slice, dim='P', coords='minimal')
-            for m_slice in file_slices
+            for m_slice in file_slices_all
         ]
     if listing.coords.M is None:
         t_slice = m_slices[0]
     else:
         t_slice = xr.concat(m_slices, dim='M', coords='minimal')
 
-    one_file_slice = file_slices[0][0]
     encoding: dict[str, dict[str, Any]] = {
         str(varname): {'chunks': tuple(da.sizes[dim] for dim in da.dims)}
-        for varname, da in one_file_slice.data_vars.items()
+        for varname, da in example_ds.data_vars.items()
     }
     # Since we're only writing a single time slice, xarray doesn't have enough
     # information to choose the right temporal resolution. It defaults to
