@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 import re
 from types import TracebackType
-from typing import Callable, Iterable, Mapping, NamedTuple, Sequence, TypeVar, cast
+from typing import Any, Callable, Iterable, Mapping, NamedTuple, Sequence, TypeVar, cast
 import warnings
 
 import icechunk
@@ -196,6 +196,12 @@ class FileSetDescriptor:
         if not match:
             return None
         return self.parse_match(match.groupdict())
+
+    @property
+    def time_res(self):
+        if 'hour' in self._matcher.groupindex:
+            return 'hours'
+        return 'days'
 
 
 @dataclass
@@ -389,7 +395,7 @@ def update(
 
     initialized = False
     if existing is None:
-        initialize(session, descriptor.opener, listing)
+        initialize(session, descriptor.opener, descriptor.time_res, listing)
         initialized = True
         existing = xr.open_zarr(session.store, zarr_format=3)
         if limit is not None:
@@ -527,7 +533,12 @@ def write_one_file_slice(session: icechunk.session.ForkSession, opener: _FileOpe
     return session
 
 
-def initialize(session: icechunk.session.Session, opener: _FileOpener, listing: FileSetListing) -> None:
+def initialize(
+        session: icechunk.session.Session,
+        opener: _FileOpener,
+        time_res: str,
+        listing: FileSetListing
+) -> None:
     t = next(iter(listing.coords.T))
     file_slices: list[list[xr.Dataset]] = [
         [
@@ -563,12 +574,24 @@ def initialize(session: icechunk.session.Session, opener: _FileOpener, listing: 
         t_slice = xr.concat(m_slices, dim='M', coords='minimal')
 
     one_file_slice = file_slices[0][0]
-    encoding = {
-        varname: {'chunks': tuple(da.sizes[dim] for dim in da.dims)}
+    encoding: dict[str, dict[str, Any]] = {
+        str(varname): {'chunks': tuple(da.sizes[dim] for dim in da.dims)}
         for varname, da in one_file_slice.data_vars.items()
     }
+    # Since we're only writing a single time slice, xarray doesn't have enough
+    # information to choose the right temporal resolution. It defaults to
+    # integer days, which doesn't work for a 6-hourly dataset like CFSv2.
+    date_str = t_slice['IRIDL_time'].dt.strftime("%Y-%m-%d %H:%M:%S").values[0]
+    units = f'{time_res} since {date_str}'
+    encoding['IRIDL_time'] = {'units': units}
+
     t_slice.to_zarr(session.store, consolidated=False, encoding=encoding)
 
+# TODO this is temporary, to avoid having the regression tests break because of
+# an inconsequential change in how date units are formatted. Remove this after
+# regenerating the existing datasets.
+import xarray.coding.times
+xarray.coding.times._cleanup_netcdf_time_units = lambda x: x
 
 def open_one_file(
     path: Path, backend_kwargs: dict[str, dict[str, str]] | None = None
