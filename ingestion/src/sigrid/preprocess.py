@@ -161,7 +161,9 @@ class FileSetDescriptor:
             original_time_dim: str | None = None,
             parse_match : Callable[[dict[str, str]],FileCoords] | None = None,
             backend_kwargs: dict[str, dict[str, str]] | None = None,
-            drop_vars: str | Sequence[str] = (),
+            data_vars: str | Sequence[str] | None = None,
+            drop_coords: str | Sequence[str] = (),
+            drop_vars: str | Sequence[str] = (),  # TODO for backwards compatibility, remove when no longer needed
             expand_coords: str | Sequence[str] = (),
             aux_coords: str | Sequence[str] = (),
     ) -> None:
@@ -171,20 +173,22 @@ class FileSetDescriptor:
         self.catalog_path = catalog_path
         self._matcher = re.compile(pattern)
         self.parse_match = parse_match or default_parse_match
-        self.backend_kwargs = backend_kwargs
 
-        if isinstance(drop_vars, str):
-            drop_vars = [drop_vars]
-        if isinstance(expand_coords, str):
-            expand_coords = [expand_coords]
-        if isinstance(aux_coords, str):
-            aux_coords = [aux_coords]
+        if drop_coords == ():
+            drop_coords = drop_vars
+
+        def ensure_list(x):
+            if isinstance(x, str):
+                return [x]
+            return x
+
         self.opener = _FileOpener(
             original_time_dim,
             backend_kwargs,
-            drop_vars,
-            expand_coords,
-            aux_coords,
+            ensure_list(data_vars),
+            ensure_list(drop_coords),
+            ensure_list(expand_coords),
+            ensure_list(aux_coords),
         )
 
     def parse_path(self, path: str | Path) -> FileCoords | None:
@@ -198,7 +202,8 @@ class FileSetDescriptor:
 class _FileOpener:
     original_time_dim: str | None
     backend_kwargs: dict[str, dict[str, str]] | None
-    drop_vars: Sequence[str]
+    data_vars: Sequence[str] | None
+    drop_coords: Sequence[str] | None
     expand_coords: Sequence[str]
     aux_coords: Sequence[str]
 
@@ -206,8 +211,20 @@ class _FileOpener:
         """Use as a context manager or call close() on the dataset when finished with it."""
         ds = open_one_file(path, backend_kwargs=self.backend_kwargs)
 
-        if self.drop_vars:
-            ds = ds.drop_vars(self.drop_vars)
+        if self.data_vars is not None:
+            # cast works around a bug in xarray's type hints: when x is a
+            # sequence, ds[x] is a Dataset, not a DataArray.
+            ds = cast(xr.Dataset, ds[self.data_vars])
+
+        if self.drop_coords is not None:
+            # TODO I want this to affect only coords, but SPEAR is currently
+            # using it to drop TIME_bnds, which is a variable. Coordinate
+            # the catalog fix with Azhar, then uncomment this check.
+            # if not all(c in ds.coords for c in self.drop_coords):
+            #     raise Exception(
+            #         f"Not all of {self.drop_coords} are present as coordinates."
+            #     )
+            ds = ds.drop_vars(self.drop_coords)
 
         # Data vars get expanded along IRIDL_time, coords don't unless they're
         # explicitly listed in expand_coords.
