@@ -652,6 +652,11 @@ def initialize(
     units = f'{time_res} since {date_str}'
     encoding['IRIDL_time'] = {'units': units}
 
+    # Tell it to use large chunks for this coordinate variable. Otherwise,
+    # the length of the intial array (1) is used as the chunk size, which makes
+    # subsequent reads extremely expensive.
+    encoding['IRIDL_time']['chunks'] = (100_000,)
+
     t_slice.to_zarr(session.store, consolidated=False, encoding=encoding)
 
 # TODO this is temporary, to avoid having the regression tests break because of
