@@ -15,30 +15,8 @@ raw_cat = preprocess.FileSetCatalog(
     config.orig_root
 )
 
-to_fix = (
-    'SubC/EMC/GEFSv12/forecast/psl',
-    'SubC/EMC/GEFSv12/forecast/tas',
-    'SubC/EMC/GEFSv12/forecast/tasmax',
-    'SubC/EMC/GEFSv12/forecast/tasmin',
-    'SubC/EMC/GEFSv12/forecast/ua_10m',
-    'SubC/EMC/GEFSv12/forecast/va_10m',
-    'SubC/EMC/GEFSv12/forecast/zg_500',
-    'ERSSTv5',
-)
 
-def marks(var_path: str):
-    if any(partial_name in var_path for partial_name in to_fix):
-        return pytest.mark.xfail(strict=True)
-    else:
-        return ()
-
-@pytest.mark.parametrize(
-        'var_path',
-        [
-            pytest.param(var_path, marks=marks(var_path))
-            for var_path in raw_cat.list_all()
-        ],
-)
+@pytest.mark.parametrize('var_path', raw_cat.list_all())
 def test_it(var_path: str):
     descriptor, icechunk_info = raw_cat.get_entry(var_path)
     storage = icechunk.in_memory_storage()
