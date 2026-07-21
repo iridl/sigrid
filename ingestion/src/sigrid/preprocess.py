@@ -3,6 +3,7 @@ import concurrent.futures
 from concurrent.futures import Executor, Future
 from dataclasses import dataclass
 import enum
+import fcntl
 import importlib.util
 import itertools
 import os
@@ -396,17 +397,27 @@ def update(
         first: np.datetime64 | None,
         parallel: int,
 ) -> icechunk.Session:
-    repo = get_repo(
-            icechunk.local_filesystem_storage,
-            top_config.icechunk_root / icechunk_info.relpath,
-            top_config.orig_root
-        )
-    session = repo.writable_session('main')
-    modified = update_session(session, descriptor, limit=limit, first=first, parallel=parallel)
-    if modified:
-        snapshot_id = session.commit(f'update from {descriptor.dir}')
-        print(f'Committed snapshot: {snapshot_id}')
-    return session
+    store_path = top_config.icechunk_root / icechunk_info.relpath
+    lock_path = store_path.with_name(f'{store_path.name}.lock')
+    lock_path.parent.mkdir(exist_ok=True, parents=True)
+    lock_file = lock_path.open(mode='a')
+    session = None
+    try:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        repo = get_repo(
+                icechunk.local_filesystem_storage,
+                store_path,
+                top_config.orig_root
+            )
+        session = repo.writable_session('main')
+        modified = update_session(session, descriptor, limit=limit, first=first, parallel=parallel)
+        if modified:
+            snapshot_id = session.commit(f'update from {descriptor.dir}')
+            print(f'Committed snapshot: {snapshot_id}')
+        return session
+    finally:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+        lock_file.close()
 
 def update_session(
         session: icechunk.session.Session,
