@@ -658,11 +658,6 @@ def initialize(
 
     t_slice.to_zarr(session.store, consolidated=False, encoding=encoding)
 
-# TODO this is temporary, to avoid having the regression tests break because of
-# an inconsequential change in how date units are formatted. Remove this after
-# regenerating the existing datasets.
-import xarray.coding.times
-xarray.coding.times._cleanup_netcdf_time_units = lambda x: x
 
 def open_one_file(
     path: Path, backend_kwargs: dict[str, dict[str, str]] | None = None
