@@ -823,6 +823,11 @@ def main():
         top_config.orig_root
     )
     vars = args.vars or raw_cat.list_all()
+
+    # I wish this worked as a context manager, so we could suppress the warning
+    # only when the lock is held.
+    icechunk.set_logs_filter('[{message="The LocalFileSystem storage is not safe for concurrent commits}]=off')
+
     for var in vars:
         print(var)
         descriptor, icechunk_info = raw_cat.get_entry(var)
