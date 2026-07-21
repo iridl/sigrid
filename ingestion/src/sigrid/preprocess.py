@@ -785,7 +785,7 @@ def open_icechunk(rel_path: str, decode_times: bool = True, decode_cf: bool = Tr
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("var")
+    parser.add_argument("vars", nargs="*")
     parser.add_argument("--limit", type=int)
     parser.add_argument("--first", type=np.datetime64)
     parser.add_argument("--parallel", type=int, default=1)
@@ -797,18 +797,21 @@ def main():
         top_config.raw_catalog_root,
         top_config.orig_root
     )
-    descriptor, icechunk_info = raw_cat.get_entry(args.var)
-    repo = get_repo(
-        icechunk.local_filesystem_storage,
-        top_config.icechunk_root / icechunk_info.relpath,
-        top_config.orig_root
-    )
-    session = repo.writable_session('main')
-    modified = update(session, descriptor, limit=args.limit, first=args.first, parallel=args.parallel)
-    if modified:
-        snapshot_id = session.commit(f'update from {descriptor.dir}')
-        print(f'Committed snapshot: {snapshot_id}')
-    print(xr.open_zarr(session.store))
+    vars = args.vars or raw_cat.list_all()
+    for var in vars:
+        print(var)
+        descriptor, icechunk_info = raw_cat.get_entry(var)
+        repo = get_repo(
+            icechunk.local_filesystem_storage,
+            top_config.icechunk_root / icechunk_info.relpath,
+            top_config.orig_root
+        )
+        session = repo.writable_session('main')
+        modified = update(session, descriptor, limit=args.limit, first=args.first, parallel=args.parallel)
+        if modified:
+            snapshot_id = session.commit(f'update from {descriptor.dir}')
+            print(f'Committed snapshot: {snapshot_id}')
+        print(xr.open_zarr(session.store))
 
 
 if __name__ == '__main__':
