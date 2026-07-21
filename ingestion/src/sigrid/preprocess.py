@@ -389,6 +389,26 @@ def expand(ds: xr.Dataset, dim: str, expand_coords: Iterable[str]) -> xr.Dataset
     return ds
 
 def update(
+        top_config: TopConfig,
+        descriptor: FileSetDescriptor,
+        icechunk_info: IcechunkInfo,
+        limit: int | None,
+        first: np.datetime64 | None,
+        parallel: int,
+) -> icechunk.Session:
+    repo = get_repo(
+            icechunk.local_filesystem_storage,
+            top_config.icechunk_root / icechunk_info.relpath,
+            top_config.orig_root
+        )
+    session = repo.writable_session('main')
+    modified = update_session(session, descriptor, limit=limit, first=first, parallel=parallel)
+    if modified:
+        snapshot_id = session.commit(f'update from {descriptor.dir}')
+        print(f'Committed snapshot: {snapshot_id}')
+    return session
+
+def update_session(
         session: icechunk.session.Session,
         descriptor: FileSetDescriptor,
         *,
@@ -422,7 +442,7 @@ def update(
 
     if len(times_to_fetch) == 0:
         return initialized
-        
+
     if len(existing['IRIDL_time']) > 0:
         last_old = existing['IRIDL_time'][-1]
         first_new = times_to_fetch[0]
@@ -795,16 +815,10 @@ def main():
     for var in vars:
         print(var)
         descriptor, icechunk_info = raw_cat.get_entry(var)
-        repo = get_repo(
-            icechunk.local_filesystem_storage,
-            top_config.icechunk_root / icechunk_info.relpath,
-            top_config.orig_root
+        session = update(
+            top_config, descriptor, icechunk_info,
+            args.limit, args.first, args.parallel
         )
-        session = repo.writable_session('main')
-        modified = update(session, descriptor, limit=args.limit, first=args.first, parallel=args.parallel)
-        if modified:
-            snapshot_id = session.commit(f'update from {descriptor.dir}')
-            print(f'Committed snapshot: {snapshot_id}')
         print(xr.open_zarr(session.store))
 
 

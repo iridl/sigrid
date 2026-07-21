@@ -23,7 +23,7 @@ def test_it(var_path: str):
     repo_config = icechunk.RepositoryConfig.default()
     repo = icechunk.Repository.create(storage, repo_config)
     session = repo.writable_session('main')
-    modified = preprocess.update(
+    modified = preprocess.update_session(
         # Looks like in_memory_storage doesn't handle parallel writes, so we
         # have to either use parallel=0 or write to disk.
         # TODO is parallel with local storage faster?
