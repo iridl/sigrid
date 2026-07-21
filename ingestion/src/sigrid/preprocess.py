@@ -648,8 +648,7 @@ def initialize(
     # Since we're only writing a single time slice, xarray doesn't have enough
     # information to choose the right temporal resolution. It defaults to
     # integer days, which doesn't work for a 6-hourly dataset like CFSv2.
-    date_str = t_slice['IRIDL_time'].dt.strftime("%Y-%m-%d %H:%M:%S").values[0]
-    units = f'{time_res} since {date_str}'
+    units = f'{time_res} since 1960-01-01'
     encoding['IRIDL_time'] = {'units': units, 'dtype': 'int32'}
 
     # Tell it to use large chunks for this coordinate variable. Otherwise,
