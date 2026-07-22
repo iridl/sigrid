@@ -828,14 +828,24 @@ def main():
     # only when the lock is held.
     icechunk.set_logs_filter('[{message="The LocalFileSystem storage is not safe for concurrent commits}]=off')
 
+    errors = {}
     for var in vars:
         print(var)
-        descriptor, icechunk_info = raw_cat.get_entry(var)
-        session = update(
-            top_config, descriptor, icechunk_info,
-            args.limit, args.first, args.parallel
-        )
-        print(xr.open_zarr(session.store))
+        try:
+            descriptor, icechunk_info = raw_cat.get_entry(var)
+            session = update(
+                top_config, descriptor, icechunk_info,
+                args.limit, args.first, args.parallel
+            )
+            print(xr.open_zarr(session.store))
+            errors[var] = None
+        except Exception as e:
+            errors[var] = e
+
+    print('\n\nSummary:')
+    for k, v in errors.items():
+        print(k, f'{type(v)}, {v}')
+
 
 
 if __name__ == '__main__':
