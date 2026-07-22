@@ -396,7 +396,7 @@ def update(
         limit: int | None,
         first: np.datetime64 | None,
         parallel: int,
-) -> icechunk.Session:
+) -> bool:
     store_path = top_config.icechunk_root / icechunk_info.relpath
     lock_path = store_path.with_name(f'{store_path.name}.lock')
     lock_path.parent.mkdir(exist_ok=True, parents=True)
@@ -414,7 +414,7 @@ def update(
         if modified:
             snapshot_id = session.commit(f'update from {descriptor.dir}')
             print(f'Committed snapshot: {snapshot_id}')
-        return session
+        return modified
     finally:
         fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
         lock_file.close()
@@ -828,23 +828,23 @@ def main():
     # only when the lock is held.
     icechunk.set_logs_filter('[{message="The LocalFileSystem storage is not safe for concurrent commits}]=off')
 
-    errors = {}
+    results = {}
     for var in vars:
         print(var)
         try:
             descriptor, icechunk_info = raw_cat.get_entry(var)
-            session = update(
+            modified = update(
                 top_config, descriptor, icechunk_info,
                 args.limit, args.first, args.parallel
             )
-            print(xr.open_zarr(session.store))
-            errors[var] = None
+            print(open_icechunk(var))
+            results[var] = modified
         except Exception as e:
-            errors[var] = e
+            results[var] = e
 
     print('\n\nSummary:')
-    for k, v in errors.items():
-        print(k, f'{type(v)}, {v}')
+    for k, v in results.items():
+        print(k, f'{type(v)}: {v}')
 
 
 
