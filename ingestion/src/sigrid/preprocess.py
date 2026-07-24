@@ -204,7 +204,7 @@ class _FileOpener:
 
     def open(self, path: Path, file_coords: FileCoords) -> xr.Dataset:
         """Use as a context manager or call close() on the dataset when finished with it."""
-        ds = open_one_file(path, self.backend_kwargs) 
+        ds = open_one_file(path, backend_kwargs=self.backend_kwargs)
 
         if self.drop_vars:
             ds = ds.drop_vars(self.drop_vars)
