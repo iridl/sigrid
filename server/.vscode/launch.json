@@ -26,15 +26,25 @@
 				"envFile": "${workspaceFolder}/../.env"
 			},
 			{
-				"name": "temp",
+				"name": "client-test",
 				"type": "debugpy",
 				"request": "launch",
-				"console": "integratedTerminal",
-				"program": "${workspaceFolder}/catalog/NMME/COLA-RSMAS/CCSM4/index.py",
+				"module": "pytest",
+				"python": "${workspaceFolder}/.pixi/envs/client/bin/python",
 				"args": [
+					"client-test",
+					"${input:extraArgs}"
 				],
+				"console": "integratedTerminal",
 				"cwd": "${workspaceFolder}",
 				"envFile": "${workspaceFolder}/../.env"
 			}
-    ]
+    ],
+	"inputs": [
+		{
+			"id": "extraArgs",
+			"type": "promptString",
+			"description": "extra pytest args"
+		}
+	]
 }
