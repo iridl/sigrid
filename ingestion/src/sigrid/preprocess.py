@@ -204,7 +204,7 @@ class _FileOpener:
 
     def open(self, path: Path, file_coords: FileCoords) -> xr.Dataset:
         """Use as a context manager or call close() on the dataset when finished with it."""
-        ds = open_one_file(path, self.backend_kwargs) # Nuevo XC
+        ds = open_one_file(path, self.backend_kwargs) 
 
         if self.drop_vars:
             ds = ds.drop_vars(self.drop_vars)
@@ -557,7 +557,7 @@ def initialize(session: icechunk.session.Session, opener: _FileOpener, listing: 
 
 
 def open_one_file(path: Path, backend_kwargs: dict | None = None
-) -> xr.Dataset: #Nuevo XC 
+) -> xr.Dataset: 
 
     # decode_coords doesn't control decoding of coordinate values, it controls
     # which variables become coordinates as opposed to data variables. That's
@@ -591,7 +591,7 @@ def open_one_file(path: Path, backend_kwargs: dict | None = None
             mask_and_scale=False,
             decode_times=False,
             decode_coords=decode_coords,
-            backend_kwargs=effective_backend_kwargs,   # <-- nuevo XC
+            backend_kwargs=effective_backend_kwargs,   
         )
         return result
     except Exception as e:
