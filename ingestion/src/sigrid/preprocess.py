@@ -1,17 +1,18 @@
 import argparse
 import concurrent.futures
-from concurrent.futures import Executor, Future
-from dataclasses import dataclass
 import enum
 import fcntl
 import importlib.util
 import itertools
 import os
-from pathlib import Path
 import re
-from types import TracebackType
-from typing import Any, Callable, Iterable, Mapping, NamedTuple, Sequence, TypeVar, cast
 import warnings
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from concurrent.futures import Executor, Future
+from dataclasses import dataclass
+from pathlib import Path
+from types import TracebackType
+from typing import Any, NamedTuple, TypeVar, cast
 
 import icechunk
 import icechunk.session
@@ -20,8 +21,8 @@ import tqdm
 import xarray as xr
 import xarray.conventions
 import zarr
+from typing_extensions import Self
 from zarr.errors import GroupNotFoundError, ZarrUserWarning
-
 
 # In my opinion, using unsanctioned codecs makes the icechunk store inappropriate to
 # expose publicly, because not all clients will have the libraries required to read it,
@@ -553,7 +554,7 @@ class SyncExecutor(Executor):
         future.set_result(result)
         return future
 
-    def __enter__(self) -> "SyncExecutor":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None) -> None:
@@ -839,7 +840,7 @@ def main():
             )
             print(open_icechunk(var))
             results[var] = modified
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             results[var] = e
 
     print('\n\nSummary:')
