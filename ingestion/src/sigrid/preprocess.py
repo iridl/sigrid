@@ -180,8 +180,11 @@ class FileSetDescriptor:
         if isinstance(aux_coords, str):
             aux_coords = [aux_coords]
         self.opener = _FileOpener(
-            original_time_dim, drop_vars, expand_coords, aux_coords,
-            backend_kwargs=backend_kwargs,   # <-- nuevo XC
+            original_time_dim, 
+            drop_vars, 
+            expand_coords, 
+            aux_coords,
+            backend_kwargs=backend_kwargs, 
         )
 
     def parse_path(self, path: str | Path) -> FileCoords | None:
@@ -197,11 +200,10 @@ class _FileOpener:
     drop_vars: Sequence[str]
     expand_coords: Sequence[str]
     aux_coords: Sequence[str]
-    backend_kwargs: dict | None = None   # <-- nuevo XC
+    backend_kwargs: dict | None = None   
 
     def open(self, path: Path, file_coords: FileCoords) -> xr.Dataset:
         """Use as a context manager or call close() on the dataset when finished with it."""
-        #ds = open_one_file(path)
         ds = open_one_file(path, self.backend_kwargs) # Nuevo XC
 
         if self.drop_vars:
@@ -283,14 +285,12 @@ class FileSetListing:
         # Once we've created the icechunk store, we can get the shape from
         # that, and only scan files that we actually need to read.
         self._paths: dict[FileCoords, Path] = {}
-        all_files = list(descriptor.dir.rglob('*')) #Nuevo XC ????
         for path in descriptor.dir.rglob('*'):
             if path.is_file():
                 coords = descriptor.parse_path(str(path))
                 if coords is not None:
                     self._paths[coords] = path
         self.coords = assemble_coords(self._paths.keys())
-
 
     def list_times(self, first: np.datetime64 | None = None) -> Iterable[np.datetime64]:
         vals = self.coords.T
@@ -360,7 +360,7 @@ def update(
         limit: int | None,
         first: np.datetime64 | None,
         parallel: int
-) -> int:
+) -> bool:
     listing = FileSetListing(descriptor)
     try:
         existing = xr.open_zarr(session.store, zarr_format=3)
@@ -370,8 +370,10 @@ def update(
         # new store here.
         existing = None
 
+    initialized = False
     if existing is None:
         initialize(session, descriptor.opener, listing)
+        initialized = True
         existing = xr.open_zarr(session.store, zarr_format=3)
         if limit is not None:
             limit -= 1  # We already wrote the first slice
@@ -384,7 +386,7 @@ def update(
     times_to_fetch = list(itertools.islice(times_to_fetch, limit))
 
     if len(times_to_fetch) == 0:
-        return 0
+        return initialized
         
     if len(existing['IRIDL_time']) > 0:
         last_old = existing['IRIDL_time'][-1]
@@ -465,7 +467,7 @@ def update(
 
     finally:
         executor.shutdown(cancel_futures=True, wait=False)
-    return success_count
+    return initialized or success_count > 0
 
 
 class SyncExecutor(Executor):
@@ -504,7 +506,6 @@ def write_one_file_slice(session: icechunk.session.ForkSession, opener: _FileOpe
             ds[v].attrs.pop('missing_value', None)
             ds[v].attrs.pop('scale_factor', None)
             ds[v].attrs.pop('add_offset', None)
-        #ds.to_zarr(session.store, region=region, zarr_format=3, consolidated=False)
         try:
             ds.to_zarr(session.store, region=region, zarr_format=3, consolidated=False)
         except Exception as e:
@@ -555,7 +556,8 @@ def initialize(session: icechunk.session.Session, opener: _FileOpener, listing: 
     t_slice.to_zarr(session.store, consolidated=False, encoding=encoding)
 
 
-def open_one_file(path: Path, backend_kwargs: dict | None = None) -> xr.Dataset: #Nuevo XC 
+def open_one_file(path: Path, backend_kwargs: dict | None = None
+) -> xr.Dataset: #Nuevo XC 
 
     # decode_coords doesn't control decoding of coordinate values, it controls
     # which variables become coordinates as opposed to data variables. That's
@@ -695,9 +697,10 @@ def main():
         top_config.orig_root
     )
     session = repo.writable_session('main')
-    new_count = update(session, descriptor, limit=args.limit, first=args.first, parallel=args.parallel)
-    if new_count:
-        session.commit(f'update from {descriptor.dir}')
+    modified = update(session, descriptor, limit=args.limit, first=args.first, parallel=args.parallel)
+    if modified:
+        snapshot_id = session.commit(f'update from {descriptor.dir}')
+        print(f'Committed snapshot: {snapshot_id}')
     print(xr.open_zarr(session.store))
 
 
