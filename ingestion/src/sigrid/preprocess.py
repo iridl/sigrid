@@ -1,16 +1,18 @@
 import argparse
 import concurrent.futures
-from concurrent.futures import Executor, Future
-from dataclasses import dataclass
 import enum
+import fcntl
 import importlib.util
 import itertools
 import os
-from pathlib import Path
 import re
-from types import TracebackType
-from typing import Callable, Iterable, Mapping, NamedTuple, Sequence, TypeVar, cast
 import warnings
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from concurrent.futures import Executor, Future
+from dataclasses import dataclass
+from pathlib import Path
+from types import TracebackType
+from typing import Any, NamedTuple, TypeVar, cast
 
 import icechunk
 import icechunk.session
@@ -19,8 +21,8 @@ import tqdm
 import xarray as xr
 import xarray.conventions
 import zarr
+from typing_extensions import Self
 from zarr.errors import GroupNotFoundError, ZarrUserWarning
-
 
 # In my opinion, using unsanctioned codecs makes the icechunk store inappropriate to
 # expose publicly, because not all clients will have the libraries required to read it,
@@ -135,6 +137,7 @@ class FileCoords(NamedTuple):
     t: np.datetime64
     m: int | None
     p: int | None
+    l: int | None
 
 
 class DatasetCoords(NamedTuple):
@@ -144,6 +147,7 @@ class DatasetCoords(NamedTuple):
     T: Iterable[np.datetime64]
     M: Sequence[int] | None
     P: Sequence[int] | None
+    L: Sequence[int] | None
 
 T = TypeVar('T')
 
@@ -161,7 +165,9 @@ class FileSetDescriptor:
             original_time_dim: str | None = None,
             parse_match : Callable[[dict[str, str]],FileCoords] | None = None,
             backend_kwargs: dict[str, dict[str, str]] | None = None,
-            drop_vars: str | Sequence[str] = (),
+            data_vars: str | Sequence[str] | None = None,
+            drop_coords: str | Sequence[str] = (),
+            drop_vars: str | Sequence[str] = (),  # TODO for backwards compatibility, remove when no longer needed
             expand_coords: str | Sequence[str] = (),
             aux_coords: str | Sequence[str] = (),
     ) -> None:
@@ -171,19 +177,21 @@ class FileSetDescriptor:
         self.catalog_path = catalog_path
         self._matcher = re.compile(pattern)
         self.parse_match = parse_match or default_parse_match
-        self.backend_kwargs = backend_kwargs
 
-        if isinstance(drop_vars, str):
-            drop_vars = [drop_vars]
-        if isinstance(expand_coords, str):
-            expand_coords = [expand_coords]
-        if isinstance(aux_coords, str):
-            aux_coords = [aux_coords]
+        if drop_coords == ():
+            drop_coords = drop_vars
+
+        def ensure_list(x):
+            if isinstance(x, str):
+                return [x]
+            return x
+
         self.opener = _FileOpener(
-            original_time_dim, 
-            drop_vars, 
-            expand_coords, 
-            aux_coords,
+            original_time_dim,
+            ensure_list(data_vars),
+            ensure_list(drop_coords),
+            ensure_list(expand_coords),
+            ensure_list(aux_coords),
             backend_kwargs=backend_kwargs, 
         )
 
@@ -193,21 +201,40 @@ class FileSetDescriptor:
             return None
         return self.parse_match(match.groupdict())
 
+    @property
+    def time_res(self):
+        if 'hour' in self._matcher.groupindex:
+            return 'hours'
+        return 'days'
+
 
 @dataclass
 class _FileOpener:
     original_time_dim: str | None
-    drop_vars: Sequence[str]
+    data_vars: Sequence[str] | None
+    drop_coords: Sequence[str] | None
     expand_coords: Sequence[str]
     aux_coords: Sequence[str]
-    backend_kwargs: dict | None = None   
+    backend_kwargs: dict | None = None 
 
     def open(self, path: Path, file_coords: FileCoords) -> xr.Dataset:
         """Use as a context manager or call close() on the dataset when finished with it."""
         ds = open_one_file(path, backend_kwargs=self.backend_kwargs)
 
-        if self.drop_vars:
-            ds = ds.drop_vars(self.drop_vars)
+        if self.data_vars is not None:
+            # cast works around a bug in xarray's type hints: when x is a
+            # sequence, ds[x] is a Dataset, not a DataArray.
+            ds = cast(xr.Dataset, ds[self.data_vars])
+
+        if self.drop_coords is not None:
+            # TODO I want this to affect only coords, but SPEAR is currently
+            # using it to drop TIME_bnds, which is a variable. Coordinate
+            # the catalog fix with Azhar, then uncomment this check.
+            # if not all(c in ds.coords for c in self.drop_coords):
+            #     raise Exception(
+            #         f"Not all of {self.drop_coords} are present as coordinates."
+            #     )
+            ds = ds.drop_vars(self.drop_coords)
 
         # Data vars get expanded along IRIDL_time, coords don't unless they're
         # explicitly listed in expand_coords.
@@ -221,6 +248,8 @@ class _FileOpener:
             ds = ds.expand_dims(P=[file_coords.p])
         if file_coords.m is not None:
             ds = ds.expand_dims(M=[file_coords.m])
+        if file_coords.l is not None:
+            ds = ds.expand_dims(L=[file_coords.l])
 
         t_dim = self.original_time_dim
         if t_dim is None:
@@ -295,7 +324,7 @@ class FileSetListing:
     def list_times(self, first: np.datetime64 | None = None) -> Iterable[np.datetime64]:
         vals = self.coords.T
         if first is not None:
-            vals = [v for v in vals if v >= first]
+            vals = (v for v in vals if v >= first)
         return vals
     
     def get_path(self, coords: FileCoords) -> Path | None:
@@ -303,8 +332,8 @@ class FileSetListing:
 
 
 def default_parse_match(values: dict[str, str]) -> FileCoords:
-    t = m = p = None
-    if 'year' in values or 'month' in values or 'day' in values:
+    t = m = p = l = None
+    if 'year' in values or 'month' in values or 'day' in values or 'hour' in values:
         if not ('year' in values and 'month' in values):
             raise Exception('Path contains only a partial date')
         year = int(values['year'])
@@ -316,30 +345,38 @@ def default_parse_match(values: dict[str, str]) -> FileCoords:
             day = int(values['day'])
         else:
             day = 1
-        t = np.datetime64(f'{year}-{month:02}-{day:02}')
+        if 'hour' in values:
+            hour = int(values['hour'])
+        else:
+            hour = 0
+        t = np.datetime64(f'{year}-{month:02}-{day:02}T{hour:02}:00')
     else:
         raise Exception('No date was retrieved from path')
     if 'member' in values:
         m = int(values['member'])
     if 'pressure' in values:
         p = int(values['pressure'])
-    return FileCoords(t, m, p)
+    return FileCoords(t, m, p, l)
     
 
 def assemble_coords(coords: Iterable[FileCoords]) -> DatasetCoords:
     t_vals: set[np.datetime64] = set()
     m_vals: set[int | None] = set()
     p_vals: set[int | None] = set()
+    l_vals: set[int | None] = set()
     for coord in coords:
         t_vals.add(coord.t)
         m_vals.add(coord.m)
         p_vals.add(coord.p)
+        l_vals.add(coord.l)
     def helper[T: (int, str)](x: set[T | None], reverse: bool = False) -> list[T] | None:
         if None in x:
             assert x == {None}
             return None
         return sorted(cast(set[T], x), reverse=reverse)
-    return DatasetCoords(sorted(t_vals), helper(m_vals), helper(p_vals, reverse=True))
+    return DatasetCoords(
+        sorted(t_vals), helper(m_vals), helper(p_vals, reverse=True), helper(l_vals)
+    )
 
 def expand(ds: xr.Dataset, dim: str, expand_coords: Iterable[str]) -> xr.Dataset:
     ds = ds.expand_dims(dim)
@@ -354,6 +391,36 @@ def expand(ds: xr.Dataset, dim: str, expand_coords: Iterable[str]) -> xr.Dataset
     return ds
 
 def update(
+        top_config: TopConfig,
+        descriptor: FileSetDescriptor,
+        icechunk_info: IcechunkInfo,
+        limit: int | None,
+        first: np.datetime64 | None,
+        parallel: int,
+) -> bool:
+    store_path = top_config.icechunk_root / icechunk_info.relpath
+    lock_path = store_path.with_name(f'{store_path.name}.lock')
+    lock_path.parent.mkdir(exist_ok=True, parents=True)
+    lock_file = lock_path.open(mode='a')
+    session = None
+    try:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        repo = get_repo(
+                icechunk.local_filesystem_storage,
+                store_path,
+                top_config.orig_root
+            )
+        session = repo.writable_session('main')
+        modified = update_session(session, descriptor, limit=limit, first=first, parallel=parallel)
+        if modified:
+            snapshot_id = session.commit(f'update from {descriptor.dir}')
+            print(f'Committed snapshot: {snapshot_id}')
+        return modified
+    finally:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+        lock_file.close()
+
+def update_session(
         session: icechunk.session.Session,
         descriptor: FileSetDescriptor,
         *,
@@ -372,7 +439,7 @@ def update(
 
     initialized = False
     if existing is None:
-        initialize(session, descriptor.opener, listing)
+        initialize(session, descriptor.opener, descriptor.time_res, listing)
         initialized = True
         existing = xr.open_zarr(session.store, zarr_format=3)
         if limit is not None:
@@ -387,7 +454,7 @@ def update(
 
     if len(times_to_fetch) == 0:
         return initialized
-        
+
     if len(existing['IRIDL_time']) > 0:
         last_old = existing['IRIDL_time'][-1]
         first_new = times_to_fetch[0]
@@ -441,7 +508,10 @@ def update(
             for t in times_to_fetch
             for m in listing.coords.M or [None]
             for p in listing.coords.P or [None]
-            if (path := listing.get_path(file_coords := FileCoords(t, m, p))) is not None
+            for l in listing.coords.L or [None]
+            if (
+                path := listing.get_path(file_coords := FileCoords(t, m, p, l))
+            ) is not None
         ]
         total_count = len(futures)
         success_count = 0
@@ -484,7 +554,7 @@ class SyncExecutor(Executor):
         future.set_result(result)
         return future
 
-    def __enter__(self) -> "SyncExecutor":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None) -> None:
@@ -513,51 +583,120 @@ def write_one_file_slice(session: icechunk.session.ForkSession, opener: _FileOpe
     return session
 
 
-def initialize(session: icechunk.session.Session, opener: _FileOpener, listing: FileSetListing) -> None:
+def initialize(
+        session: icechunk.session.Session,
+        opener: _FileOpener,
+        time_res: str,
+        listing: FileSetListing
+) -> None:
     t = next(iter(listing.coords.T))
-    file_slices: list[list[xr.Dataset]] = [
+    file_coords = [
         [
-            # Out of laziness, I'm assuming for now that the initial
-            # t slice has no missing files. If we need to deal with
-            # that situation, we can insert empty slices, or move to
-            # filling in values one file at a time.
-            opener.open(
-                raise_if_null(
-                    listing.get_path(FileCoords(t, m, p)),
-                    'Missing file in initial time slice',
-                ),
-                FileCoords(t, m, p)
-            )            
+            [
+                FileCoords(t, m, p, l)
+                for l in listing.coords.L or [None]
+            ]
             for p in listing.coords.P or [None]
         ]
         for m in listing.coords.M or [None]
     ]
-    # Combine a list of lists of (m, p) slices into a single t slice.
+    file_slices_some_missing = [
+        [
+            [
+                None if (path := listing.get_path(mpl_coords)) is None
+                else opener.open(path, mpl_coords)
+                for mpl_coords in mp_coords
+            ]
+            for mp_coords in m_coords
+        ]
+        for m_coords in file_coords
+    ]
+    example_ds = next(
+        mpl_ds
+        for m_slices in file_slices_some_missing
+        for mp_slices in m_slices
+        for mpl_ds in mp_slices
+        if mpl_ds is not None
+    )
+
+    def empty_slice(c: FileCoords) -> xr.Dataset:
+        result = xr.full_like(example_ds, np.nan)
+        if c.m is not None:
+            result['M'] = [c.m]
+        if c.p is not None:
+            result['P'] = [c.p]
+        if c.l is not None:
+            result['L'] = [c.l]
+        return result
+
+    # Replace missing files with an all-NaN slice.
+    # TODO this isn't entirely desirable, because it means we can't detect
+    # missing chunks in the initial slice just by reading zarr metadata, whereas
+    # we can do that in other the other time slices. The alternatives are to use
+    # to_zarr with compute=False (requires dask), or to drop down to the Zarr
+    # API and create an xarray-compatible Zarr structure by hand.
+    file_slices_all = [
+        [
+            [
+                empty_slice(file_coords[i][j][k]) if ds is None else ds
+                for k, ds in enumerate(mpl_slices)
+            ]
+            for j, mpl_slices in enumerate(mp_slices)
+        ]
+        for i, mp_slices in enumerate(file_slices_some_missing)
+    ]
+
+
+    # Combine a list of lists of (m, p, l) slices into a single t slice.
     # Note that we test for coord is None, not for len(slice) == 1,
     # because there are cases where we want to keep a dimension that has
     # length 1 (e.g. SubC GEFSv12 zg).
+    if listing.coords.L is None:
+        mp_slices = [
+            [mp_slice[0] for mp_slice in p_slice]
+            for p_slice in file_slices_all
+        ]
+    else:
+        mp_slices = [
+            [
+                xr.concat(mp_slice, dim='L', coords='minimal')
+                for mp_slice in p_slice
+            ]
+            for p_slice in file_slices_all
+        ]
     if listing.coords.P is None:
-        m_slices = [m_slice[0] for m_slice in file_slices]
+        m_slices = [m_slice[0] for m_slice in mp_slices]
     else:
         m_slices = [
             xr.concat(m_slice, dim='P', coords='minimal')
-            for m_slice in file_slices
+            for m_slice in mp_slices
         ]
     if listing.coords.M is None:
         t_slice = m_slices[0]
     else:
         t_slice = xr.concat(m_slices, dim='M', coords='minimal')
 
-    one_file_slice = file_slices[0][0]
-    encoding = {
-        varname: {'chunks': tuple(da.sizes[dim] for dim in da.dims)}
-        for varname, da in one_file_slice.data_vars.items()
+    encoding: dict[str, dict[str, Any]] = {
+        str(varname): {'chunks': tuple(da.sizes[dim] for dim in da.dims)}
+        for varname, da in example_ds.data_vars.items()
     }
+    # Since we're only writing a single time slice, xarray doesn't have enough
+    # information to choose the right temporal resolution. It defaults to
+    # integer days, which doesn't work for a 6-hourly dataset like CFSv2.
+    units = f'{time_res} since 1960-01-01'
+    encoding['IRIDL_time'] = {'units': units, 'dtype': 'int32'}
+
+    # Tell it to use large chunks for this coordinate variable. Otherwise,
+    # the length of the intial array (1) is used as the chunk size, which makes
+    # subsequent reads extremely expensive.
+    encoding['IRIDL_time']['chunks'] = (100_000,)
+
     t_slice.to_zarr(session.store, consolidated=False, encoding=encoding)
 
 
-def open_one_file(path: Path, backend_kwargs: dict | None = None
-) -> xr.Dataset: 
+def open_one_file(
+    path: Path, backend_kwargs: dict | None = None
+) -> xr.Dataset:
 
     # decode_coords doesn't control decoding of coordinate values, it controls
     # which variables become coordinates as opposed to data variables. That's
@@ -583,7 +722,6 @@ def open_one_file(path: Path, backend_kwargs: dict | None = None
     if path.suffix in ('.grb', '.grib'):
         # Only cfgrib understands 'indexpath'; avoid it for other engines.
         effective_backend_kwargs.setdefault('indexpath', '')
-
     try:
         result = xr.open_dataset(
             path,
@@ -629,7 +767,12 @@ def raise_if_null(x: T | None, message: str) -> T:
 def auto_detect_region(slice_coords: FileCoords, dest: xr.Dataset):
     # Adapted from xarray's implementation of region='auto', but this is much faster
     # for the cases we encounter.
-    externals = {'IRIDL_time': slice_coords.t, 'M': slice_coords.m, 'P': slice_coords.p}
+    externals = {
+        'IRIDL_time': slice_coords.t,
+        'M': slice_coords.m,
+        'P': slice_coords.p,
+        'L': slice_coords.l,
+    }
     region: Mapping[str, slice] = {}
     for dim in dest.dims:
         # Xarray's type hints are inconsistent. Keys of Dataset.dims are Hashable,
@@ -678,7 +821,7 @@ def open_icechunk(rel_path: str, decode_times: bool = True, decode_cf: bool = Tr
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("var")
+    parser.add_argument("vars", nargs="*")
     parser.add_argument("--limit", type=int)
     parser.add_argument("--first", type=np.datetime64)
     parser.add_argument("--parallel", type=int, default=1)
@@ -690,18 +833,30 @@ def main():
         top_config.raw_catalog_root,
         top_config.orig_root
     )
-    descriptor, icechunk_info = raw_cat.get_entry(args.var)
-    repo = get_repo(
-        icechunk.local_filesystem_storage,
-        top_config.icechunk_root / icechunk_info.relpath,
-        top_config.orig_root
-    )
-    session = repo.writable_session('main')
-    modified = update(session, descriptor, limit=args.limit, first=args.first, parallel=args.parallel)
-    if modified:
-        snapshot_id = session.commit(f'update from {descriptor.dir}')
-        print(f'Committed snapshot: {snapshot_id}')
-    print(xr.open_zarr(session.store))
+    vars = args.vars or raw_cat.list_all()
+
+    # I wish this worked as a context manager, so we could suppress the warning
+    # only when the lock is held.
+    icechunk.set_logs_filter('[{message="The LocalFileSystem storage is not safe for concurrent commits}]=off')
+
+    results = {}
+    for var in vars:
+        print(var)
+        try:
+            descriptor, icechunk_info = raw_cat.get_entry(var)
+            modified = update(
+                top_config, descriptor, icechunk_info,
+                args.limit, args.first, args.parallel
+            )
+            print(open_icechunk(var))
+            results[var] = modified
+        except Exception as e:  # noqa: BLE001
+            results[var] = e
+
+    print('\n\nSummary:')
+    for k, v in results.items():
+        print(k, f'{type(v)}: {v}')
+
 
 
 if __name__ == '__main__':
