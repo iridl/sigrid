@@ -55,3 +55,9 @@ client-test = {cmd = "env $(sed 's/#.*//' ../.env) pytest client-test", default-
 typeCheckingMode = "recommended"
 reportUnknownMemberType = false
 
+
+[tool.ruff.lint]
+# TRY002 says not to raise Exception, but rather use a custom subclass. I see no
+# point specializing exceptions until/unless there's special handling for them.
+ignore = ["TRY002"]
+

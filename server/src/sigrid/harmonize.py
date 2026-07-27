@@ -3,12 +3,12 @@
 import functools
 import importlib.util
 import os
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Callable, Self, cast
+from typing import Any, Self, cast
 
 import icechunk
 import numpy as np
