@@ -188,11 +188,11 @@ class FileSetDescriptor:
 
         self.opener = _FileOpener(
             original_time_dim,
+            backend_kwargs,
             ensure_list(data_vars),
             ensure_list(drop_coords),
             ensure_list(expand_coords),
             ensure_list(aux_coords),
-            backend_kwargs=backend_kwargs, 
         )
 
     def parse_path(self, path: str | Path) -> FileCoords | None:
@@ -211,11 +211,11 @@ class FileSetDescriptor:
 @dataclass
 class _FileOpener:
     original_time_dim: str | None
+    backend_kwargs: dict[str, dict[str, str]] | None  
     data_vars: Sequence[str] | None
     drop_coords: Sequence[str] | None
     expand_coords: Sequence[str]
     aux_coords: Sequence[str]
-    backend_kwargs: dict | None = None 
 
     def open(self, path: Path, file_coords: FileCoords) -> xr.Dataset:
         """Use as a context manager or call close() on the dataset when finished with it."""
@@ -579,7 +579,8 @@ def write_one_file_slice(session: icechunk.session.ForkSession, opener: _FileOpe
         try:
             ds.to_zarr(session.store, region=region, zarr_format=3, consolidated=False)
         except Exception as e:
-            raise Exception(f'Error reading {path}: {e}') from e
+            e.add_note(f"Error reading {path} ")
+            raise
     return session
 
 
@@ -695,7 +696,7 @@ def initialize(
 
 
 def open_one_file(
-    path: Path, backend_kwargs: dict | None = None
+    path: Path, backend_kwargs: dict[str, dict[str, str]] | None = None
 ) -> xr.Dataset:
 
     # decode_coords doesn't control decoding of coordinate values, it controls
