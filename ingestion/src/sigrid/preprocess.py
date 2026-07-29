@@ -579,7 +579,7 @@ def write_one_file_slice(session: icechunk.session.ForkSession, opener: _FileOpe
         try:
             ds.to_zarr(session.store, region=region, zarr_format=3, consolidated=False)
         except Exception as e:
-            e.add_note(f"Error reading {path} ")
+            e.add_note(f"Error reading {path} ") 
             raise
     return session
 
