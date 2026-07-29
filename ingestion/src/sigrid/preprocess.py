@@ -211,7 +211,7 @@ class FileSetDescriptor:
 @dataclass
 class _FileOpener:
     original_time_dim: str | None
-    backend_kwargs: dict[str, dict[str, str]] | None  
+    backend_kwargs: dict[str, dict[str, str]] | None
     data_vars: Sequence[str] | None
     drop_coords: Sequence[str] | None
     expand_coords: Sequence[str]
