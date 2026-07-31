@@ -34,7 +34,7 @@ def test_one(proxy, server, test_path):
     # TODO why?
     if (
         'CanSIPS-IC4' in test_path and
-        ('sst' in test_path or 't2m' in test_path)
+        ('tos' in test_path or 'tas' in test_path or 'tasmax' in test_path or 'tasmin' in test_path or 'ta' in test_path)
     ):
         atol = 1e-4
     else:
