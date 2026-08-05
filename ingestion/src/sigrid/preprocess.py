@@ -576,7 +576,10 @@ def write_one_file_slice(session: icechunk.session.ForkSession, opener: _FileOpe
             ds[v].attrs.pop('missing_value', None)
             ds[v].attrs.pop('scale_factor', None)
             ds[v].attrs.pop('add_offset', None)
-        ds.to_zarr(session.store, region=region, zarr_format=3, consolidated=False)
+        try:
+            ds.to_zarr(session.store, region=region, zarr_format=3, consolidated=False)
+        except Exception as e:
+            raise Exception(f'Error writing the contents of {path} to zarr: {e}') from e
     return session
 
 
@@ -712,6 +715,13 @@ def open_one_file(
         decode_coords = 'all'
     else:
         decode_coords = True
+
+    # Default: don't persist cfgrib's .idx cache files to disk. Any explicit
+    # 'indexpath' in the catalog's backend_kwargs overrides this default.
+    effective_backend_kwargs = dict(backend_kwargs or {})
+    if path.suffix in ('.grb', '.grib'):
+        # Only cfgrib understands 'indexpath'; avoid it for other engines.
+        effective_backend_kwargs.setdefault('indexpath', '')
     try:
         result = xr.open_dataset(
             path,
@@ -719,7 +729,7 @@ def open_one_file(
             mask_and_scale=False,
             decode_times=False,
             decode_coords=decode_coords,
-            backend_kwargs=backend_kwargs,
+            backend_kwargs=effective_backend_kwargs,   
         )
         return result
     except Exception as e:
