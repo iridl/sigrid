@@ -75,7 +75,12 @@ def compare_data(da1, da2, atol):
     for i in (0, s_len // 2, s_len - 1):
         s = da1['S'].isel(S=i).values
         same = compare_slice(da1.sel(S=s), da2.sel(S=s), atol=atol)
-        print(f"S={s}: {same}")
+        if same:
+            print(f"S={s}: same")
+        else:
+            print(f"S={s}:")
+            print(da1.sel(S=s).isel(L=0, M=0).values)
+            print(da2.sel(S=s).isel(L=0, M=0).values)
         all_same &= same
     return all_same
 
