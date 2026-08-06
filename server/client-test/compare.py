@@ -42,7 +42,11 @@ def compare_coords(ds1, ds2):
         if c2 is None:
             print(cname, 'present', 'absent')
             return False
-        if not np.array_equal(c1.values, c2.values):
+        if np.issubdtype(c1.dtype, np.floating):
+            same = np.allclose(c1.values, c2.values, equal_nan=True)
+        else:
+            same = np.array_equal(c1.values, c2.values)
+        if not same:
             print(cname, 'values differ:')
             print(c1.values)
             print(c2.values)
