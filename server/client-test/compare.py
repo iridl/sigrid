@@ -26,11 +26,13 @@ def compare_ds(ds1, ds2, atol):
 
     all_same = True
     all_same &= compare_shape(da1, da2)
-    all_same &= compare_coords(da1, da2)
-    all_same &= compare_data(da1, da2, atol)
+    if all_same:
+        all_same &= compare_coords(da1, da2)
+        all_same &= compare_data(da1, da2, atol)
     return all_same
 
 def compare_coords(ds1, ds2):
+    all_same = True
     for cname in sorted(set(ds1.coords) | set(ds2.coords)):
         if cname == 'target':
             continue
@@ -50,8 +52,8 @@ def compare_coords(ds1, ds2):
             print(cname, 'values differ:')
             print(c1.values)
             print(c2.values)
-            return False
-    return True
+            all_same = False
+    return all_same
 
 def compare_shape(da1, da2):
      dims1 = sorted(list(da1.sizes.items()))
