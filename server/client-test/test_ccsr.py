@@ -30,8 +30,11 @@ def test_one(proxy, server, test_path):
     # Ingrid's L is to the midpoint of the month, pydap's is to the start.
     ds2['L'] = ds2['L'] - 0.5
 
-    # CanSIPS t2m and sst differ in the fifth decimal place.
-    # TODO why?
+    # IRIDL uses g2clib for GRIB decoding, while sigrid uses ecCodes. The two
+    # libraries use different implementations of the GRIB bit-(un)packing
+    # formula that can yield slighly different floating point numbers when
+    # reading the same file. The magnitude of the difference between Ingrid and
+    # Sigrid depends on the scaling factors used to encode each variable.
     if (
         'CanSIPS-IC4' in test_path and
         ('tos' in test_path or 'tas' in test_path or 'tasmax' in test_path or 'tasmin' in test_path or 'ta' in test_path)
@@ -42,7 +45,7 @@ def test_one(proxy, server, test_path):
 
     # CCSM4 sst has a first S value that's non-contiguous with the rest. Ingrid
     # drops it, so drop it from pydap before comparing.
-    if test_path == 'NMME/COLA-RSMAS/CCSM4/sst':
+    if test_path == 'NMME/COLA-RSMAS/CCSM4/tos':
         ds1 = ds1.isel(S=slice(1, None))
 
     # SPEAR forecasts are missing some starts. Ingrid has a regular grid with

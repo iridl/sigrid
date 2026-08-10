@@ -26,11 +26,13 @@ def compare_ds(ds1, ds2, atol):
 
     all_same = True
     all_same &= compare_shape(da1, da2)
-    all_same &= compare_coords(da1, da2)
-    all_same &= compare_data(da1, da2, atol)
+    if all_same:
+        all_same &= compare_coords(da1, da2)
+        all_same &= compare_data(da1, da2, atol)
     return all_same
 
 def compare_coords(ds1, ds2):
+    all_same = True
     for cname in sorted(set(ds1.coords) | set(ds2.coords)):
         if cname == 'target':
             continue
@@ -42,12 +44,16 @@ def compare_coords(ds1, ds2):
         if c2 is None:
             print(cname, 'present', 'absent')
             return False
-        if not np.array_equal(c1.values, c2.values):
+        if np.issubdtype(c1.dtype, np.floating):
+            same = np.allclose(c1.values, c2.values, equal_nan=True)
+        else:
+            same = np.array_equal(c1.values, c2.values)
+        if not same:
             print(cname, 'values differ:')
             print(c1.values)
             print(c2.values)
-            return False
-    return True
+            all_same = False
+    return all_same
 
 def compare_shape(da1, da2):
      dims1 = sorted(list(da1.sizes.items()))
@@ -70,19 +76,39 @@ def compare_data(da1, da2, atol):
     all_same = True
     for i in (0, s_len // 2, s_len - 1):
         s = da1['S'].isel(S=i).values
-        same = compare_slice(da1.sel(S=s), da2.sel(S=s), atol=atol)
-        print(f"S={s}: {same}")
+        slice1 = da1.sel(S=s)
+        slice2 = da2.sel(S=s)
+        same = compare_slice(slice1, slice2, atol=atol)
+        if same:
+            print(f"S={s}: same")
+        else:
+            print(f"S={s}:")
+            print('da1')
+            print(slice1.isel(L=0, M=0).values)
+            print('da2')
+            print(slice2.isel(L=0, M=0).values)
         all_same &= same
     return all_same
 
 def compare_slice(da1, da2, atol):
     start = time.time()
-    a1 = da1.values
+    da1.load()
     print(f'da1 took {time.time() - start}s')
     start = time.time()
-    a2 = da2.values
+    da2.load()
     print(f'da2 took {time.time() - start}s')
-    return np.isclose(a1, a2, equal_nan=True, atol=atol).all()
+    da1, da2 = xr.align(da1, da2, join='override')
+    if np.allclose(da1, da2, equal_nan=True, atol=atol):
+        return True
+    diff = np.abs(da1 - da2)
+    idx = diff.argmax(...)
+    max_diff = diff[idx]
+    # np.array2string prints 32-bit floats with the appropriate number of
+    # digits, unlike python's built-in formatting, which converts to a 64-bit
+    # float and then formats that.
+    labels = {dim: np.array2string(diff[dim].values[i.item()]) for dim, i in idx.items()}
+    print(f'tolerance {atol}, max diff {np.array2string(max_diff)} between {np.array2string(da1[idx])} and {np.array2string(da2[idx])} at {labels}')
+    return False
 
 def fetch(url):
     ds = xr.open_dataset(url, decode_times=False)
