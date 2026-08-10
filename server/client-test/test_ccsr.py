@@ -45,7 +45,7 @@ def test_one(proxy, server, test_path):
 
     # CCSM4 sst has a first S value that's non-contiguous with the rest. Ingrid
     # drops it, so drop it from pydap before comparing.
-    if test_path == 'NMME/COLA-RSMAS/CCSM4/sst':
+    if test_path == 'NMME/COLA-RSMAS/CCSM4/tos':
         ds1 = ds1.isel(S=slice(1, None))
 
     # SPEAR forecasts are missing some starts. Ingrid has a regular grid with
