@@ -771,7 +771,7 @@ def initialize(
 
 
 def open_one_file(
-    path: Path, backend_kwargs: dict[str, dict[str, str]] | None = None
+    path: Path, backend_kwargs: dict[str, Any] | None = None
 ) -> xr.Dataset:
 
     # decode_coords doesn't control decoding of coordinate values, it controls
