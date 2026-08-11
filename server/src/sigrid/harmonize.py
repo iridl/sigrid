@@ -36,7 +36,6 @@ class DatasetConfig:
     encodings: Mapping[str, Mapping[str, str]]
     bare_dims: Iterable[str]
     lead_is_month: bool
-    y_increasing: bool
 
 
 def rename(ds: xr.Dataset, mapping: Mapping[str, str]):
@@ -58,7 +57,7 @@ def standardize(ds: xr.Dataset, config: DatasetConfig):
     
     # Invert Y from N-S to S-N
     if getattr(config, "y_increasing", False):
-        if ds["Y"].values[0] > ds["Y"].values[-1]:
+        if len(ds["Y"]) > 1 and ds["Y"].values[0] > ds["Y"].values[-1]:
             ds = ds.isel(Y=slice(None, None, -1))
 
     ds = standardize_attrs(
@@ -94,20 +93,21 @@ def convert_units(ds: xr.Dataset, standard_attrs: Mapping[str, Mapping[str, str]
 type UnitConverter = Callable[[xr.DataArray], xr.DataArray]
 
 def linear_converter(offset: float, scale: float) -> UnitConverter:
-    # Builds a converter for any affine transformation: new = old * scale + offset.
-    # Covers both purely multiplicative conversions (offset=0, e.g. hPa -> Pa)
-    # and affine ones (e.g. Kelvin -> Celsius, which needs both scale and offset).
+    """ Builds a converter for any affine transformation: new = old * scale + offset.
+     Covers both purely multiplicative conversions (offset=0, e.g. hPa -> Pa)
+     and affine ones (e.g. Kelvin -> Celsius, which needs both scale and offset). 
+     """
     def converter(da: xr.DataArray):
         return da * scale + offset
     return converter
 
 def null_converter(da: xr.DataArray):
-    # Used when the source and target units are numerically identical and
-    # only the *name/spelling* of the unit changes (e.g. 'degrees_north' vs
-    # 'degree_north' -- same physical unit, different string used by
-    # different data providers). No math needed, just pass the data through.
+    """  Used when the source and target units are numerically identical and
+     only the *name/spelling* of the unit changes (e.g. 'degrees_north' vs
+     'degree_north' -- same physical unit, different string used by
+     different data providers). No math needed, just pass the data through.
+     """ 
     return da
-
 # Central lookup table: maps a (original_units, target_units) pair to the
 # UnitConverter function that performs that specific conversion.
 #
@@ -116,7 +116,7 @@ def null_converter(da: xr.DataArray):
 # same thing), so several keys often point to converters with identical
 # math -- one entry per literal spelling encountered in real datasets.
 #
-# MappingProxyType makes this table read-only at runtime, since it's meant
+# MappingProxyType makes this table read-only, since it's meant
 # to be a fixed, shared reference used across all datasets/providers.
 STANDARD_UNIT_CONVERSIONS: Mapping[tuple[str, str], UnitConverter] = MappingProxyType({
     ('degrees_north', 'degree_north'): null_converter,
@@ -130,7 +130,7 @@ STANDARD_UNIT_CONVERSIONS: Mapping[tuple[str, str], UnitConverter] = MappingProx
     # in millimeters. Converts kg m^-2 s^-1 to mm by using water density
     # (1000 kg/m^3) to turn mass into an equivalent depth, and multiplying
     # by the number of seconds in a day to get a daily total instead of
-    # a per-second rate. 
+    # a per-second rate.
     ('kg m**-2 s**-1', 'mm/day'): linear_converter(0, 1000 * 60 * 60 * 24 / 1000),
     ('kg m-2 s-1', 'mm/day'): linear_converter(0, 1000 * 60 * 60 * 24 / 1000),
     ('kg m^-2 s^-1', 'mm/day'): linear_converter(0, 1000 * 60 * 60 * 24 / 1000),
@@ -142,15 +142,6 @@ STANDARD_UNIT_CONVERSIONS: Mapping[tuple[str, str], UnitConverter] = MappingProx
     ('hPa', 'Pa'): linear_converter(0, 100),
     # Volumetric latent heat of vaporization: 2453 MJ m-3
     ('watt/m^2', 'mm/day'): linear_converter(0, 1000 * 60 * 60 * 24 / 2453e6),
-
-    # --- Daily-accumulated quantities converted to average rate ---
-    # Energy accumulated over a day (J/m^2) converted to average power (W/m^2).
-    # W/m^2 = (J/m^2) / (seconds in a day). Assumes the original data is a
-    # daily accumulation; XC Run tests, discuss with DL-Team, confirm with Andy
-    ('J m**-2', 'W m**-2'): linear_converter(0, 1 / (60 * 60 * 24)),
-    # Mass accumulated over a day (kg/m^2) converted to average rate
-    # (kg m^-2 s^-1). Same assumption: original data is a daily accumulation.
-    ('kg m**-2', 'kg m**-2 s**-1'): linear_converter(0, 1 / (60 * 60 * 24)),
 })
 
 def convert_units_da(
