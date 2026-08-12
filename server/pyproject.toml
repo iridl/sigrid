@@ -37,7 +37,7 @@ pytest = ">=9.0.3,<10"
 
 [tool.pixi.feature.client.pypi-dependencies]
 #recording-proxy = { path = "../recording-proxy", editable = true }
-recording-proxy = { git = "ssh://git@github.com/iridl/recording-proxy.git", rev = "a1df94c"}
+recording-proxy = { git = "https://github.com/iridl/recording-proxy.git", rev = "a1df94c"}
 
 [tool.pixi.environments]
 default = {features = ["dev"], solve-group = "prod"}
