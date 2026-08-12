@@ -100,7 +100,7 @@ class FileSetCatalog:
     _raw_catalog_root: Path
     _data_root: Path
 
-    def get_entry(self, path_arg: str | URLPath) -> tuple["FileSetDescriptor", IcechunkInfo]:
+    def get_entry(self, path_arg: str | URLPath) -> tuple["OriginalDatasetDescriptor", IcechunkInfo]:
         path_str = str(path_arg)
         dir, var_name = path_str.rsplit('/', maxsplit=1)
         index_path = self._raw_catalog_root / dir / 'index.py'
@@ -112,7 +112,13 @@ class FileSetCatalog:
             name=var_name,
             catalog_path = URLPath(path_str)
         )
-        return FileSetDescriptor(**kwargs), IcechunkInfo(path_str)
+        type_ = kwargs.pop('type', 'FileSet')
+        descriptor_class = {
+            'FileSet': FileSetDescriptor,
+            'SingleFile': SingleFileDescriptor
+        }[type_]
+        descriptor = descriptor_class(**kwargs)
+        return descriptor, IcechunkInfo(path_str)
 
     def _load_index(self, index_path: Path):
         spec = importlib.util.spec_from_file_location('catalog', index_path)
@@ -207,6 +213,59 @@ class FileSetDescriptor:
             return 'hours'
         return 'days'
 
+class SingleFileDescriptor:
+    def __init__(
+            self,
+            *,
+            name: str,
+            dir: Path,
+            catalog_path: URLPath,
+            pattern: str,
+            original_time_dim: str | None = None,
+            backend_kwargs : dict[str, Any] | None = None,
+            data_vars: str | Sequence[str] | None = None,
+            drop_coords: str | Sequence[str] = (),
+    ):
+        self.name = name
+        self.dir = dir
+        self.catalog_path = catalog_path
+        self._matcher = re.compile(pattern)
+        self.original_time_dim = original_time_dim
+        self.backend_kwargs = backend_kwargs
+        self.data_vars = data_vars
+        self.drop_coords = drop_coords
+
+    def open(self):
+        # This is a trimmed copy of _FileOpener.open. See the original for
+        # explanatory comments. TODO Merge them to reduce duplication and
+        # enforce consistency.
+        paths = [
+            f for f in self.dir.glob('*') if self._matcher.search(str(f))
+        ]
+        if len(paths) > 1:
+            raise Exception('type is SingleFile but multiple files match pattern')
+        if len(paths) < 1:
+            raise Exception('no matching file found')
+        ds = open_one_file(paths[0], backend_kwargs=self.backend_kwargs)
+        if self.data_vars is not None:
+            ds = cast(xr.Dataset, ds[self.data_vars])
+        if self.drop_coords is not None:
+            if not all(c in ds.coords for c in self.drop_coords):
+                raise Exception(
+                    f"Not all of {self.drop_coords} are present as coordinates."
+                )
+            ds = ds.drop_vars(self.drop_coords)
+        if self.original_time_dim:
+            ds = ds.rename({self.original_time_dim: 'IRIDL_time'})
+        ds = ds.drop_vars([c for c in ds.coords if ds.coords[c].dims == ()])
+        for varname in ds.data_vars:
+            if ds[varname].dtype == np.dtype('float64'):
+                ds[varname] = ds[varname].astype(np.float32)
+        return ds
+
+# TODO this is currently a disjunction of two unrelated classes. What common
+# API should they share to reduce duplication between the two code paths?
+type OriginalDatasetDescriptor = SingleFileDescriptor | FileSetDescriptor
 
 @dataclass
 class _FileOpener:
@@ -326,7 +385,7 @@ class FileSetListing:
         if first is not None:
             vals = (v for v in vals if v >= first)
         return vals
-    
+
     def get_path(self, coords: FileCoords) -> Path | None:
         return self._paths.get(coords)
 
@@ -357,7 +416,7 @@ def default_parse_match(values: dict[str, str]) -> FileCoords:
     if 'pressure' in values:
         p = int(values['pressure'])
     return FileCoords(t, m, p, l)
-    
+
 
 def assemble_coords(coords: Iterable[FileCoords]) -> DatasetCoords:
     t_vals: set[np.datetime64] = set()
@@ -392,7 +451,7 @@ def expand(ds: xr.Dataset, dim: str, expand_coords: Iterable[str]) -> xr.Dataset
 
 def update(
         top_config: TopConfig,
-        descriptor: FileSetDescriptor,
+        descriptor: OriginalDatasetDescriptor,
         icechunk_info: IcechunkInfo,
         limit: int | None,
         first: np.datetime64 | None,
@@ -411,14 +470,31 @@ def update(
                 top_config.orig_root
             )
         session = repo.writable_session('main')
-        modified = update_session(session, descriptor, limit=limit, first=first, parallel=parallel)
+        if isinstance(descriptor, FileSetDescriptor):
+            modified = update_session(session, descriptor, limit=limit, first=first, parallel=parallel)
+        else:
+            modified = update_session_single_file(session, descriptor)
         if modified:
-            snapshot_id = session.commit(f'update from {descriptor.dir}')
+            snapshot_id = session.commit('update')
             print(f'Committed snapshot: {snapshot_id}')
         return modified
     finally:
         fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
         lock_file.close()
+
+def update_session_single_file(
+        session: icechunk.session.Session,
+        descriptor: SingleFileDescriptor,
+) -> bool:
+    try:
+        existing = xr.open_zarr(session.store, zarr_format=3)
+    except (GroupNotFoundError, FileNotFoundError):
+        existing = None
+    if existing is not None:
+        raise Exception('Updates of single-file dataset not yet implemented')
+    ds = descriptor.open()
+    ds.to_zarr(session.store)
+    return True
 
 def update_session(
         session: icechunk.session.Session,
@@ -695,7 +771,7 @@ def initialize(
 
 
 def open_one_file(
-    path: Path, backend_kwargs: dict[str, dict[str, str]] | None = None
+    path: Path, backend_kwargs: dict[str, Any] | None = None
 ) -> xr.Dataset:
 
     # decode_coords doesn't control decoding of coordinate values, it controls
