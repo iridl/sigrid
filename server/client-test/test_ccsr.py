@@ -36,7 +36,7 @@ def test_one(proxy, server, test_path):
     # reading the same file. The magnitude of the difference between Ingrid and
     # Sigrid depends on the scaling factors used to encode each variable.
     if (
-        'CanSIPS-IC4' in test_path and
+        ('CanSIPS-IC4' in test_path or 'CFSv2' in test_path) and
         ('tos' in test_path or 'tas' in test_path or 'tasmax' in test_path or 'tasmin' in test_path or 'ta' in test_path)
     ):
         atol = 1e-4
