@@ -36,7 +36,7 @@ class DatasetConfig:
     encodings: Mapping[str, Mapping[str, str]]
     bare_dims: Iterable[str]
     lead_is_month: bool
-    y_increasing: bool = False
+    y_increasing: bool | None = None
 
 
 def rename(ds: xr.Dataset, mapping: Mapping[str, str]):
@@ -57,8 +57,13 @@ def standardize(ds: xr.Dataset, config: DatasetConfig):
         ds = add_target(ds, config.lead_is_month)
     
     # Invert Y from N-S to S-N
-    if config.y_increasing:
-        if len(ds["Y"]) > 1 and ds["Y"].values[0] > ds["Y"].values[-1]:
+    if config.y_increasing is not None and len(ds["Y"]) > 1:
+        is_increasing = ds["Y"].values[0] < ds["Y"].values[-1]
+        if config.y_increasing and not is_increasing:
+            # We want ascending order, but it is descending 
+            ds = ds.isel(Y=slice(None, None, -1))
+        elif not config.y_increasing and is_increasing:
+            # We want descending order, but it is ascending 
             ds = ds.isel(Y=slice(None, None, -1))
 
     ds = standardize_attrs(
@@ -94,9 +99,7 @@ def convert_units(ds: xr.Dataset, standard_attrs: Mapping[str, Mapping[str, str]
 type UnitConverter = Callable[[xr.DataArray], xr.DataArray]
 
 def linear_converter(offset: float, scale: float) -> UnitConverter:
-    """ Builds a converter for any affine transformation: new = old * scale + offset.
-     Covers both purely multiplicative conversions (offset=0, e.g. hPa -> Pa)
-     and affine ones (e.g. Kelvin -> Celsius, which needs both scale and offset). 
+    """ Builds a converter for any affine transformation. 
      """
     def converter(da: xr.DataArray):
         return da * scale + offset
