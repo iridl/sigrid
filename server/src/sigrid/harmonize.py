@@ -75,10 +75,13 @@ def standardize_y(ds: xr.Dataset, want_increasing: bool | None):
     return ds
 
 def drop_non_std(ds: xr.Dataset, standard_attrs: Mapping[str, Mapping[str, str]], bare_dims: Iterable[str]):
+    original_data_vars = list(ds.data_vars)
     ds = ds.drop_vars([
         name for name in ds.variables
         if name not in standard_attrs
     ])
+    if len(list(ds.data_vars)) == 0:
+        raise Exception(f'None of the data variables were found in standard_attrs. {original_data_vars}')
 
     non_std_dims = [
         name for name in ds.dims if name not in set(bare_dims) | set(standard_attrs)
