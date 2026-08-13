@@ -55,16 +55,8 @@ def standardize(ds: xr.Dataset, config: DatasetConfig):
     ds = convert_units(ds, config.da_attrs)
     if 'L' in ds.dims:
         ds = add_target(ds, config.lead_is_month)
-    
-    # Invert Y from N-S to S-N
-    if config.y_increasing is not None and len(ds["Y"]) > 1:
-        is_increasing = ds["Y"].values[0] < ds["Y"].values[-1]
-        if config.y_increasing and not is_increasing:
-            # We want ascending order, but it is descending 
-            ds = ds.isel(Y=slice(None, None, -1))
-        elif not config.y_increasing and is_increasing:
-            # We want descending order, but it is ascending 
-            ds = ds.isel(Y=slice(None, None, -1))
+
+    ds = standardize_y(ds, config.y_increasing)
 
     ds = standardize_attrs(
         ds,
@@ -74,6 +66,13 @@ def standardize(ds: xr.Dataset, config: DatasetConfig):
     )
     return ds
 
+def standardize_y(ds: xr.Dataset, want_increasing: bool | None):
+    '''Invert Y from N-S to S-N if necessary'''
+    if want_increasing is not None and len(ds[Coords.Y]) > 1:
+        is_increasing = ds[Coords.Y].values[0] < ds[Coords.Y].values[-1]
+        if is_increasing != want_increasing:
+            ds = ds.isel({Coords.Y: slice(None, None, -1)})
+    return ds
 
 def drop_non_std(ds: xr.Dataset, standard_attrs: Mapping[str, Mapping[str, str]], bare_dims: Iterable[str]):
     ds = ds.drop_vars([
