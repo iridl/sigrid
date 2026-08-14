@@ -16,7 +16,7 @@ raw_cat = preprocess.FileSetCatalog(
 )
 
 
-@pytest.mark.parametrize('var_path', raw_cat.list_all())
+@pytest.mark.parametrize('var_path', list(raw_cat.list_all()))
 def test_it(var_path: str):
     descriptor, icechunk_info = raw_cat.get_entry(var_path)
     storage = icechunk.in_memory_storage()

@@ -810,10 +810,7 @@ def open_icechunk(rel_path: str, decode_times: bool = True, decode_cf: bool = Tr
     # Workaround for https://github.com/earth-mover/icechunk/issues/2105
     if not icechunk.Repository.exists(storage):
         raise Exception(f'No repository exists at {storage}')
-    repo = icechunk.Repository.open(
-        storage,
-        authorize_virtual_chunk_access={f'file://{c.orig_root}/': None}
-    )
+    repo = icechunk.Repository.open(storage)
     session = repo.readonly_session("main")
     ds = xr.open_zarr(session.store, zarr_format=3, decode_times=decode_times, decode_cf=decode_cf)
     return ds
