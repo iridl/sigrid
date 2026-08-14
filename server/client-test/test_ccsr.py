@@ -35,9 +35,10 @@ def test_one(proxy, server, test_path):
     # formula that can yield slighly different floating point numbers when
     # reading the same file. The magnitude of the difference between Ingrid and
     # Sigrid depends on the scaling factors used to encode each variable.
+    temp_vars = ('tos', 'tas', 'tasmax', 'tasmin')
     if (
         ('CanSIPS-IC4' in test_path or 'CFSv2' in test_path) and
-        ('tos' in test_path or 'tas' in test_path or 'tasmax' in test_path or 'tasmin' in test_path or 'ta' in test_path)
+        any(test_path.endswith(f'/{suff}') for suff in temp_vars)
     ):
         atol = 1e-4
     else:
