@@ -22,10 +22,7 @@ def test_one(proxy, server, test_path):
     # because of updates. If we want to check for successful updates, we'll need
     # to write a separate set of tests for that.
     if ds2.sizes['S'] <= 100 :
-        print("S es menor que 100")
         ds1 = ds1.sel(S=ds2.S)
-        print(ds2)
-        print(ds1)
     else:
         ds1 = ds1.sel(S=slice(None, '2026-05-01'))
         ds2 = ds2.sel(S=slice(None, '2026-05-01'))
