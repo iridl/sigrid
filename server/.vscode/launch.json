@@ -38,6 +38,18 @@
 				"console": "integratedTerminal",
 				"cwd": "${workspaceFolder}",
 				"envFile": "${workspaceFolder}/../.env"
+			},
+			{
+				"name": "print",
+				"type": "debugpy",
+				"request": "launch",
+				"program": "test/print.py",
+				"args": [
+					"${input:extraArgs}"
+				],
+				"console": "integratedTerminal",
+				"cwd": "${workspaceFolder}",
+				"envFile": "${workspaceFolder}/../.env"
 			}
     ],
 	"inputs": [
