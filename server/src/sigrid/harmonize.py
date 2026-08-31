@@ -221,23 +221,15 @@ def standardize_attrs_da(
 
 def add_target(ds: xr.Dataset, lead_is_month: bool):
     if lead_is_month:
-        # Set lead times
-        leads = range(ds.sizes[Coords.L])
-        ds = ds.assign_coords({Coords.L: leads})
         # Set target
         targets, targets_bnds = S_L_to_target_monthly(
-            ds[Coords.S], leads
+            ds[Coords.S], ds[Coords.L]
         )
         targets_bnds = targets_bnds.data
     else:
         targets = ds[Coords.target]
-        leads = (
-            targets.isel({Coords.S: 0}, drop=True)
-            - ds[Coords.S].isel({Coords.S: 0}, drop=True)
-        )
         targets_bnds = np.stack([targets, targets + np.timedelta64(1, 'D')], axis=2)
     ds = ds.assign_coords({
-        Coords.L: leads,
         Coords.target: targets,
         Coords.target_bnds: (
             (Coords.S, Coords.L, Coords.nbound), targets_bnds
@@ -246,10 +238,14 @@ def add_target(ds: xr.Dataset, lead_is_month: bool):
 
     return ds
 
-def S_L_to_target_monthly(S: xr.DataArray, l_values: Sequence[int]):
+def S_L_to_target_monthly(S: xr.DataArray, L: xr.DataArray):
+    if not np.issubdtype(S.dtype, 'datetime64'):
+        raise Exception(f"Bad S dtype {S.dtype}")
+    if not np.issubdtype(L.dtype, 'int'):
+        raise Exception(f"Bad L dtype {L.dtype}")
     target_values = (
         S.values.astype('datetime64[M]')[:, np.newaxis] +
-        np.array(l_values).astype('timedelta64[M]')
+        L.values.astype('timedelta64[M]')
     )
     target_bnds_values = (
         target_values[:, :, np.newaxis] +
@@ -258,7 +254,7 @@ def S_L_to_target_monthly(S: xr.DataArray, l_values: Sequence[int]):
     target_bnds = xr.DataArray(
         data=target_bnds_values,
         dims=[Coords.S, Coords.L, Coords.nbound],
-        coords={Coords.S: S, Coords.L: l_values},
+        coords={Coords.S: S, Coords.L: L},
     )
 
     return target_bnds.isel({Coords.nbound: 0}, drop=True), target_bnds
