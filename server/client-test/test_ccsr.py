@@ -56,8 +56,8 @@ def test_one(proxy, server, test_path):
         ds2 = ds2.sel(S=ds1['S'])
 
     # Ingrid CFSv2 zg has only 200 hPa, while I added a couple other levels to
-    # sigrid; and Ingrid starts in April even though March is available.
+    # sigrid.
     if 'CFSv2' in test_path and 'zg' in test_path:
-        ds1 = ds1.sel(P=[200]).isel(S=slice(1, None))
+        ds1 = ds1.sel(P=[200])
 
     assert compare.compare_ds(ds1, ds2, atol)
