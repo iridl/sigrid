@@ -1,9 +1,8 @@
 import os
 from pathlib import Path
 
-import pytest
-
 import compare
+import pytest
 
 # TODO yuck
 listfile = Path(os.environ['COOKED_CATALOG_ROOT']).parent.parent / 'test/iridl-vs-ccsr.txt'

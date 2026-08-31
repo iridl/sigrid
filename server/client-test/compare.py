@@ -3,6 +3,7 @@ import time
 import numpy as np
 import xarray as xr
 
+
 def compare_ds(ds1, ds2, atol):
     names = list(ds1.data_vars)
     assert len(names) == 1
@@ -56,8 +57,8 @@ def compare_coords(ds1, ds2):
     return all_same
 
 def compare_shape(da1, da2):
-     dims1 = sorted(list(da1.sizes.items()))
-     dims2 = sorted(list(da2.sizes.items()))
+     dims1 = sorted(da1.sizes.items())
+     dims2 = sorted(da2.sizes.items())
      if dims1 == dims2:
          print('same dims')
          return True
@@ -112,7 +113,7 @@ def compare_slice(da1, da2, atol):
 
 def fetch(url):
     ds = xr.open_dataset(url, decode_times=False)
-    for name, coord in ds.variables.items():
+    for coord in ds.variables.values():
         if coord.attrs.get("calendar") == "360":
             coord.attrs["calendar"] = "360_day"
     ds = xr.decode_cf(ds)
