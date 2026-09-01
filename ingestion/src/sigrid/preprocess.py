@@ -852,7 +852,7 @@ def main():
 
     print('\n\nSummary:')
     for k, v in results.items():
-        print(k, f'{type(v)}: {v}')
+        print(k, f'{v.__class__.__name__}: {v}')
 
 
 
