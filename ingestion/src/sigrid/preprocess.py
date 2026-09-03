@@ -825,6 +825,15 @@ def open_icechunk(rel_path: str, decode_times: bool = True, decode_cf: bool = Tr
     ds = xr.open_zarr(session.store, zarr_format=3, decode_times=decode_times, decode_cf=decode_cf)
     return ds
 
+def summarize_result(x: bool | Exception) -> str:
+    if x is True:
+        message = 'Success, new data appended.'
+    elif x is False:
+        message = 'Success, no new data to append.'
+    elif isinstance(x, Exception):
+        message = f'{x.__class__.__name__}: {x}'
+    return message
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -862,7 +871,7 @@ def main():
 
     print('\n\nSummary:')
     for k, v in results.items():
-        print(k, f'{v.__class__.__name__}: {v}')
+        print(f'{k}: {summarize_result(v)}')
 
 
 
