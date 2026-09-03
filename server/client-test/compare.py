@@ -69,10 +69,11 @@ def compare_shape(da1, da2):
          return False
 
 def compare_data(da1, da2, atol):
-    # Accomodating the fact that Ingrid typically has a regular S grid, even if
-    # we have no files for some values of S, whereas pydap's S coordinate only
-    # contains values of S for which files are present. Only compare data for dates
-    # that exist in both datasets; rely on compare_shape to catch missing dates.
+    # Use sel, not isel, to select by date, to accomodate the fact that Ingrid
+    # typically has a regular S grid, even if we have no files for some values
+    # of S, whereas pydap's S coordinate only contains values of S for which
+    # files are present. Only compare data for dates that exist in pydap; rely
+    # on compare_shape to catch missing dates.
     s_len = da1.sizes['S']
     all_same = True
     for i in (0, s_len // 2, s_len - 1):
