@@ -84,7 +84,10 @@ def compare_data(da1, da2, atol):
         else:
             print(f"S={s}:")
             print('da1')
-            print(slice1.isel(L=0).values) #M=0
+            if 'M' in da1.sizes: 
+                print(slice1.isel(L=0, M=0).values)
+            else:
+                print(slice1.isel(L=0).values)
             print('da2')
             print(slice2.isel(L=0).values)
         all_same &= same
@@ -92,18 +95,16 @@ def compare_data(da1, da2, atol):
 
 def compare_slice(da1, da2, atol):
     start = time.time()
-    if 'M' in da1.sizes and da1.sizes['M'] > 10:
-        da1 = load_chunked(da1, dim='M', chunk_size=10)
-        print(f'da1 took {time.time() - start}s')
-        start = time.time()
-        da2 = load_chunked(da2, dim='M', chunk_size=10)
-        print(f'da2 took {time.time() - start}s')
-    else:
-        da1.load()
-        print(f'da1 took {time.time() - start}s')
-        start = time.time()
-        da2.load()
-        print(f'da2 took {time.time() - start}s')
+
+    dim_chunk='L'
+    if 'M' in da1.sizes and da1.sizes['M'] > da1.sizes['L']:
+        dim_chunk='M'
+
+    da1 = load_chunked(da1, dim=dim_chunk)
+    print(f'da1 took {time.time() - start}s')
+    start = time.time()
+    da2 = load_chunked(da2, dim=dim_chunk)
+    print(f'da2 took {time.time() - start}s')
 
     da1, da2 = xr.align(da1, da2, join='override')
     if np.allclose(da1, da2, equal_nan=True, atol=atol):
@@ -123,10 +124,12 @@ def fetch(url):
     for name, coord in ds.variables.items():
         if coord.attrs.get("calendar") == "360":
             coord.attrs["calendar"] = "360_day"
-    if "S2S/" in url:
-        ds = xr.decode_cf(ds,decode_timedelta=True)
-    else:
+
+    if 'months' in ds['L'].units:
         ds = xr.decode_cf(ds)
+    else:
+        ds = xr.decode_cf(ds,decode_timedelta=True)
+        
     return ds
  
 def parse_listfile(filename):

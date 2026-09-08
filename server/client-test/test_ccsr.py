@@ -21,8 +21,8 @@ def test_one(proxy, server, test_path):
     # Cut them both off so I don't have tests failing or busting the response cache
     # because of updates. If we want to check for successful updates, we'll need
     # to write a separate set of tests for that.
-    if ds2.sizes['S'] <= 100 :
-        ds1 = ds1.sel(S=ds2.S)
+    if ds1.sizes['S'] < ds2.sizes['S'] :
+        ds2 = ds2.sel(S=ds1.S)
     else:
         ds1 = ds1.sel(S=slice(None, '2026-05-01'))
         ds2 = ds2.sel(S=slice(None, '2026-05-01'))
@@ -31,7 +31,7 @@ def test_one(proxy, server, test_path):
     ds2 = ds2.convert_calendar('standard', dim='S', align_on='date')
 
     # Ingrid's L is to the midpoint of the month, pydap's is to the start.
-    if "S2S/" not in reference_path:
+    if  'timedelta' not in str(ds1['L'].dtype) :
         ds2['L'] = ds2['L'] - 0.5
 
     # IRIDL uses g2clib for GRIB decoding, while sigrid uses ecCodes. The two
