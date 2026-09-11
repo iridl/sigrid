@@ -1,0 +1,17 @@
+[workspace]
+channels = ["conda-forge"]
+name = "test-regridding"
+platforms = ["linux-64"]
+version = "0.0.0"
+
+[dependencies]
+xesmf = ">=0.9.2,<0.10"
+xarray = "*"
+icechunk = "*"
+dask = "*"
+scipy = ">=1.18.0,<2"
+netcdf4 = ">=1.7.4,<2"
+
+
+[pypi-dependencies]
+sigrid-server = {path = "..", editable = true}
