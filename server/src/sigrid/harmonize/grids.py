@@ -30,7 +30,7 @@ def regrid_conservative(
     present. Both ds_in and ds_out must have bounds coordinates associated with
     X and Y.
 
-    If you want to regrid a Dataset that lacksno bounds coordinates, you can use
+    If you want to regrid a Dataset that lacks bounds coordinates, use
     `ensure_bounds` to add them.
     """
     src_lat_bounds = _bounds_for(ds_in, C.Y)
