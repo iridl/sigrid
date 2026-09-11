@@ -1,18 +1,21 @@
 import abc
-from typing import Iterable, Mapping, cast, override
+import warnings
+from collections.abc import Iterable, Mapping
+from typing import cast, override
 
 import dask.array
 import jinja2
 import numpy as np
+import webob
+import xarray as xr
+import xarray.coding.common
+import xarray.conventions
 from pydap.handlers.lib import BaseHandler
 from pydap.model import BaseType, DatasetType
-import webob
 from webob.dec import wsgify
 from webob.exc import HTTPFound, HTTPNotFound
-import xarray as xr
-import xarray.conventions
 
-import sigrid.harmonize as harmonize
+from sigrid import harmonize
 from sigrid.harmonize import Coords
 
 
@@ -29,7 +32,7 @@ class XarrayHandler(BaseHandler, abc.ABC):
             # TODO maybe instead of doing an extra read here, we can find a way to defer
             # sending the headers until the first chunk has been read successfully?
             da = next(iter(source.data_vars.values()))
-            da.isel({dim: 0 for dim in da.dims}).data
+            da.isel({dim: 0 for dim in da.dims}).data  # noqa: B018
 
             # TODO populate last-modified
             # self.additional_headers.append(
@@ -46,11 +49,24 @@ class XarrayHandler(BaseHandler, abc.ABC):
             assert all(isinstance(d, str) for d in source.dims)
             dims = cast(Iterable[str], source.dims)
 
-            # Apply cf-encoding
-            vars, attrs = cast(
-                tuple[Mapping[str, xr.Variable], Mapping[str, str]],
-                xarray.conventions.cf_encoder(source.variables, source.attrs)
-            )
+            # Apply cf-encoding.
+            # Check for NaNs in floats that will be converted to ints. If there
+            # are none, add a _FillValue to suppress an xarray warning that's
+            # raised regardless of whether NaNs are present or not.
+            for cname, coord in source.coords.items():
+                if (
+                    np.issubdtype(coord.dtype, np.floating) and
+                    np.issubdtype(coord.encoding.get('dtype'), np.integer) and
+                    '_FillValue' not in coord.encoding and
+                    coord.isnull().any()
+                ):
+                    raise Exception(f"Coordinate {cname} can't be encoded as {coord.encoding['dtype']} because it contains NaNs.")
+            with warnings.catch_warnings():
+                warnings.filterwarnings('ignore', '.* floating point data as an integer dtype without any _FillValue .*', xarray.coding.common.SerializationWarning)
+                vars, attrs = cast(
+                    tuple[Mapping[str, xr.Variable], Mapping[str, str]],
+                    xarray.conventions.cf_encoder(source.variables, source.attrs)
+                )
 
             # build dataset
 
@@ -81,7 +97,7 @@ class XarrayHandler(BaseHandler, abc.ABC):
                 # TODO deal with the type error when I deal with groups and
                 # understand what's intended.
                 self.dataset[dim].dims = ["/" + str(dim)]  # pyright: ignore[reportAttributeAccessIssue]
-    
+
     @abc.abstractmethod
     def open(self) -> xr.Dataset: ...
 
@@ -197,7 +213,7 @@ class CatalogFileHandler(XarrayHandler):
         for da in ds.data_vars.values():
             aux_coords = set(da.attrs.get('coordinates', '').split())
             if Coords.S in da.dims:
-                aux_coords |= set([Coords.target, Coords.target_bnds])
+                aux_coords |= {Coords.target, Coords.target_bnds}
             if aux_coords:
                 da.attrs['coordinates'] = ' '.join(aux_coords)
 
@@ -214,7 +230,7 @@ class CatalogFileHandler(XarrayHandler):
         # To help users understand what they will get via opendap, add the units
         # and calendar attributes that the response will have when datetimes
         # get cf-encoded.
-        for name, coord in self.ds.coords.items():
+        for coord in self.ds.coords.values():
             if np.issubdtype(coord.dtype, np.datetime64):
                 coord.attrs['units'] = coord.encoding['units']
                 coord.attrs['calendar'] = coord.encoding['calendar']
