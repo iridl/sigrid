@@ -86,19 +86,28 @@ def compare_data(da1, da2, atol):
         else:
             print(f"S={s}:")
             print('da1')
-            print(slice1.isel(L=0, M=0).values)
+            if 'M' in da1.sizes: 
+                print(slice1.isel(L=0, M=0).values)
+            else:
+                print(slice1.isel(L=0).values)
             print('da2')
-            print(slice2.isel(L=0, M=0).values)
+            print(slice2.isel(L=0).values)
         all_same &= same
     return all_same
 
 def compare_slice(da1, da2, atol):
     start = time.time()
-    da1.load()
+
+    dim_chunk='L'
+    if 'M' in da1.sizes and da1.sizes['M'] > da1.sizes['L']:
+        dim_chunk='M'
+
+    da1 = load_chunked(da1, dim=dim_chunk)
     print(f'da1 took {time.time() - start}s')
     start = time.time()
-    da2.load()
+    da2 = load_chunked(da2, dim=dim_chunk)
     print(f'da2 took {time.time() - start}s')
+
     da1, da2 = xr.align(da1, da2, join='override')
     if np.allclose(da1, da2, equal_nan=True, atol=atol):
         return True
@@ -123,9 +132,11 @@ def fetch(url):
     for coord in ds.variables.values():
         if coord.attrs.get("calendar") == "360":
             coord.attrs["calendar"] = "360_day"
+            
     ds = xr.decode_cf(ds)
-    return ds
 
+    return ds
+ 
 def parse_listfile(filename):
     paths = {}
     with open(filename) as f:
@@ -140,3 +151,19 @@ def parse_listfile(filename):
                 paths[url1] = line
                 url1 = None
     return paths
+
+def load_chunked(da, dim='M', chunk_size=10):
+    """Load a DataArray in chunks along `dim` to avoid oversized single requests
+    (e.g. Ingrid's 413 Request Entity Too Large on very large slices)."""
+    if dim not in da.dims or da.sizes[dim] <= chunk_size:
+        da.load()
+        return da
+
+    pieces = []
+    size = da.sizes[dim]
+    for start in range(0, size, chunk_size):
+        end = min(start + chunk_size, size)
+        piece = da.isel({dim: slice(start, end)})
+        piece.load()
+        pieces.append(piece)
+    return xr.concat(pieces, dim=dim)
