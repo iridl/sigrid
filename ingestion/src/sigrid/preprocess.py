@@ -7,7 +7,7 @@ import itertools
 import os
 import re
 import warnings
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from concurrent.futures import Executor, Future
 from dataclasses import dataclass
 from pathlib import Path
@@ -313,23 +313,33 @@ class FileSetListing:
         # TODO We only really need to do this the first time.
         # Once we've created the icechunk store, we can get the shape from
         # that, and only scan files that we actually need to read.
-        self._paths: dict[FileCoords, Path] = {}
-        for path in descriptor.dir.rglob('*'):
-            if path.is_file():
-                coords = descriptor.parse_path(str(path))
-                if coords is not None:
-                    self._paths[coords] = path
-        self.coords = assemble_coords(self._paths.keys())
+        self._path_strs: dict[FileCoords, str] = {}
+        for path_str in walk_files(descriptor.dir):
+            coords = descriptor.parse_path(path_str)
+            if coords is not None:
+                self._path_strs[coords] = path_str
+        self.coords = assemble_coords(self._path_strs.keys())
 
     def list_times(self, first: np.datetime64 | None = None) -> Iterable[np.datetime64]:
         vals = self.coords.T
         if first is not None:
             vals = (v for v in vals if v >= first)
         return vals
-    
-    def get_path(self, coords: FileCoords) -> Path | None:
-        return self._paths.get(coords)
 
+    def get_path(self, coords: FileCoords) -> Path | None:
+        path_str = self._path_strs.get(coords)
+        if path_str is None:
+            return None
+        return Path(path_str)
+
+def walk_files(root: Pathy) -> Iterator[str]:
+    """Yield a Path for every regular file under root (recursively)."""
+    with os.scandir(root) as entries:
+        for entry in entries:
+            if entry.is_dir(follow_symlinks=False):
+                yield from walk_files(entry)
+            elif entry.is_file(follow_symlinks=False):
+                yield entry.path
 
 def default_parse_match(values: dict[str, str]) -> FileCoords:
     t = m = p = l = None
@@ -815,6 +825,15 @@ def open_icechunk(rel_path: str, decode_times: bool = True, decode_cf: bool = Tr
     ds = xr.open_zarr(session.store, zarr_format=3, decode_times=decode_times, decode_cf=decode_cf)
     return ds
 
+def summarize_result(x: bool | Exception) -> str:
+    if x is True:
+        message = 'Success, new data appended.'
+    elif x is False:
+        message = 'Success, no new data to append.'
+    elif isinstance(x, Exception):
+        message = f'{x.__class__.__name__}: {x}'
+    return message
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -852,7 +871,7 @@ def main():
 
     print('\n\nSummary:')
     for k, v in results.items():
-        print(k, f'{type(v)}: {v}')
+        print(f'{k}: {summarize_result(v)}')
 
 
 

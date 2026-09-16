@@ -2,9 +2,8 @@ import os
 from pathlib import Path
 import numpy as np
 
-import pytest
-
 import compare
+import pytest
 
 # TODO yuck
 listfile = Path(os.environ['COOKED_CATALOG_ROOT']).parent.parent / 'test/iridl-vs-ccsr.txt'
@@ -43,10 +42,11 @@ def test_one(proxy, server, test_path):
     # formula that can yield slighly different floating point numbers when
     # reading the same file. The magnitude of the difference between Ingrid and
     # Sigrid depends on the scaling factors used to encode each variable.
-    temp_vars = ('tos', 'tas', 'tasmax', 'tasmin')
+    temperature_vars = ('tos', 'tas', 'tasmax', 'tasmin')
+
     if (
         ('CanSIPS-IC4' in test_path or 'CFSv2' in test_path) and
-        any(test_path.endswith(f'/{suff}') for suff in temp_vars)
+        any(test_path.endswith(f'/{suff}') for suff in temperature_vars)
     ):
         atol = 1e-4
     else:
@@ -65,8 +65,8 @@ def test_one(proxy, server, test_path):
         ds2 = ds2.sel(S=ds1['S'])
 
     # Ingrid CFSv2 zg has only 200 hPa, while I added a couple other levels to
-    # sigrid; and Ingrid starts in April even though March is available.
+    # sigrid.
     if 'CFSv2' in test_path and 'zg' in test_path:
-        ds1 = ds1.sel(P=[200]).isel(S=slice(1, None))
+        ds1 = ds1.sel(P=[200])
 
     assert compare.compare_ds(ds1, ds2, atol)

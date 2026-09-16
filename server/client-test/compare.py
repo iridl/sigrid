@@ -3,6 +3,7 @@ import time
 import numpy as np
 import xarray as xr
 
+
 def compare_ds(ds1, ds2, atol):
     names = list(ds1.data_vars)
     assert len(names) == 1
@@ -56,8 +57,8 @@ def compare_coords(ds1, ds2):
     return all_same
 
 def compare_shape(da1, da2):
-     dims1 = sorted(list(da1.sizes.items()))
-     dims2 = sorted(list(da2.sizes.items()))
+     dims1 = sorted(da1.sizes.items())
+     dims2 = sorted(da2.sizes.items())
      if dims1 == dims2:
          print('same dims')
          return True
@@ -68,10 +69,11 @@ def compare_shape(da1, da2):
          return False
 
 def compare_data(da1, da2, atol):
-    # Accomodating the fact that Ingrid typically has a regular S grid, even if
-    # we have no files for some values of S, whereas pydap's S coordinate only
-    # contains values of S for which files are present. Only compare data for dates
-    # that exist in both datasets; rely on compare_shape to catch missing dates.
+    # Use sel, not isel, to select by date, to accomodate the fact that Ingrid
+    # typically has a regular S grid, even if we have no files for some values
+    # of S, whereas pydap's S coordinate only contains values of S for which
+    # files are present. Only compare data for dates that exist in pydap; rely
+    # on compare_shape to catch missing dates.
     s_len = da1.sizes['S']
     all_same = True
     for i in (0, s_len // 2, s_len - 1):
@@ -109,19 +111,25 @@ def compare_slice(da1, da2, atol):
     da1, da2 = xr.align(da1, da2, join='override')
     if np.allclose(da1, da2, equal_nan=True, atol=atol):
         return True
+    nan_diff = np.logical_xor(da1.isnull(), da2.isnull())
+    if nan_diff.any():
+        idx = nan_diff.argmax(...)
+        # np.array2string prints 32-bit floats with the appropriate number of
+        # digits, unlike python's built-in formatting, which converts to a 64-bit
+        # float and then formats that.
+        labels = {dim: np.array2string(nan_diff[dim].values[i.item()]) for dim, i in idx.items()}
+        print(f'Unaligned NaNs at {labels}')
     diff = np.abs(da1 - da2)
     idx = diff.argmax(...)
     max_diff = diff[idx]
-    # np.array2string prints 32-bit floats with the appropriate number of
-    # digits, unlike python's built-in formatting, which converts to a 64-bit
-    # float and then formats that.
-    labels = {dim: np.array2string(diff[dim].values[i.item()]) for dim, i in idx.items()}
-    print(f'tolerance {atol}, max diff {np.array2string(max_diff)} between {np.array2string(da1[idx])} and {np.array2string(da2[idx])} at {labels}')
+    if max_diff > atol:
+        labels = {dim: np.array2string(diff[dim].values[i.item()]) for dim, i in idx.items()}
+        print(f'tolerance {atol}, max diff {np.array2string(max_diff)} between {np.array2string(da1[idx])} and {np.array2string(da2[idx])} at {labels}')
     return False
 
 def fetch(url):
     ds = xr.open_dataset(url, decode_times=False)
-    for name, coord in ds.variables.items():
+    for coord in ds.variables.values():
         if coord.attrs.get("calendar") == "360":
             coord.attrs["calendar"] = "360_day"
 
