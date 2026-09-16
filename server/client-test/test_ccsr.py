@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import numpy as np
 
 import pytest
 
@@ -34,7 +35,7 @@ def test_one(proxy, server, test_path):
     ds2 = ds2.convert_calendar('standard', dim='S', align_on='date')
 
     # Ingrid's L is to the midpoint of the month, pydap's is to the start.
-    if  'timedelta' not in str(ds1['L'].dtype) :
+    if not np.issubdtype(ds1['L'].dtype, np.timedelta64) :
         ds2['L'] = ds2['L'] - 0.5
 
     # IRIDL uses g2clib for GRIB decoding, while sigrid uses ecCodes. The two
