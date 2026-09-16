@@ -125,10 +125,11 @@ def fetch(url):
         if coord.attrs.get("calendar") == "360":
             coord.attrs["calendar"] = "360_day"
 
-    if 'months' in ds['L'].units:
+    units = ds['L'].attrs.get('units')
+    if units is None or 'months' in units:
         ds = xr.decode_cf(ds)
     else:
-        ds = xr.decode_cf(ds,decode_timedelta=True)
+        ds = xr.decode_cf(ds, decode_timedelta=True)
         
     return ds
  

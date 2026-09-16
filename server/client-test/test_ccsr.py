@@ -18,11 +18,14 @@ def test_one(proxy, server, test_path):
     ds1 = compare.fetch(url1)
     ds2 = compare.fetch(url2)
 
+    # Some S2S models in IRIDL combine different versions into a single dataset,
+    # whereas PyDAP keeps them separate. Therefore, S in PyDAP could be smaller 
+    # than in IRIDL.
+    if 'S2S/ECMF/' in test_path :
+        ds2 = ds2.sel(S=ds1.S)
     # Cut them both off so I don't have tests failing or busting the response cache
     # because of updates. If we want to check for successful updates, we'll need
     # to write a separate set of tests for that.
-    if ds1.sizes['S'] < ds2.sizes['S'] :
-        ds2 = ds2.sel(S=ds1.S)
     else:
         ds1 = ds1.sel(S=slice(None, '2026-05-01'))
         ds2 = ds2.sel(S=slice(None, '2026-05-01'))
