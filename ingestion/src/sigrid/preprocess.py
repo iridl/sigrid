@@ -686,20 +686,28 @@ def initialize(
     else:
         t_slice = xr.concat(m_slices, dim='M', coords='minimal')
 
+    # Set chunking for data vars
     encoding: dict[str, dict[str, Any]] = {
         str(varname): {'chunks': tuple(da.sizes[dim] for dim in da.dims)}
         for varname, da in example_ds.data_vars.items()
     }
+    # Set chunking for coordinate vars. Force large chunks along the IRIDL_time
+    # dimension, otherwise the length of the intial array (1) is used as the
+    # chunk size, which makes reading the whole coord very expensive.
+    encoding.update({
+        str(coord_name): {
+            'chunks': tuple(
+                100_000 if dim == 'IRIDL_time' else coord.sizes[dim]
+                for dim in coord.dims
+            )
+        }
+        for coord_name, coord in t_slice.coords.items()
+    })
     # Since we're only writing a single time slice, xarray doesn't have enough
     # information to choose the right temporal resolution. It defaults to
     # integer days, which doesn't work for a 6-hourly dataset like CFSv2.
     units = f'{time_res} since 1960-01-01'
-    encoding['IRIDL_time'] = {'units': units, 'dtype': 'int32'}
-
-    # Tell it to use large chunks for this coordinate variable. Otherwise,
-    # the length of the intial array (1) is used as the chunk size, which makes
-    # subsequent reads extremely expensive.
-    encoding['IRIDL_time']['chunks'] = (100_000,)
+    encoding['IRIDL_time'].update({'units': units, 'dtype': 'int32'})
 
     t_slice.to_zarr(session.store, consolidated=False, encoding=encoding)
 
