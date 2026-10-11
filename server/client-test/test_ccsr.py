@@ -29,6 +29,10 @@ def test_one(proxy, server, test_path):
     else:
         ds1 = ds1.sel(S=slice(None, '2026-05-01'))
         ds2 = ds2.sel(S=slice(None, '2026-05-01'))
+        # SubC: IRIDL's S grid is regular and includes starts with no files;
+        # sigrid's S has only the starts with files.
+        if test_path.startswith('SubC/'):
+            ds2 = ds2.sel(S=ds1.S)
 
     # Convert Ingrid's 360_day calendar to standard
     ds2 = ds2.convert_calendar('standard', dim='S', align_on='date')
