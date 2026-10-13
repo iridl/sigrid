@@ -51,7 +51,7 @@ def compare_coords(ds1, ds2):
             # missing values. compare_shape limits how many missing
             # values are tolerated.
             same = set(c1.values) <= set(c2.values)
-        if np.issubdtype(c1.dtype, np.floating):
+        elif np.issubdtype(c1.dtype, np.floating):
             same = np.allclose(c1.values, c2.values, equal_nan=True)
         else:
             same = np.array_equal(c1.values, c2.values)
@@ -77,7 +77,7 @@ def compare_shape(da1, da2):
         if s1 == s2:
             print('same dims')
             return True
-        if (s2 - s1) / s2 > .8:
+        if (s2 - s1) / s2 < .2:
             print(f'mostly same dims, S close enough: {s1} vs {s2}')
             return True
         print(f'S lengths are too different: {s1} vs {s2}')
@@ -120,7 +120,7 @@ def compare_data(da1, da2, atol):
             missing_s = missing_s[[0, missing_count // 2, missing_count - 1]]
         for s in missing_s:
             slice2 = da2.sel(S=s)
-            if not slice2.isnan().all():
+            if not slice2.isnull().all():
                 print(f'S={s} is missing from da1 and non-NaN in da2')
                 all_same = False
     return all_same
