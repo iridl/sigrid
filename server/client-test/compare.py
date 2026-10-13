@@ -45,6 +45,12 @@ def compare_coords(ds1, ds2):
         if c2 is None:
             print(cname, 'present', 'absent')
             return False
+        if cname == 'S':
+            # Just check that all sigrid values are also in iridl,
+            # not vice versa, because of different handling of
+            # missing values. compare_shape limits how many missing
+            # values are tolerated.
+            same = set(c1.values) <= set(c2.values)
         if np.issubdtype(c1.dtype, np.floating):
             same = np.allclose(c1.values, c2.values, equal_nan=True)
         else:
@@ -57,23 +63,37 @@ def compare_coords(ds1, ds2):
     return all_same
 
 def compare_shape(da1, da2):
-     dims1 = sorted(da1.sizes.items())
-     dims2 = sorted(da2.sizes.items())
-     if dims1 == dims2:
-         print('same dims')
-         return True
-     else:
-         print('different dims:')
-         print(dims1)
-         print(dims2)
-         return False
+    dims1 = sorted(
+        (name, size) for name, size in da1.sizes.items()
+        if name != 'S'
+    )
+    dims2 = sorted(
+        (name, size) for name, size in da2.sizes.items()
+        if name != 'S'
+    )
+    s1 = da1.sizes['S']
+    s2 = da2.sizes['S']
+    if dims1 == dims2:
+        if s1 == s2:
+            print('same dims')
+            return True
+        if (s2 - s1) / s2 > .8:
+            print(f'mostly same dims, S close enough: {s1} vs {s2}')
+            return True
+        print(f'S lengths are too different: {s1} vs {s2}')
+        return False
+    else:
+        print('different dims')
+        print(dims1, f'S={s1}')
+        print(dims2, f'S={s2}')
+        return False
 
 def compare_data(da1, da2, atol):
-    # Use sel, not isel, to select by date, to accomodate the fact that Ingrid
-    # typically has a regular S grid, even if we have no files for some values
-    # of S, whereas pydap's S coordinate only contains values of S for which
-    # files are present. Only compare data for dates that exist in pydap; rely
-    # on compare_shape to catch missing dates.
+    # When there are missing S values, sigrid has gaps in S, while ingrid
+    # has a regular S grid but some entries are all-NaN. In that case, pick
+    # three S slices that are present in both to compare, and pick three
+    # S slices that are missing from sigrid and verify that they're all-NaN
+    # in ingrid.
     s_len = da1.sizes['S']
     all_same = True
     for i in (0, s_len // 2, s_len - 1):
@@ -93,6 +113,16 @@ def compare_data(da1, da2, atol):
             print('da2')
             print(slice2.isel(L=0).values)
         all_same &= same
+    if da1.sizes['S'] < da2.sizes['S']:
+        missing_s = np.setdiff1d(da2['S'].values, da1['S'].values)
+        missing_count = len(missing_s)
+        if missing_count > 3:
+            missing_s = missing_s([0, missing_count // 2, missing_count - 1])
+        for s in missing_s:
+            slice2 = da2.sel(S=s)
+            if not slice2.isnan().all():
+                print(f'S={s} is missing from da1 and non-NaN in da2')
+                all_same = False
     return all_same
 
 def compare_slice(da1, da2, atol):
