@@ -117,7 +117,7 @@ def compare_data(da1, da2, atol):
         missing_s = np.setdiff1d(da2['S'].values, da1['S'].values)
         missing_count = len(missing_s)
         if missing_count > 3:
-            missing_s = missing_s([0, missing_count // 2, missing_count - 1])
+            missing_s = missing_s[[0, missing_count // 2, missing_count - 1]]
         for s in missing_s:
             slice2 = da2.sel(S=s)
             if not slice2.isnan().all():
