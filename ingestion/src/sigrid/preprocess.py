@@ -465,12 +465,6 @@ def update_session(
     if len(times_to_fetch) == 0:
         return initialized
 
-    if len(existing['IRIDL_time']) > 0:
-        last_old = existing['IRIDL_time'][-1]
-        first_new = times_to_fetch[0]
-        if first_new < last_old:
-            raise Exception("Inserting prior to an existing time slice is not yet implemented.")
-
     # Resize arrays to prepare them to receive the new chunks. Typically done
     # with xarray + dask, but I'm dropping down to zarr to avoid dask.
     # Any array that has the IRIDL_time dimension needs to be extended.
@@ -494,6 +488,144 @@ def update_session(
     z_arr = zgroup['IRIDL_time']
     assert isinstance(z_arr, zarr.Array)
     z_arr[-len(new_times_encoded):] = new_times_encoded.values
+
+    # If any new time falls before/between existing ones, reorder.
+    # At this point the arrays are laid out as [old..., new...] (unsorted).
+    # Existing chunks are moved with icechunk's reindex_array (manifest-only);
+    # the new slots stay empty and are filled later by write_one_file_slice.
+    # NOTE: `existing` is still the view from BEFORE the resize, so
+    # existing['IRIDL_time'] only have the old times.
+    old_times = existing['IRIDL_time'].values
+    new_times_ns = np.asarray(times_to_fetch)
+    if len(old_times) > 0 and new_times_ns.min() < old_times.max():
+        merged = np.union1d(old_times, new_times_ns)  # sorted, unique
+        n_old = len(old_times)
+
+        # No overlap between old and new times.
+        # union1d drops duplicates, so if any time in times_to_fetch already
+        # exists (or is repeated inside times_to_fetch), `merged` would be
+        # shorter than the resized arrays (n_old + n_new). The computed
+        # positions would then not match the array size and the final write
+        # of the time coordinate would fail (or silently misplace data).
+        assert len(merged) == n_old + len(new_times_ns), (
+            f'times_to_fetch has duplicates or overlaps existing times: '
+            f'expected {n_old + len(new_times_ns)} unique times, got {len(merged)}'
+        )
+
+        # The chosen approach is to use reindex_array, using a double index array, 
+        #  forward and backward arrays, to ensure that the correct chunks are referenced 
+        #  and that no indices end up pointing to chunks that have already been moved to a new position, 
+        #  which could result in duplicate chunks which would be a mistake.
+        #  https://icechunk.io/en/stable/guides/moving-chunks/#backward-function (see reindex_array section)
+
+        # Using S as example (S2S ECMF reforecast v_2026 2006-2025): 
+        #           old_times:  [2025-01-10, 2025-01-20, 2025-01-30], new_times = [2025-01-05, 2025-01-25]
+        #           position:   [      0           1          2    ]              [      0          1   ]     
+        #   merged  = [2025-01-05, 2025-01-10, 2025-01-20, 2025-01-25, 2025-01-30] (final sorted time axis)
+        #  old_pos  = [                1           2                       4   ]  (final position of each old slice)
+        old_pos = np.searchsorted(merged, old_times)  # new position of each existing slice
+        #  fwd_map: old position -> new position   {0: 1, 1: 2, 2: 4}
+        #   Tells icechunk where to move each existing chunk.
+        fwd_map = {i: int(p) for i, p in enumerate(old_pos)} 
+        # bwd_map: new position -> old position   {1: 0, 2: 1, 4: 2} 
+        # It is the inverse of fwd_map. It allows reindex_array to clear positions 
+        #  that should not receive any chunks, preventing stale data from remaining.
+        bwd_map = {p: i for i, p in fwd_map.items()} 
+
+
+        # The time axis is NOT assumed to be axis 0: each variable may have
+        #  'IRIDL_time' in a different position, so the chunk-index remapping
+        #  is built per variable for the axis `ax` where time lives.
+        # Important Note: This is a way to make the implementation more general, but for now, 
+        #                   it cannot be applied to other coordinates because reindex_array moves 
+        #                   entire chunks. Therefore, it is only applicable to IRIDL_Time from the var, 
+        #                   since its chunk size is 1, but not to coordinates such as Y, which has a chunk 
+        #                   size of 121 
+        #       (ECMF CY50):
+        #                   variable              shape                     chunks (storage)      
+        #                      tp             (1520, 47, 121, 240)          (1, 47, 121, 240)
+        def make_forward(ax):
+            def forward(idx):
+                new = fwd_map.get(idx[ax])
+                if new is None:
+                    return None
+                out = list(idx)
+                out[ax] = new  # only the time component changes
+                return out
+            return forward
+
+        def make_backward(ax):
+            def backward(idx):
+                # Positions that no existing chunk maps to (the new time slots)
+                #  return None, so icechunk clears them instead of leaving stale data. 
+                #  (more info on the S example above)
+                old = bwd_map.get(idx[ax])
+                if old is None:
+                    return None
+                out = list(idx)
+                out[ax] = old
+                return out
+            return backward
+
+        # Collect (name, array, time_axis) and validate ALL variables before
+        #  touching anything, so a failed assertion cannot leave the session
+        #  with some arrays already reindexed and others not.
+        to_reorder = []
+        for name in existing.variables:
+            assert isinstance(name, str)
+            if name == 'IRIDL_time' or 'IRIDL_time' not in existing[name].dims:
+                continue
+
+            ax = existing[name].dims.index('IRIDL_time')  # axis where time lives
+            z = zgroup[name]
+            assert isinstance(z, zarr.Array)
+
+            if name in existing.data_vars:
+                # One chunk per time step along the time axis => chunk index == time index ,
+                #  which is what makes forward/backward valid. (see ECMF CY50 tp example above )
+                assert z.chunks[ax] == 1, (
+                    f'{name}: time chunk size must be 1 along axis {ax}, '
+                    f'got chunks={z.chunks}'
+                )
+
+            to_reorder.append((name, z, ax))
+
+        for name, z, ax in to_reorder:
+            # reindex_array only moves whole chunks
+            # Example:
+            #               variable             shape                chunks (storage)
+            #                  tp          (1520, 47, 121, 240)       (1, 47, 121, 240)
+            if name in existing.data_vars:
+                session.reindex_array(
+                    f'/{name}',
+                    forward=make_forward(ax),
+                    backward=make_backward(ax),
+                )
+            else:
+                # reindex_array only moves whole chunks and coordinates are a single chunk
+                # along time, so we rewrite them in memory (cheap: they are small).
+                # Example:
+                #               variable             shape                chunks (storage)
+                #           valid_time_expanded   (1660, 47)                (100000, 47)
+                sl_old = [slice(None)] * z.ndim
+                sl_old[ax] = slice(0, n_old)
+                old_vals = z[tuple(sl_old)]
+
+                fill = z.fill_value if z.fill_value is not None else 0
+                new_vals = np.full(z.shape, fill, dtype=z.dtype)
+
+                sl_new = [slice(None)] * z.ndim
+                sl_new[ax] = old_pos  # old slices go to their sorted positions
+                new_vals[tuple(sl_new)] = old_vals
+                z[:] = new_vals
+
+        # Sorted time coordinate (same encoding as the existing one)
+        merged_encoded = xarray.conventions.encode_cf_variable(
+            xr.Variable('IRIDL_time', merged, encoding=existing['IRIDL_time'].encoding)
+        )
+        z_arr[:] = merged_encoded.values
+    ############# Fin de cambio XC ########
+
     # refresh our xarray view of the existing array to reflect the extended time coord
     existing = xr.open_zarr(session.store, zarr_format=3)
 
