@@ -330,6 +330,9 @@ type Opener = Callable[[], xr.Dataset]
 class DisplayDataset:
     subdatasets: Iterable[str]
     variables: Iterable[str]
+    # Optional text shown on the dataset's web page, from a `description`
+    # string in its index.py.
+    description: str | None = None
 
 
 class Catalog:
@@ -359,6 +362,16 @@ class Catalog:
         return None
 
     def open_dataset(self, catalog_path: str) -> DisplayDataset | None:
+        path = self.open_dataset_path(catalog_path)
+        if path is None:
+            return None
+        return path[-1]
+
+    def open_dataset_path(self, catalog_path: str) -> list[DisplayDataset] | None:
+        """Return the listing of each dataset from the root down to catalog_path.
+
+        The web pages use these listings to draw the catalog tree.
+        """
         if not catalog_path.startswith('/'):
             raise Exception(f'Absolute catalog path was expected; got relative path {catalog_path}')
         if not catalog_path.endswith('/'):
@@ -367,15 +380,14 @@ class Catalog:
         components = catalog_path[1:-1].split('/')
         if components == ['']:
             components = []
+        path = [node.display()]
         for component in components:
             sub = node.subdatasets.get(component)
             if sub is None:
                 return None
             node = sub
-        return DisplayDataset(
-            [name for name, sub in node.subdatasets.items() if not sub.hidden],
-            list(node.variables)
-        )
+            path.append(node.display())
+        return path
 
 
 class CatalogNode:
@@ -411,6 +423,15 @@ class CatalogNode:
             var: functools.partial(self.open_var, var)
             for var in var_names
         }
+
+    def display(self) -> DisplayDataset:
+        description = getattr(self.module, 'description', None)
+        return DisplayDataset(
+            # Sorted so listings don't depend on directory order.
+            sorted(name for name, sub in self.subdatasets.items() if not sub.hidden),
+            list(self.variables),
+            description if isinstance(description, str) else None,
+        )
 
     @functools.cached_property
     def module(self):

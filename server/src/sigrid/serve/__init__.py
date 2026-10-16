@@ -4,7 +4,6 @@ from collections.abc import Iterable, Mapping
 from typing import cast, override
 
 import dask.array
-import jinja2
 import numpy as np
 import webob
 import xarray as xr
@@ -17,6 +16,7 @@ from webob.exc import HTTPFound, HTTPNotFound
 
 from sigrid import harmonize
 from sigrid.harmonize import Coords
+from sigrid.serve import pages
 
 
 class XarrayHandler(BaseHandler, abc.ABC):
@@ -145,11 +145,11 @@ class Server:
         assert url_path.startswith('/')
 
         if url_path.endswith('/'):
-            node = self.catalog.open_dataset(url_path)
-            if node is None:
+            listings = self.catalog.open_dataset_path(url_path)
+            if listings is None:
                 return HTTPNotFound()
-            return self.dir(node)
-        else:        
+            return self.dir(req.script_name, path_components(url_path), listings)
+        else:
             parent_path, last_component = url_path.rsplit('/', maxsplit=1)
             if '.' in last_component:
                 varname, extension = last_component.rsplit('.', maxsplit=1)
@@ -164,48 +164,32 @@ class Server:
                     return HTTPFound(location=req.path + '/')
                 return HTTPNotFound()
 
-            return CatalogFileHandler(ds, varname, extension)  # TODO bad name--only handles variables.
+            # The web page needs the listings along the variable's path to
+            # draw the catalog tree; OPeNDAP responses don't.
+            page = None
+            if extension is None:
+                listings = self.catalog.open_dataset_path(parent_path + '/')
+                assert listings is not None  # open_variable found the variable
+                page = (req.script_name, path_components(parent_path + '/'), listings)
+            return CatalogFileHandler(ds, varname, extension, page)  # TODO bad name--only handles variables.
 
-    def dir(self, dataset: harmonize.DisplayDataset):
+    def dir(
+        self,
+        mount: str,
+        components: list[str],
+        listings: list[harmonize.DisplayDataset],
+    ):
         """Return a directory listing."""
-       
+        return webob.Response(text=pages.render_dir(mount, components, listings))
 
-        context = {
-            "dirs": dataset.subdatasets,
-            "vars": dataset.variables,
-        }
 
-        return webob.Response(
-            body=self.dir_template.render(context),
-        )
-
-    dir_template = jinja2.Template("""
-        <!-- OPeNDAP -->
-        {% if dirs %}
-        <h1>Datasets</h1>
-        <table>
-            <tbody>
-                {% for x in dirs %}
-                <tr><td><a href="{{ x }}/">{{ x }}</a></td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% endif %}
-        {% if vars %}
-        <h1>Variables</h1>
-        <table>
-            <tbody>
-                {% for x in vars %}
-                <tr><td><a href="{{ x }}">{{ x }}</a></td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% endif %}
-    """)
+def path_components(dataset_path: str) -> list[str]:
+    """Split a dataset path such as /SubC/ECCC/ into ['SubC', 'ECCC']."""
+    return [c for c in dataset_path.split('/') if c]
 
 
 class CatalogFileHandler(XarrayHandler):
-    def __init__(self, ds, varname, extension):
+    def __init__(self, ds, varname, extension, page=None):
         # Populate data variables' "coordinates" attribute, otherwise variables
         # that xarray considers to be auxiliary vars turn into data vars
         # in the OPeNDAP response. Doing this here so that the attribute is
@@ -219,6 +203,8 @@ class CatalogFileHandler(XarrayHandler):
 
         self.ds = ds
         self.extension = extension
+        # (mount, components, listings) for the web page; see Server.__call__.
+        self.page = page
         super().__init__(varname)
 
     @override
@@ -235,34 +221,13 @@ class CatalogFileHandler(XarrayHandler):
                 coord.attrs['units'] = coord.encoding['units']
                 coord.attrs['calendar'] = coord.encoding['calendar']
 
-        context = {
-            'ds': self.ds,
-            'url': request.url,
-        }
-        response = webob.Response(body=self.var_template.render(context))
+        assert self.page is not None
+        mount, components, listings = self.page
+        body = pages.render_var(
+            mount, components, listings, self.name, self.ds, request.path_url,
+        )
+        response = webob.Response(text=body)
         return response(environ, start_response)
-
-    
-    var_template = jinja2.Template(
-        """
-        <html><body> 
-            <script>
-                function copyURL() {
-                    const pageUrl = window.location.href;
-                    navigator.clipboard.writeText(pageUrl).then(() => {
-                        const btn = document.getElementById('copyButton');
-                        btn.innerText = "URL Copied";
-                        setTimeout(() => btn.innerText = "Copy OPeNDAP URL", 2000);
-                    }).catch(err => {
-                        console.error('Failed to copy opendap URL: ', err);
-                    });
-                }
-            </script>
-        <button onclick="copyURL()" id="copyButton">Copy OPeNDAP URL</button>
-        {{ds._repr_html_()}}
-        </body><html>
-        """
-    )
 
     @override
     def open(self):
