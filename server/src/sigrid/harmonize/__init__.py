@@ -4,7 +4,7 @@ import functools
 import importlib.util
 import os
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 from types import MappingProxyType
@@ -333,6 +333,10 @@ class DisplayDataset:
     # Optional text shown on the dataset's web page, from a `description`
     # string in its index.py.
     description: str | None = None
+    # Optional links shown on the dataset's web page, from a `links` list
+    # in its index.py. Each is a dict with 'href' and optional 'name' and
+    # 'description', like the link: blocks of an Ingrid catalog entry.
+    links: list[dict[str, str]] = field(default_factory=list)
 
 
 class Catalog:
@@ -426,11 +430,13 @@ class CatalogNode:
 
     def display(self) -> DisplayDataset:
         description = getattr(self.module, 'description', None)
+        links = getattr(self.module, 'links', [])
         return DisplayDataset(
             # Sorted so listings don't depend on directory order.
             sorted(name for name, sub in self.subdatasets.items() if not sub.hidden),
             list(self.variables),
             description if isinstance(description, str) else None,
+            [link for link in links if isinstance(link, dict) and 'href' in link],
         )
 
     @functools.cached_property

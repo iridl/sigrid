@@ -47,6 +47,7 @@ def render_dir(mount: str, components: Sequence[str], listings: Sequence[Display
     return env.get_template('dir').render(
         title=components[-1] if components else root_name(mount),
         description=listing.description,
+        links=listing.links,
         dirs=listing.subdatasets,
         vars=listing.variables,
         **frame(mount, components, listings),
@@ -231,6 +232,8 @@ h1 { margin: 0 0 4px; font-size: 1.6rem; }
 h2 { margin: 24px 0 8px; font-size: 1.1rem; }
 .sub { margin: 0; color: var(--muted); }
 .desc { max-width: 70ch; }
+.links { margin: 8px 0 0; padding-left: 20px; max-width: 70ch; }
+.links li { margin-bottom: 2px; overflow-wrap: anywhere; }
 table { border-collapse: collapse; }
 td, th { text-align: left; padding: 5px 14px 5px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
 th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 500; }
@@ -292,6 +295,13 @@ details.attrs summary { cursor: pointer; color: var(--accent); }
 <h1>{{ title }}</h1>
 {% if description %}
 <p class="desc">{{ description }}</p>
+{% endif %}
+{% if links %}
+<ul class="links">
+{% for link in links %}
+<li><a href="{{ link.href }}">{{ link.description or link.name or link.href }}</a></li>
+{% endfor %}
+</ul>
 {% endif %}
 {% if dirs %}
 <div class="listhead">

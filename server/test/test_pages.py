@@ -46,3 +46,16 @@ def test_describe_values():
     dates = np.array(['2024-06-13', '2024-06-17', '2024-06-20', '2024-06-24',
                       '2024-06-27', '2024-07-01', '2026-09-07'], dtype='datetime64[ns]')
     assert pages.describe_values(dates) == '2024-06-13 to 2026-09-07'
+
+
+def test_render_dir_shows_links():
+    listings = [
+        DisplayDataset(['SPEAR'], []),
+        DisplayDataset(['forecast'], [], None, [
+            {'name': 'Journal Paper', 'description': 'SPEAR <paper>', 'href': 'https://doi.org/x'},
+            {'name': 'site', 'href': 'https://example.org/'},
+        ]),
+    ]
+    html = pages.render_dir('/data', ['SPEAR'], listings)
+    assert '<a href="https://doi.org/x">SPEAR &lt;paper&gt;</a>' in html
+    assert '<a href="https://example.org/">site</a>' in html
