@@ -624,7 +624,6 @@ def update_session(
             xr.Variable('IRIDL_time', merged, encoding=existing['IRIDL_time'].encoding)
         )
         z_arr[:] = merged_encoded.values
-    ############# Fin de cambio XC ########
 
     # refresh our xarray view of the existing array to reflect the extended time coord
     existing = xr.open_zarr(session.store, zarr_format=3)
