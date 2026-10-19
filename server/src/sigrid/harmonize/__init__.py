@@ -337,6 +337,10 @@ class DisplayDataset:
     # in its index.py. Each is a dict with 'href' and optional 'name' and
     # 'description', like the link: blocks of an Ingrid catalog entry.
     links: list[dict[str, str]] = field(default_factory=list)
+    # Standard attributes (long_name, units, ...) of each variable, from the
+    # nearest DatasetConfig above this dataset. Lets the listing describe
+    # variables without opening their stores.
+    variable_attrs: Mapping[str, Mapping[str, str]] = field(default_factory=dict)
 
 
 class Catalog:
@@ -431,13 +435,26 @@ class CatalogNode:
     def display(self) -> DisplayDataset:
         description = getattr(self.module, 'description', None)
         links = getattr(self.module, 'links', [])
+        variables = list(self.variables)
+        standard_attrs = self.standard_attrs() if variables else {}
         return DisplayDataset(
             # Sorted so listings don't depend on directory order.
             sorted(name for name, sub in self.subdatasets.items() if not sub.hidden),
-            list(self.variables),
+            variables,
             description if isinstance(description, str) else None,
             [link for link in links if isinstance(link, dict) and 'href' in link],
+            {var: standard_attrs[var] for var in variables if var in standard_attrs},
         )
+
+    def standard_attrs(self) -> Mapping[str, Mapping[str, str]]:
+        """da_attrs of the nearest `config` DatasetConfig in this or a parent index.py."""
+        node = self
+        while node is not None:
+            config = getattr(node.module, 'config', None)
+            if isinstance(config, DatasetConfig):
+                return config.da_attrs
+            node = node.parent
+        return {}
 
     @functools.cached_property
     def module(self):

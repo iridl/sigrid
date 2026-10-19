@@ -2,19 +2,26 @@
 
 Every page has the same frame: a site header, the catalog tree on the left
 and the page content on the right. The tree is opened along the path to the
-current page, so it shows where the page sits and its neighbours.
+current page, so it shows where the page sits and its neighbours. In narrow
+windows the tree is hidden and the breadcrumb is the only navigation.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
 import jinja2
 import numpy as np
 import xarray as xr
 
-from sigrid.harmonize import DisplayDataset
+from sigrid.harmonize import Coords, DisplayDataset
 
 SITE_NAME = 'CCSR Data Library'
+
+# Coordinates with more elements than this get a summary only, so a page
+# never loads a large array.
+MAX_SUMMARY_SIZE = 1_000_000
+
+ONE_HOUR = np.timedelta64(1, 'h')
 
 
 @dataclass
@@ -28,12 +35,18 @@ class TreeItem:
 
 
 @dataclass
-class GridRow:
+class VarInfo:
+    """One row of a variable page: the data variable or a coordinate variable."""
     name: str
-    long_name: str
-    size: int
-    values: str
-    units: str
+    dims: str
+    dtype: str = ''
+    long_name: str = ''
+    summary: str = ''
+    units: str = ''
+    attrs: Mapping = field(default_factory=dict)
+    # Shown in the row's drawer, under the attributes.
+    values_label: str = ''
+    values: str = ''
 
 
 def render_dir(mount: str, components: Sequence[str], listings: Sequence[DisplayDataset]) -> str:
@@ -49,7 +62,10 @@ def render_dir(mount: str, components: Sequence[str], listings: Sequence[Display
         description=listing.description,
         links=listing.links,
         dirs=listing.subdatasets,
-        vars=listing.variables,
+        vars=[
+            (var, listing.variable_attrs.get(var, {}))
+            for var in listing.variables
+        ],
         **frame(mount, components, listings),
     )
 
@@ -70,8 +86,9 @@ def render_var(
         long_name=da.attrs.get('long_name', ''),
         units=da.attrs.get('units', ''),
         url=url,
-        grid_rows=[grid_row(ds, str(dim)) for dim in da.dims],
-        attr_groups=attr_groups(ds, varname),
+        data_var=data_var_info(ds, varname),
+        coords=coord_infos(ds, varname),
+        global_attrs=ds.attrs,
         **frame(mount, components, listings, varname),
     )
 
@@ -140,51 +157,162 @@ def build_tree(
     return root
 
 
-def grid_row(ds: xr.Dataset, dim: str) -> GridRow:
-    size = ds.sizes[dim]
-    if dim not in ds.coords:
-        # A dimension without a coordinate variable, e.g. lead L.
-        return GridRow(dim, '', size, '', '')
-    coord = ds[dim]
-    return GridRow(
-        dim,
-        coord.attrs.get('long_name', ''),
-        size,
-        describe_values(coord.values),
-        coord.attrs.get('units', ''),
+def data_var_info(ds: xr.Dataset, varname: str) -> VarInfo:
+    da = ds[varname]
+    return VarInfo(
+        name=varname,
+        dims=dims_text(da),
+        dtype=served_dtype(da),
+        long_name=da.attrs.get('long_name', ''),
+        units=da.attrs.get('units', ''),
+        attrs=da.attrs,
     )
+
+
+def coord_infos(ds: xr.Dataset, varname: str) -> list[VarInfo]:
+    """The variable's dimension coordinates in its dimension order, then the
+    other coordinates (e.g. target, target_bnds)."""
+    da = ds[varname]
+    infos = []
+    for dim in map(str, da.dims):
+        if dim in ds.coords:
+            infos.append(coord_info(ds, dim))
+        else:
+            infos.append(VarInfo(
+                name=dim, dims=f'({dim}: {ds.sizes[dim]})',
+                summary='No coordinate variable',
+            ))
+    infos += [
+        coord_info(ds, str(name)) for name in ds.coords
+        if name not in da.dims
+    ]
+    return infos
+
+
+def coord_info(ds: xr.Dataset, name: str) -> VarInfo:
+    coord = ds[name]
+    info = VarInfo(
+        name=name,
+        dims=dims_text(coord),
+        dtype=served_dtype(coord),
+        long_name=coord.attrs.get('long_name', ''),
+        units=coord.attrs.get('units', ''),
+        attrs=coord.attrs,
+    )
+    if coord.size == 0 or coord.size > MAX_SUMMARY_SIZE:
+        return info
+    values = coord.values
+    if coord.ndim == 1:
+        info.summary = describe_values(values)
+        info.values_label = 'Values'
+        info.values = ', '.join(format_value(v) for v in values)
+        return info
+    # Multi-dimensional times, e.g. target (S, L) and target_bnds (S, L, nbound),
+    # are shown as offsets from S or target when the offsets don't depend on S.
+    offsets = relative_offsets(ds, coord)
+    if offsets is not None:
+        base, offset_values, summary = offsets
+        info.summary = summary
+        info.values_label = f'{name} − {base}'
+        info.values = ', '.join(format_value(v) for v in offset_values.ravel())
+    else:
+        info.summary = f'{format_value(values.min())} to {format_value(values.max())}'
+    return info
+
+
+def relative_offsets(ds: xr.Dataset, coord: xr.DataArray):
+    """For a datetime coordinate that is S or target plus offsets that are the
+    same for every S, return (base name, offsets along the other dims, summary).
+    Otherwise None."""
+    if not np.issubdtype(coord.dtype, np.datetime64) or Coords.S not in coord.dims:
+        return None
+    if Coords.target in ds.coords and ds[Coords.target].dims == coord.dims[:-1]:
+        # Bounds: one offset from target per bound.
+        base = Coords.target
+    elif Coords.S in ds.coords:
+        base = Coords.S
+    else:
+        return None
+    offset = coord - ds[base]
+    first = offset.isel({Coords.S: 0})
+    if not bool((offset == first).all()):
+        return None
+    first = first.values
+    if base == Coords.target:
+        # Offsets per bound must also be the same for every other element.
+        per_bound = first.reshape(-1, first.shape[-1])
+        if not (per_bound == per_bound[0]).all():
+            return None
+        parts = [
+            base if o == np.timedelta64(0, 'ns') else f'{base} + {format_value(o)}'
+            for o in per_bound[0]
+        ]
+        return base, per_bound[0], '[' + ', '.join(parts) + ']'
+    return base, first, f'{base} + ({describe_values(first.ravel())})'
+
+
+def dims_text(da: xr.DataArray) -> str:
+    return '(' + ', '.join(f'{dim}: {size}' for dim, size in da.sizes.items()) + ')'
+
+
+def served_dtype(da: xr.DataArray) -> str:
+    """The type OPeNDAP sends, which differs from xarray's for encoded times."""
+    return str(np.dtype(da.encoding.get('dtype', da.dtype)))
 
 
 def describe_values(values: np.ndarray) -> str:
     """Short text for a coordinate's values: all of them if there are few,
-    otherwise first to last, plus the step if it is constant."""
+    otherwise first to last and the spacing."""
     if values.size == 0:
         return ''
     if values.size <= 6:
         return ', '.join(format_value(v) for v in values)
     text = f'{format_value(values[0])} to {format_value(values[-1])}'
+    spacing = describe_spacing(values)
+    if spacing:
+        text += ', ' + spacing
+    return text
+
+
+def describe_spacing(values: np.ndarray) -> str:
+    if np.issubdtype(values.dtype, np.datetime64):
+        months = values.astype('datetime64[M]')
+        first_of_month = (values.astype('datetime64[D]') == months.astype('datetime64[D]')).all()
+        if first_of_month and (np.diff(months) == np.timedelta64(1, 'M')).all():
+            return 'every month'
+        steps = np.unique(np.diff(values))
+        if len(steps) <= 3:
+            return 'every ' + ' or '.join(format_value(s) for s in steps)
+        return 'irregular spacing'
+    if np.issubdtype(values.dtype, np.timedelta64):
+        steps = np.unique(np.diff(values))
+        return f'by {format_value(steps[0])}' if len(steps) == 1 else ''
     if np.issubdtype(values.dtype, np.number):
         steps = np.diff(values)
         if np.allclose(steps, steps[0]):
-            text += f' by {format_value(steps[0])}'
-    return text
+            return f'by {format_value(steps[0])}'
+    return ''
 
 
 def format_value(v) -> str:
     if isinstance(v, np.datetime64):
         # Dates at midnight are shown without the time.
         return np.datetime_as_string(v, unit='s').removesuffix('T00:00:00')
+    if isinstance(v, np.timedelta64):
+        return format_timedelta(v)
     if isinstance(v, (float, np.floating)):
         return f'{v:g}'
     return str(v)
 
 
-def attr_groups(ds: xr.Dataset, varname: str) -> list[tuple[str, dict]]:
-    """Attributes of the variable, then its coordinates, then the dataset."""
-    groups = [(varname, ds[varname].attrs)]
-    groups += [(str(name), coord.attrs) for name, coord in ds.coords.items()]
-    groups.append(('Global', ds.attrs))
-    return [(name, attrs) for name, attrs in groups if attrs]
+def format_timedelta(v: np.timedelta64) -> str:
+    hours = v / ONE_HOUR
+    if hours % 24 == 0:
+        days = int(hours // 24)
+        return f'{days} day' if abs(days) == 1 else f'{days} days'
+    if hours == int(hours):
+        return f'{int(hours)} hour' if abs(hours) == 1 else f'{int(hours)} hours'
+    return str(v)
 
 
 env = jinja2.Environment(
@@ -214,19 +342,18 @@ env = jinja2.Environment(
 body { margin: 0; background: var(--bg); color: var(--fg);
   font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
 a { color: var(--accent); }
-code, pre, .tree { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.88em; }
+code, pre, .tree, .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.88em; }
 .site { padding: 10px 20px; border-bottom: 2px solid var(--accent); }
 .site a { color: var(--fg); font-weight: 600; text-decoration: none; }
 .panes { display: grid; grid-template-columns: minmax(200px, 280px) minmax(0, 1fr); }
 .tree { padding: 14px 16px; border-right: 1px solid var(--rule); overflow-x: auto; }
-.tree summary { display: none; }
 .tree ul { list-style: none; margin: 0; padding-left: 14px; }
-.tree > details > ul { padding-left: 0; }
+.tree > ul { padding-left: 0; }
 .tree li { padding: 1px 0; white-space: nowrap; }
 .tree a { text-decoration: none; }
 .tree a.var { color: var(--muted); }
 .tree a[aria-current] { background: var(--accent-soft); color: var(--fg); border-radius: 3px; padding: 0 4px; }
-main { padding: 14px 24px 40px; min-width: 0; max-width: 980px; }
+main { padding: 14px 24px 40px; min-width: 0; max-width: 1100px; }
 .crumbs { margin: 0 0 6px; color: var(--muted); overflow-wrap: anywhere; }
 h1 { margin: 0 0 4px; font-size: 1.6rem; }
 h2 { margin: 24px 0 8px; font-size: 1.1rem; }
@@ -237,7 +364,6 @@ h2 { margin: 24px 0 8px; font-size: 1.1rem; }
 table { border-collapse: collapse; }
 td, th { text-align: left; padding: 5px 14px 5px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
 th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 500; }
-.num { font-variant-numeric: tabular-nums; }
 .scroll { overflow-x: auto; }
 .listhead { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between; max-width: 600px; }
 #filter { font: inherit; padding: 3px 8px; border: 1px solid var(--rule); border-radius: 4px; background: var(--bg); color: var(--fg); }
@@ -248,12 +374,30 @@ th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; colo
 .urlrow code { flex: 1; min-width: 0; white-space: nowrap; }
 pre { padding: 8px 10px; margin: 10px 0 0; }
 button { font: inherit; font-size: 0.85rem; padding: 4px 10px; border: 1px solid var(--accent); color: var(--accent); background: var(--bg); border-radius: 4px; cursor: pointer; }
-details.attrs { margin-top: 20px; }
-details.attrs summary { cursor: pointer; color: var(--accent); }
-@media (max-width: 700px) {
+.vars { border-top: 1px solid var(--rule); }
+.var { border-bottom: 1px solid var(--rule); }
+.var > summary, .var > .row { display: flex; flex-wrap: wrap; gap: 2px 14px; padding: 6px 0 6px 18px; position: relative; }
+.var > summary { cursor: pointer; list-style: none; }
+.var > summary::-webkit-details-marker { display: none; }
+.var > summary::before { content: "▸"; position: absolute; left: 2px; color: var(--muted); }
+.var[open] > summary::before { content: "▾"; }
+.var .n { flex: 0 0 7em; font-weight: 600; }
+.var .d { flex: 0 0 13em; color: var(--muted); }
+.var .t { flex: 0 0 5em; color: var(--muted); }
+.var .ln { flex: 1 1 11em; }
+.var .s { flex: 2 1 16em; font-variant-numeric: tabular-nums; }
+.var .u { flex: 0 1 11em; color: var(--muted); }
+.var .body { padding: 0 0 10px 18px; }
+dl.attrs { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 14px; margin: 4px 0 0; }
+dl.attrs dt { color: var(--muted); }
+dl.attrs dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.vlabel { margin: 10px 0 0; color: var(--muted); }
+pre.values { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 16em; overflow-y: auto; margin-top: 4px; }
+.none { margin: 4px 0 0; color: var(--muted); }
+/* Below this width the tree takes too much room; the breadcrumb remains. */
+@media (max-width: 900px) {
   .panes { grid-template-columns: minmax(0, 1fr); }
-  .tree { border-right: 0; border-bottom: 1px solid var(--rule); }
-  .tree summary { display: list-item; cursor: pointer; color: var(--muted); font-family: system-ui, sans-serif; }
+  .tree { display: none; }
   main { padding: 14px 16px 40px; }
 }
 </style>
@@ -263,8 +407,6 @@ details.attrs summary { cursor: pointer; color: var(--accent); }
 <header class="site"><a href="{{ root_href }}">{{ site_name }}</a></header>
 <div class="panes">
 <nav class="tree" aria-label="Catalog">
-<details open>
-<summary>Catalog</summary>
 {% macro tree_list(items) %}
 <ul>
 {% for item in items %}
@@ -275,7 +417,6 @@ details.attrs summary { cursor: pointer; color: var(--accent); }
 </ul>
 {% endmacro %}
 {{ tree_list([tree]) }}
-</details>
 </nav>
 <main>
 <p class="crumbs">
@@ -318,13 +459,16 @@ details.attrs summary { cursor: pointer; color: var(--accent); }
 {% endif %}
 {% if vars %}
 <h2>Variables</h2>
+<div class="scroll">
 <table>
+<thead><tr><th>Name</th><th>Long name</th><th>Units</th></tr></thead>
 <tbody>
-{% for x in vars %}
-<tr><td><a href="{{ x }}">{{ x }}</a></td></tr>
+{% for x, attrs in vars %}
+<tr><td><a href="{{ x }}">{{ x }}</a></td><td>{{ attrs.long_name }}</td><td>{{ attrs.units }}</td></tr>
 {% endfor %}
 </tbody>
 </table>
+</div>
 {% endif %}
 {% endblock %}
 {% block script %}
@@ -343,6 +487,31 @@ filter.addEventListener('input', () => {
 """,
 
 'var': """{% extends 'base' %}
+{% macro var_row(v) %}
+{% set cells %}<span class="n mono">{{ v.name }}</span><span class="d mono">{{ v.dims }}</span><span class="t mono">{{ v.dtype }}</span><span class="ln">{{ v.long_name }}</span><span class="s">{{ v.summary }}</span><span class="u">{{ v.units }}</span>{% endset %}
+{% if v.attrs or v.values %}
+<details class="var">
+<summary>{{ cells }}</summary>
+<div class="body">
+{% if v.attrs %}
+<dl class="attrs">
+{% for k, val in v.attrs.items() %}
+<dt>{{ k }}</dt><dd>{{ val }}</dd>
+{% endfor %}
+</dl>
+{% else %}
+<p class="none">No attributes</p>
+{% endif %}
+{% if v.values %}
+<p class="vlabel">{{ v.values_label }}</p>
+<pre class="values">{{ v.values }}</pre>
+{% endif %}
+</div>
+</details>
+{% else %}
+<div class="var"><div class="row">{{ cells }}</div></div>
+{% endif %}
+{% endmacro %}
 {% block main %}
 <h1>{{ long_name or varname }}</h1>
 <p class="sub"><code>{{ varname }}</code>{% if units %} · {{ units }}{% endif %}</p>
@@ -351,30 +520,31 @@ filter.addEventListener('input', () => {
 <div class="urlrow"><code id="url">{{ url }}</code><button type="button" id="copy">Copy OPeNDAP URL</button></div>
 <pre id="snippet">import xarray as xr
 ds = xr.open_dataset("<span class="url">{{ url }}</span>")</pre>
-<p>OPeNDAP metadata: <a href="{{ varname }}.das">{{ varname }}.das</a> · <a href="{{ varname }}.dds">{{ varname }}.dds</a></p>
 </section>
-<h2>Grids</h2>
-<div class="scroll">
-<table>
-<thead><tr><th>Name</th><th>Long name</th><th>Size</th><th>Values</th><th>Units</th></tr></thead>
-<tbody>
-{% for row in grid_rows %}
-<tr><td><code>{{ row.name }}</code></td><td>{{ row.long_name }}</td><td class="num">{{ row.size }}</td><td class="num">{{ row.values }}</td><td>{{ row.units }}</td></tr>
-{% endfor %}
-</tbody>
-</table>
+<h2>Data variable</h2>
+<div class="vars">
+{{ var_row(data_var) }}
 </div>
-<details class="attrs">
-<summary>All attributes</summary>
-<pre>
-{% for name, attrs in attr_groups %}
-{{ name }}
-{% for k, v in attrs.items() %}
-    {{ k }}: {{ v }}
+<h2>Coordinates</h2>
+<div class="vars">
+{% for c in coords %}
+{{ var_row(c) }}
 {% endfor %}
+</div>
+{% if global_attrs %}
+<div class="vars" style="margin-top: 20px">
+<details class="var">
+<summary><span class="n">Other attributes</span></summary>
+<div class="body">
+<dl class="attrs">
+{% for k, val in global_attrs.items() %}
+<dt>{{ k }}</dt><dd>{{ val }}</dd>
 {% endfor %}
-</pre>
+</dl>
+</div>
 </details>
+</div>
+{% endif %}
 {% endblock %}
 {% block script %}
 <script>
