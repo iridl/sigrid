@@ -53,6 +53,9 @@ def test_describe_values_date_spacing():
     assert pages.describe_values(dates) == '2024-06-13 to 2024-07-04, every 3 days or 4 days'
     weekly = np.arange('2024-01-01', '2024-03-01', 7, dtype='datetime64[D]').astype('datetime64[ns]')
     assert pages.describe_values(weekly).endswith(', every 7 days')
+    daily = np.arange('2024-01-01', '2024-03-01', dtype='datetime64[D]')
+    gappy = np.delete(daily, [5, 10, 11, 20, 30, 31, 32]).astype('datetime64[ns]')
+    assert pages.describe_values(gappy).endswith(', every 1 day, with 4 longer gaps')
     monthly = np.arange('1991-01', '1992-01', dtype='datetime64[M]').astype('datetime64[ns]')
     assert pages.describe_values(monthly) == '1991-01-01 to 1991-12-01, every month'
     leads = np.arange(1, 40).astype('timedelta64[D]').astype('timedelta64[ns]')
@@ -127,3 +130,25 @@ def test_render_dir_shows_links():
     html = pages.render_dir('/data', ['SPEAR'], listings)
     assert '<a href="https://doi.org/x">SPEAR &lt;paper&gt;</a>' in html
     assert '<a href="https://example.org/">site</a>' in html
+
+
+def test_coord_infos_monthly_target_in_months():
+    # Monthly starts and leads, as in C3S and NMME: offsets in days vary
+    # with month length, so they are shown in months.
+    S = np.array(['2024-01', '2024-02', '2024-03'], dtype='datetime64[M]')
+    target = (S[:, None] + np.arange(3)).astype('datetime64[ns]')
+    bnds = np.stack([target, (S[:, None] + np.arange(1, 4)).astype('datetime64[ns]')], axis=2)
+    ds = xr.Dataset(
+        {'tas': (('S', 'L'), np.zeros((3, 3), 'float32'))},
+        coords={
+            'S': ('S', S.astype('datetime64[ns]')),
+            'L': ('L', [0, 1, 2]),
+            'target': (('S', 'L'), target),
+            'target_bnds': (('S', 'L', 'nbound'), bnds),
+        },
+    )
+    infos = {i.name: i for i in pages.coord_infos(ds, 'tas')}
+    assert infos['S'].summary == '2024-01-01, 2024-02-01, 2024-03-01'
+    assert infos['target'].summary == 'S + (0 months to 2 months, by 1 month)'
+    assert infos['target_bnds'].summary == '[target, target + 1 month]'
+    assert infos['target'].values == '0 months, 1 month, 2 months'

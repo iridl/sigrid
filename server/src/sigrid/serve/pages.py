@@ -211,10 +211,10 @@ def coord_info(ds: xr.Dataset, name: str) -> VarInfo:
     # are shown as offsets from S or target when the offsets don't depend on S.
     offsets = relative_offsets(ds, coord)
     if offsets is not None:
-        base, offset_values, summary = offsets
+        base, offset_texts, summary = offsets
         info.summary = summary
         info.values_label = f'{name} − {base}'
-        info.values = ', '.join(format_value(v) for v in offset_values.ravel())
+        info.values = ', '.join(offset_texts)
     else:
         info.summary = f'{format_value(values.min())} to {format_value(values.max())}'
     return info
@@ -233,22 +233,59 @@ def relative_offsets(ds: xr.Dataset, coord: xr.DataArray):
         base = Coords.S
     else:
         return None
-    offset = coord - ds[base]
-    first = offset.isel({Coords.S: 0})
-    if not bool((offset == first).all()):
-        return None
-    first = first.values
-    if base == Coords.target:
-        # Offsets per bound must also be the same for every other element.
-        per_bound = first.reshape(-1, first.shape[-1])
-        if not (per_bound == per_bound[0]).all():
+    # Exact offsets (e.g. days) first, then whole months for monthly data,
+    # whose offsets in days vary with the length of the month.
+    for offset, fmt in (
+        (coord - ds[base], format_value),
+        (month_offset(coord, ds[base]), format_months),
+    ):
+        if offset is None:
+            continue
+        first = offset.isel({Coords.S: 0})
+        if not bool((offset == first).all()):
+            continue
+        first = first.values
+        if base == Coords.target:
+            # Offsets per bound must also be the same for every other element.
+            per_bound = first.reshape(-1, first.shape[-1])
+            if not (per_bound == per_bound[0]).all():
+                continue
+            parts = [
+                base if o == np.zeros((), o.dtype) else f'{base} + {fmt(o)}'
+                for o in per_bound[0]
+            ]
+            return base, [fmt(o) for o in per_bound[0]], '[' + ', '.join(parts) + ']'
+        offsets = first.ravel()
+        return base, [fmt(o) for o in offsets], f'{base} + ({describe_offsets(offsets, fmt)})'
+    return None
+
+
+def month_offset(coord: xr.DataArray, base: xr.DataArray) -> xr.DataArray | None:
+    """coord - base in whole months, if both fall on the first of a month."""
+    def months(da):
+        values = da.values
+        month = values.astype('datetime64[M]')
+        if not (values.astype('datetime64[D]') == month.astype('datetime64[D]')).all():
             return None
-        parts = [
-            base if o == np.timedelta64(0, 'ns') else f'{base} + {format_value(o)}'
-            for o in per_bound[0]
-        ]
-        return base, per_bound[0], '[' + ', '.join(parts) + ']'
-    return base, first, f'{base} + ({describe_values(first.ravel())})'
+        return xr.DataArray(month.astype(np.int64), dims=da.dims)
+    coord_months, base_months = months(coord), months(base)
+    if coord_months is None or base_months is None:
+        return None
+    return coord_months - base_months
+
+
+def describe_offsets(offsets: np.ndarray, fmt) -> str:
+    if len(offsets) == 1:
+        return fmt(offsets[0])
+    text = f'{fmt(offsets[0])} to {fmt(offsets[-1])}'
+    steps = np.unique(np.diff(offsets))
+    if len(steps) == 1:
+        text += f', by {fmt(steps[0])}'
+    return text
+
+
+def format_months(n) -> str:
+    return f'{n} month' if abs(n) == 1 else f'{n} months'
 
 
 def dims_text(da: xr.DataArray) -> str:
@@ -280,9 +317,13 @@ def describe_spacing(values: np.ndarray) -> str:
         first_of_month = (values.astype('datetime64[D]') == months.astype('datetime64[D]')).all()
         if first_of_month and (np.diff(months) == np.timedelta64(1, 'M')).all():
             return 'every month'
-        steps = np.unique(np.diff(values))
+        steps, counts = np.unique(np.diff(values), return_counts=True)
         if len(steps) <= 3:
             return 'every ' + ' or '.join(format_value(s) for s in steps)
+        # Regular starts with some missing, e.g. daily with a few gaps.
+        if counts[0] >= 0.8 * counts.sum():
+            gaps = counts.sum() - counts[0]
+            return f'every {format_value(steps[0])}, with {gaps} longer gaps'
         return 'irregular spacing'
     if np.issubdtype(values.dtype, np.timedelta64):
         steps = np.unique(np.diff(values))
