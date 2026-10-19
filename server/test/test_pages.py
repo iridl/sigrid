@@ -152,3 +152,20 @@ def test_coord_infos_monthly_target_in_months():
     assert infos['target'].summary == 'S + (0 months to 2 months, by 1 month)'
     assert infos['target_bnds'].summary == '[target, target + 1 month]'
     assert infos['target'].values == '0 months, 1 month, 2 months'
+
+
+def test_handler_shows_served_units_for_times():
+    # The page shows the units OPeNDAP sends for encoded times and leads.
+    from sigrid.serve import CatalogFileHandler
+    ds = daily_forecast()
+    ds.S.encoding.update(units='hours since 1960-01-01', calendar='standard')
+    ds.target.encoding.update(units='hours since 1960-01-01', calendar='standard')
+    ds.target_bnds.encoding.update(units='hours since 1960-01-01', calendar='standard')
+    ds.L.encoding.update(units='hours', dtype='int32')
+    listings = [DisplayDataset(['f'], []), DisplayDataset([], ['ua'])]
+    handler = CatalogFileHandler(ds, 'ua', None, ('/data', ['f'], listings))
+    environ = {'REQUEST_METHOD': 'GET', 'PATH_INFO': '/f/ua', 'SCRIPT_NAME': '/data',
+               'SERVER_NAME': 'x', 'SERVER_PORT': '80', 'wsgi.url_scheme': 'http'}
+    body = b''.join(handler(environ, lambda status, headers: None)).decode()
+    assert '<dt>units</dt><dd>hours</dd>' in body
+    assert '<dt>units</dt><dd>hours since 1960-01-01</dd>' in body

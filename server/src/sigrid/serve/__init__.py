@@ -220,6 +220,9 @@ class CatalogFileHandler(XarrayHandler):
             if np.issubdtype(coord.dtype, np.datetime64):
                 coord.attrs['units'] = coord.encoding['units']
                 coord.attrs['calendar'] = coord.encoding['calendar']
+            elif np.issubdtype(coord.dtype, np.timedelta64) and 'units' in coord.encoding:
+                # e.g. lead L, sent as integer hours
+                coord.attrs['units'] = coord.encoding['units']
 
         assert self.page is not None
         mount, components, listings = self.page
