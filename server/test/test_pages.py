@@ -57,7 +57,8 @@ def test_describe_values_date_spacing():
     gappy = np.delete(daily, [5, 10, 11, 20, 30, 31, 32]).astype('datetime64[ns]')
     assert pages.describe_values(gappy).endswith(', every 1 day, with 4 longer gaps')
     monthly = np.arange('1991-01', '1992-01', dtype='datetime64[M]').astype('datetime64[ns]')
-    assert pages.describe_values(monthly) == '1991-01-01 to 1991-12-01, every month'
+    assert pages.describe_values(monthly) == '1991-01-01 to 1991-12-01, monthly'
+    assert pages.describe_values(np.delete(monthly, [4])) == '1991-01-01 to 1991-12-01, monthly, with 1 gap'
     leads = np.arange(1, 40).astype('timedelta64[D]').astype('timedelta64[ns]')
     assert pages.describe_values(leads) == '1 day to 39 days, by 1 day'
     assert pages.format_value(np.timedelta64(6, 'h')) == '6 hours'
@@ -86,12 +87,13 @@ def daily_forecast(lead_coord=True):
     return ds
 
 
-def test_coord_infos_show_target_relative_to_start():
+def test_coord_infos_show_valid_times():
     infos = {i.name: i for i in pages.coord_infos(daily_forecast(), 'ua')}
     assert list(infos) == ['S', 'L', 'X', 'target', 'target_bnds']
     assert infos['S'].dtype == 'int32'
     assert infos['L'].summary == '1 day to 7 days, by 1 day'
-    assert infos['target'].summary == 'S + (1 day to 7 days, by 1 day)'
+    assert infos['target'].summary == '2024-06-14 to 2024-06-27'
+    assert infos['target'].values.splitlines()[0] == '2024-06-13: 2024-06-14 to 2024-06-20, every 1 day'
     assert infos['target_bnds'].summary == '[target, target + 1 day]'
     assert infos['X'].values == '0, 90, 180, 270'
 
@@ -107,7 +109,7 @@ def test_render_var():
     html = pages.render_var('/data', ['f'], listings, 'ua', daily_forecast(), 'https://x/data/f/ua')
     assert 'Coordinates' in html and 'Other attributes' in html
     assert '.das' not in html and '.dds' not in html
-    assert 'S + (1 day to 7 days, by 1 day)' in html
+    assert '2024-06-14 to 2024-06-27' in html
 
 
 def test_render_dir_variable_table():
@@ -132,8 +134,8 @@ def test_render_dir_shows_links():
     assert '<a href="https://example.org/">site</a>' in html
 
 
-def test_coord_infos_monthly_target_in_months():
-    # Monthly starts and leads, as in C3S and NMME: offsets in days vary
+def test_coord_infos_monthly_bounds_in_months():
+    # Monthly starts and leads, as in C3S and NMME: bounds in days vary
     # with month length, so they are shown in months.
     S = np.array(['2024-01', '2024-02', '2024-03'], dtype='datetime64[M]')
     target = (S[:, None] + np.arange(3)).astype('datetime64[ns]')
@@ -149,9 +151,9 @@ def test_coord_infos_monthly_target_in_months():
     )
     infos = {i.name: i for i in pages.coord_infos(ds, 'tas')}
     assert infos['S'].summary == '2024-01-01, 2024-02-01, 2024-03-01'
-    assert infos['target'].summary == 'S + (0 months to 2 months, by 1 month)'
+    assert infos['target'].summary == '2024-01-01 to 2024-05-01'
+    assert infos['target'].values.splitlines()[0] == '2024-01-01: 2024-01-01, 2024-02-01, 2024-03-01'
     assert infos['target_bnds'].summary == '[target, target + 1 month]'
-    assert infos['target'].values == '0 months, 1 month, 2 months'
 
 
 def test_handler_shows_served_units_for_times():

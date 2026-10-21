@@ -207,56 +207,53 @@ def coord_info(ds: xr.Dataset, name: str) -> VarInfo:
         info.values_label = 'Values'
         info.values = ', '.join(format_value(v) for v in values)
         return info
-    # Multi-dimensional times, e.g. target (S, L) and target_bnds (S, L, nbound),
-    # are shown as offsets from S or target when the offsets don't depend on S.
-    offsets = relative_offsets(ds, coord)
+    # Bounds are shown as offsets from target, which is listed with its
+    # actual times, when the offsets are the same everywhere.
+    offsets = bounds_offsets(ds, coord)
     if offsets is not None:
-        base, offset_texts, summary = offsets
+        offset_texts, summary = offsets
         info.summary = summary
-        info.values_label = f'{name} − {base}'
+        info.values_label = f'{name} − {Coords.target}'
         info.values = ', '.join(offset_texts)
-    else:
-        info.summary = f'{format_value(values.min())} to {format_value(values.max())}'
+        return info
+    info.summary = f'{format_value(values.min())} to {format_value(values.max())}'
+    if coord.ndim == 2 and coord.dims[0] == Coords.S and Coords.S in ds.coords:
+        # e.g. target (S, L): one line of valid times per start.
+        info.values_label = f'{name} for each {Coords.S}'
+        info.values = '\n'.join(
+            f'{format_value(s)}: {describe_values(row)}'
+            for s, row in zip(ds[Coords.S].values, values)
+        )
     return info
 
 
-def relative_offsets(ds: xr.Dataset, coord: xr.DataArray):
-    """For a datetime coordinate that is S or target plus offsets that are the
-    same for every S, return (base name, offsets along the other dims, summary).
+def bounds_offsets(ds: xr.Dataset, coord: xr.DataArray):
+    """For time bounds (e.g. target_bnds) that are target plus offsets that
+    are the same for every element, return (offset per bound, summary).
     Otherwise None."""
-    if not np.issubdtype(coord.dtype, np.datetime64) or Coords.S not in coord.dims:
+    if (
+        not np.issubdtype(coord.dtype, np.datetime64)
+        or Coords.target not in ds.coords
+        or ds[Coords.target].dims != coord.dims[:-1]
+    ):
         return None
-    if Coords.target in ds.coords and ds[Coords.target].dims == coord.dims[:-1]:
-        # Bounds: one offset from target per bound.
-        base = Coords.target
-    elif Coords.S in ds.coords:
-        base = Coords.S
-    else:
-        return None
+    target = ds[Coords.target]
     # Exact offsets (e.g. days) first, then whole months for monthly data,
     # whose offsets in days vary with the length of the month.
     for offset, fmt in (
-        (coord - ds[base], format_value),
-        (month_offset(coord, ds[base]), format_months),
+        (coord - target, format_value),
+        (month_offset(coord, target), format_months),
     ):
         if offset is None:
             continue
-        first = offset.isel({Coords.S: 0})
-        if not bool((offset == first).all()):
+        per_bound = offset.values.reshape(-1, offset.shape[-1])
+        if not (per_bound == per_bound[0]).all():
             continue
-        first = first.values
-        if base == Coords.target:
-            # Offsets per bound must also be the same for every other element.
-            per_bound = first.reshape(-1, first.shape[-1])
-            if not (per_bound == per_bound[0]).all():
-                continue
-            parts = [
-                base if o == np.zeros((), o.dtype) else f'{base} + {fmt(o)}'
-                for o in per_bound[0]
-            ]
-            return base, [fmt(o) for o in per_bound[0]], '[' + ', '.join(parts) + ']'
-        offsets = first.ravel()
-        return base, [fmt(o) for o in offsets], f'{base} + ({describe_offsets(offsets, fmt)})'
+        parts = [
+            'target' if o == np.zeros((), o.dtype) else f'target + {fmt(o)}'
+            for o in per_bound[0]
+        ]
+        return [fmt(o) for o in per_bound[0]], '[' + ', '.join(parts) + ']'
     return None
 
 
@@ -274,18 +271,12 @@ def month_offset(coord: xr.DataArray, base: xr.DataArray) -> xr.DataArray | None
     return coord_months - base_months
 
 
-def describe_offsets(offsets: np.ndarray, fmt) -> str:
-    if len(offsets) == 1:
-        return fmt(offsets[0])
-    text = f'{fmt(offsets[0])} to {fmt(offsets[-1])}'
-    steps = np.unique(np.diff(offsets))
-    if len(steps) == 1:
-        text += f', by {fmt(steps[0])}'
-    return text
-
-
 def format_months(n) -> str:
-    return f'{n} month' if abs(n) == 1 else f'{n} months'
+    return plural(n, 'month')
+
+
+def plural(n, noun: str) -> str:
+    return f'{n} {noun}' if abs(n) == 1 else f'{n} {noun}s'
 
 
 def dims_text(da: xr.DataArray) -> str:
@@ -315,15 +306,20 @@ def describe_spacing(values: np.ndarray) -> str:
     if np.issubdtype(values.dtype, np.datetime64):
         months = values.astype('datetime64[M]')
         first_of_month = (values.astype('datetime64[D]') == months.astype('datetime64[D]')).all()
-        if first_of_month and (np.diff(months) == np.timedelta64(1, 'M')).all():
-            return 'every month'
+        if first_of_month:
+            month_steps = np.diff(months).astype(np.int64)
+            gaps = int((month_steps != 1).sum())
+            if gaps == 0:
+                return 'monthly'
+            if (month_steps >= 1).all() and gaps <= 0.2 * len(month_steps):
+                return f'monthly, with {plural(gaps, "gap")}'
         steps, counts = np.unique(np.diff(values), return_counts=True)
         if len(steps) <= 3:
             return 'every ' + ' or '.join(format_value(s) for s in steps)
         # Regular starts with some missing, e.g. daily with a few gaps.
         if counts[0] >= 0.8 * counts.sum():
             gaps = counts.sum() - counts[0]
-            return f'every {format_value(steps[0])}, with {gaps} longer gaps'
+            return f'every {format_value(steps[0])}, with {plural(gaps, "longer gap")}'
         return 'irregular spacing'
     if np.issubdtype(values.dtype, np.timedelta64):
         steps = np.unique(np.diff(values))
@@ -417,17 +413,20 @@ pre { padding: 8px 10px; margin: 10px 0 0; }
 button { font: inherit; font-size: 0.85rem; padding: 4px 10px; border: 1px solid var(--accent); color: var(--accent); background: var(--bg); border-radius: 4px; cursor: pointer; }
 .vars { border-top: 1px solid var(--rule); }
 .var { border-bottom: 1px solid var(--rule); }
-.var > summary, .var > .row { display: flex; flex-wrap: wrap; gap: 2px 14px; padding: 6px 0 6px 18px; position: relative; }
+.var > summary, .var > .row { display: grid; gap: 2px 14px; padding: 6px 0 6px 18px; position: relative;
+  grid-template-columns: 6.5em 11em 4em minmax(7em, 1fr) minmax(10em, 1.5fr) max-content;
+  grid-template-areas: "n d t ln s u"; }
 .var > summary { cursor: pointer; list-style: none; }
 .var > summary::-webkit-details-marker { display: none; }
 .var > summary::before { content: "▸"; position: absolute; left: 2px; color: var(--muted); }
 .var[open] > summary::before { content: "▾"; }
-.var .n { flex: 0 0 7em; font-weight: 600; }
-.var .d { flex: 0 0 13em; color: var(--muted); }
-.var .t { flex: 0 0 5em; color: var(--muted); }
-.var .ln { flex: 1 1 11em; }
-.var .s { flex: 2 1 16em; font-variant-numeric: tabular-nums; }
-.var .u { flex: 0 1 11em; color: var(--muted); }
+.var .n { grid-area: n; font-weight: 600; overflow-wrap: anywhere; }
+.var .d { grid-area: d; color: var(--muted); }
+.var .t { grid-area: t; color: var(--muted); }
+.var .ln { grid-area: ln; }
+.var .s { grid-area: s; font-variant-numeric: tabular-nums; }
+.var .u { grid-area: u; color: var(--muted); white-space: nowrap; }
+.var .wide { grid-column: 1 / -1; }
 .var .body { padding: 0 0 10px 18px; }
 dl.attrs { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 14px; margin: 4px 0 0; }
 dl.attrs dt { color: var(--muted); }
@@ -435,11 +434,24 @@ dl.attrs dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
 .vlabel { margin: 10px 0 0; color: var(--muted); }
 pre.values { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 16em; overflow-y: auto; margin-top: 4px; }
 .none { margin: 4px 0 0; color: var(--muted); }
+/* In medium windows the summary moves to a second line. */
+@media (max-width: 1300px) {
+  .var > summary, .var > .row {
+    grid-template-columns: 6.5em 11em 4em minmax(0, 1fr) max-content;
+    grid-template-areas: "n d t ln u" ". s s s s";
+  }
+}
 /* Below this width the tree takes too much room; the breadcrumb remains. */
 @media (max-width: 900px) {
   .panes { grid-template-columns: minmax(0, 1fr); }
   .tree { display: none; }
   main { padding: 14px 16px 40px; }
+}
+@media (max-width: 600px) {
+  .var > summary, .var > .row {
+    grid-template-columns: minmax(0, 1fr) max-content;
+    grid-template-areas: "n u" "d d" "t t" "ln ln" "s s";
+  }
 }
 </style>
 </head>
@@ -575,7 +587,7 @@ ds = xr.open_dataset("<span class="url">{{ url }}</span>")</pre>
 {% if global_attrs %}
 <div class="vars" style="margin-top: 20px">
 <details class="var">
-<summary><span class="n">Other attributes</span></summary>
+<summary><span class="wide">Other attributes</span></summary>
 <div class="body">
 <dl class="attrs">
 {% for k, val in global_attrs.items() %}
