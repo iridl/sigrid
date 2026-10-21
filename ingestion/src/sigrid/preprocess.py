@@ -170,6 +170,8 @@ class FileSetDescriptor:
             drop_vars: str | Sequence[str] = (),  # TODO for backwards compatibility, remove when no longer needed
             expand_coords: str | Sequence[str] = (),
             aux_coords: str | Sequence[str] = (),
+            # {dim: length}: trim or NaN-pad each file's dim to this length
+            pad_dims: Mapping[str, int] | None = None,
     ) -> None:
         # TODO constructor args need to be validated
         self.name = name
@@ -193,6 +195,7 @@ class FileSetDescriptor:
             ensure_list(drop_coords),
             ensure_list(expand_coords),
             ensure_list(aux_coords),
+            dict(pad_dims or {}),
         )
 
     def parse_path(self, path: str | Path) -> FileCoords | None:
@@ -216,6 +219,7 @@ class _FileOpener:
     drop_coords: Sequence[str] | None
     expand_coords: Sequence[str]
     aux_coords: Sequence[str]
+    pad_dims: Mapping[str, int]
 
     def open(self, path: Path, file_coords: FileCoords) -> xr.Dataset:
         """Use as a context manager or call close() on the dataset when finished with it."""
@@ -235,6 +239,13 @@ class _FileOpener:
             #         f"Not all of {self.drop_coords} are present as coordinates."
             #     )
             ds = ds.drop_vars(self.drop_coords)
+
+        # Give dims whose length varies from file to file (e.g. the number of
+        # lead records) a fixed length: trim longer files, pad shorter ones
+        # with NaN. Drop any coordinate on the dim first (drop_vars).
+        for dim, n in self.pad_dims.items():
+            ds = ds.isel({dim: slice(0, n)})
+            ds = ds.pad({dim: (0, n - ds.sizes[dim])})
 
         # Data vars get expanded along IRIDL_time, coords don't unless they're
         # explicitly listed in expand_coords.
