@@ -533,7 +533,7 @@ def update_session(
                 for f in done:
                     if e := f.exception():
                         failure_count += 1
-                        print(e)
+                        log_exception(e)
                     else:
                         success_count += 1
                         session.merge(f.result())
@@ -575,21 +575,22 @@ class SyncExecutor(Executor):
 
 
 def write_one_file_slice(session: icechunk.session.ForkSession, opener: _FileOpener, region: Mapping[str, slice], file_coords: FileCoords, path: Path):
-    with opener.open(path, file_coords) as ds:
-        # Working around an xarray bug: when updating an existing zarr store, it
-        # uses the _FillValue, scale_factor, and add_offset it finds in the
-        # store, and doesn't tolerate the ds having one even if it's the same as
-        # the one in the store. So we keep these attributes in initialize, which
-        # creates the store, but drop them here when updating.
-        for v in ds.variables:
-            ds[v].attrs.pop('_FillValue', None)
-            ds[v].attrs.pop('missing_value', None)
-            ds[v].attrs.pop('scale_factor', None)
-            ds[v].attrs.pop('add_offset', None)
-        try:
+    try:
+        with opener.open(path, file_coords) as ds:
+            # Working around an xarray bug: when updating an existing zarr store, it
+            # uses the _FillValue, scale_factor, and add_offset it finds in the
+            # store, and doesn't tolerate the ds having one even if it's the same as
+            # the one in the store. So we keep these attributes in initialize, which
+            # creates the store, but drop them here when updating.
+            for v in ds.variables:
+                ds[v].attrs.pop('_FillValue', None)
+                ds[v].attrs.pop('missing_value', None)
+                ds[v].attrs.pop('scale_factor', None)
+                ds[v].attrs.pop('add_offset', None)
             ds.to_zarr(session.store, region=region, zarr_format=3, consolidated=False)
-        except Exception as e:
-            raise Exception(f'Error writing the contents of {path} to zarr: {e}') from e
+    except Exception as e:
+        e.add_note(f'On path {path}')
+        raise
     return session
 
 
@@ -842,6 +843,12 @@ def summarize_result(x: bool | Exception) -> str:
         message = f'{x.__class__.__name__}: {x}'
     return message
 
+def log_exception(e: BaseException):
+    if hasattr(e, '__notes__'):
+        notes = '; '.join(e.__notes__)
+    else:
+        notes = ''
+    print(e, notes)
 
 def main():
     parser = argparse.ArgumentParser()
