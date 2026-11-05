@@ -6,6 +6,7 @@ import importlib.util
 import itertools
 import os
 import re
+import traceback
 import warnings
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from concurrent.futures import Executor, Future
@@ -844,11 +845,7 @@ def summarize_result(x: bool | Exception) -> str:
     return message
 
 def log_exception(e: BaseException):
-    if hasattr(e, '__notes__'):
-        notes = '; '.join(e.__notes__)
-    else:
-        notes = ''
-    print(e, notes)
+    traceback.print_exception(e)
 
 def main():
     parser = argparse.ArgumentParser()
