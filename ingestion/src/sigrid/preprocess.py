@@ -25,10 +25,6 @@ import zarr
 from typing_extensions import Self
 from zarr.errors import GroupNotFoundError, ZarrUserWarning
 
-# In my opinion, using unsanctioned codecs makes the icechunk store inappropriate to
-# expose publicly, because not all clients will have the libraries required to read it,
-# but it's fine for internal use because we control the client.
-warnings.filterwarnings("ignore", category=ZarrUserWarning, message='.*Numcodecs.*')
 
 ALLOWED_ERROR_RATE = .1
 PROGRESS_PERIOD = 1  # How often to print a progress update, in seconds
