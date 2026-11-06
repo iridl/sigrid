@@ -525,6 +525,7 @@ def update_session(
         success_count = 0
         failure_count = 0
         not_done = futures
+        modified_chunks = set()
         with tqdm.tqdm(total=total_count) as pbar:
             while not_done:
                 done, not_done = concurrent.futures.wait(not_done, timeout=PROGRESS_PERIOD)
@@ -534,6 +535,15 @@ def update_session(
                         log_exception(e)
                     else:
                         success_count += 1
+                        fork_session = f.result()
+                        diff = fork_session.status()
+                        assert not (diff.deleted_arrays or diff.deleted_groups or diff.new_arrays or diff.new_groups or diff.updated_arrays or diff.updated_groups)
+                        for path, idxs in diff.updated_chunks.items():
+                            for idx in idxs:
+                                chunk = (path, tuple(idx))
+                                if chunk in modified_chunks:
+                                    raise Exception(f'Concurrent writes to the same chunk {chunk}')
+                                modified_chunks.add(chunk)
                         session.merge(f.result())
                 completed_count = success_count + failure_count
                 pbar.update(len(done))
