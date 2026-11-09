@@ -7,13 +7,12 @@ import itertools
 import os
 import re
 import traceback
-import warnings
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from concurrent.futures import Executor, Future
 from dataclasses import dataclass
 from pathlib import Path
 from types import TracebackType
-from typing import Any, NamedTuple, TypeVar, cast
+from typing import Any, NamedTuple, Self, TypeVar, cast
 
 import icechunk
 import icechunk.session
@@ -22,9 +21,7 @@ import tqdm
 import xarray as xr
 import xarray.conventions
 import zarr
-from typing_extensions import Self
-from zarr.errors import GroupNotFoundError, ZarrUserWarning
-
+from zarr.errors import GroupNotFoundError
 
 ALLOWED_ERROR_RATE = .1
 PROGRESS_PERIOD = 1  # How often to print a progress update, in seconds
@@ -724,7 +721,7 @@ def initialize(
 
 
 def open_one_file(
-    path: Path, backend_kwargs: dict[str, dict[str, str]] | None = None
+    path: Path, backend_kwargs: dict[str, Any] | None = None
 ) -> xr.Dataset:
 
     # decode_coords doesn't control decoding of coordinate values, it controls
