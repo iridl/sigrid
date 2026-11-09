@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any, cast
 
 import icechunk
@@ -17,18 +18,14 @@ raw_cat = preprocess.FileSetCatalog(
 
 
 @pytest.mark.parametrize('var_path', list(raw_cat.list_all()))
-def test_it(var_path: str):
+def test_it(var_path: str, tmp_path: Path):
     descriptor, icechunk_info = raw_cat.get_entry(var_path)
-    storage = icechunk.in_memory_storage()
+    storage = icechunk.local_filesystem_storage(str(tmp_path))
     repo_config = icechunk.RepositoryConfig.default()
     repo = icechunk.Repository.create(storage, repo_config)
     session = repo.writable_session('main')
     modified = preprocess.update_session(
-        # Looks like in_memory_storage doesn't handle parallel writes, so we
-        # have to either use parallel=0 or write to disk.
-        # TODO is parallel with local storage faster?
-        # TODO fix in_memory_storage?
-        session, descriptor, limit=2, first=None, parallel=0
+        session, descriptor, limit=2, first=None, parallel=1
     )
     assert modified
     session.commit(f'update from {descriptor.dir}')

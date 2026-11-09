@@ -499,8 +499,11 @@ def update_session(
     if parallel > 0:
         executor = concurrent.futures.ProcessPoolExecutor(max_workers=parallel)
     else:
-        # for debugging
-        executor = SyncExecutor()
+        # We used to have --parallel=0 for debugging; but having multiple tasks
+        # share the same ForkSession in the same process results in spurious
+        # concurrent write errors, so this is currently disabled.
+        # executor = SyncExecutor()
+        raise Exception('--parallel 0 is currently broken')
     print('Starting writes')
     try:
         futures = [
