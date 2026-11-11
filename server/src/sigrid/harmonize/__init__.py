@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Self, cast
+from typing import Any, Literal, Self, cast
 
 import icechunk
 import numpy as np
@@ -54,7 +54,7 @@ def standardize(ds: xr.Dataset, config: DatasetConfig):
     ds = drop_non_std(ds, config.da_attrs, config.bare_dims)
     ds = convert_units(ds, config.da_attrs)
     if 'L' in ds.dims:
-        ds = add_target(ds, config.lead_is_month)
+        ds = add_target(ds, 'M' if config.lead_is_month else 'D')
 
     ds = standardize_y(ds, config.y_increasing)
 
@@ -219,45 +219,36 @@ def standardize_attrs_da(
     return da
 
 
-def add_target(ds: xr.Dataset, lead_is_month: bool):
-    if lead_is_month:
-        # Set target
-        targets, targets_bnds = S_L_to_target_monthly(
-            ds[Coords.S], ds[Coords.L]
-        )
-        targets_bnds = targets_bnds.data
+def add_target(ds: xr.Dataset, step: Literal['M', 'D']):
+    S = ds[Coords.S]
+    # If there's no L coordinate, this returns an array of integer indicess 0..n
+    L = ds[Coords.L]
+
+    if not np.issubdtype(S, 'datetime64'):
+        raise Exception(f"Bad S dtype {S.dtype}")
+    if not (np.issubdtype(L.dtype, 'int') or np.issubdtype(L.dtype, 'timedelta64')):
+        raise Exception(f"Bad L dtype {L.dtype}")
+
+    if Coords.target in ds:
+        target_values = ds[Coords.target].values
     else:
-        targets = ds[Coords.target]
-        targets_bnds = np.stack([targets, targets + np.timedelta64(1, 'D')], axis=2)
+        target_values = (
+            S.values.astype(f'datetime64[{step}]')[:, np.newaxis] +
+            L.values.astype(f'timedelta64[{step}]')
+        )
+    target_bnds_values = (
+        target_values[:, :, np.newaxis] +
+        np.arange(2).astype(f'timedelta64[{step}]')
+    )
+
     ds = ds.assign_coords({
-        Coords.target: targets,
-        Coords.target_bnds: (
-            (Coords.S, Coords.L, Coords.nbound), targets_bnds
-        ),
+        Coords.target: ((Coords.S, Coords.L), target_values),
+        Coords.target_bnds: ((Coords.S, Coords.L, Coords.nbound), target_bnds_values),
+        # if L was implicit, make it explicit
+        Coords.L: ds[Coords.L],
     })
 
     return ds
-
-def S_L_to_target_monthly(S: xr.DataArray, L: xr.DataArray):
-    if not np.issubdtype(S.dtype, 'datetime64'):
-        raise Exception(f"Bad S dtype {S.dtype}")
-    if not np.issubdtype(L.dtype, 'int'):
-        raise Exception(f"Bad L dtype {L.dtype}")
-    target_values = (
-        S.values.astype('datetime64[M]')[:, np.newaxis] +
-        L.values.astype('timedelta64[M]')
-    )
-    target_bnds_values = (
-        target_values[:, :, np.newaxis] +
-        np.arange(2).astype('timedelta64[M]')
-    )
-    target_bnds = xr.DataArray(
-        data=target_bnds_values,
-        dims=[Coords.S, Coords.L, Coords.nbound],
-        coords={Coords.S: S, Coords.L: L},
-    )
-
-    return target_bnds.isel({Coords.nbound: 0}, drop=True), target_bnds
 
 
 def monthly_total(ds: xr.Dataset, vars: Iterable[str]):
