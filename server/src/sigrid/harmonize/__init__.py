@@ -1,14 +1,12 @@
 # pyright: strict, reportUnknownMemberType=false
 
-import functools
-import importlib.util
 import os
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Literal, Self, cast
+from typing import Any, Literal, cast
 
 import icechunk
 import numpy as np
@@ -312,127 +310,3 @@ def open_icechunk(rel_path: str, decode_times: bool = True, drop_variables: Iter
     except Exception as e:
         e.add_note(f'When trying to open {abspath}')
         raise
-
-
-type Opener = Callable[[], xr.Dataset]
-
-
-@dataclass
-class DisplayDataset:
-    subdatasets: Iterable[str]
-    variables: Iterable[str]
-
-
-class Catalog:
-    def __init__(self, root_dir: Path):
-        self.root_dir = root_dir
-        self.root_node = CatalogNode(self, '', None)
-
-    def open_variable(self, catalog_path: str) -> xr.Dataset | None:
-        if not catalog_path.startswith('/'):
-            raise Exception(f'Absolute catalog path was expected; got relative path {catalog_path}')
-        if catalog_path.endswith('/'):
-            return None  # Variable paths can't end in slash.
-        node = self.root_node
-        components = catalog_path[1:].split('/')
-        for i, component in enumerate(components):
-            sub = node.subdatasets.get(component)
-            if sub is None:
-                if i == len(components) - 1:
-                    opener = node.variables.get(component)
-                    if opener is None:
-                        return None
-                    return opener()
-                else:
-                    return None
-            node = sub
-        # If we reach here, we bottomed out at a Dataset, not a Variable.
-        return None
-
-    def open_dataset(self, catalog_path: str) -> DisplayDataset | None:
-        if not catalog_path.startswith('/'):
-            raise Exception(f'Absolute catalog path was expected; got relative path {catalog_path}')
-        if not catalog_path.endswith('/'):
-            return None  # Dataset paths must end in slash.
-        node = self.root_node
-        components = catalog_path[1:-1].split('/')
-        if components == ['']:
-            components = []
-        for component in components:
-            sub = node.subdatasets.get(component)
-            if sub is None:
-                return None
-            node = sub
-        return DisplayDataset(
-            [name for name, sub in node.subdatasets.items() if not sub.hidden],
-            list(node.variables)
-        )
-
-
-class CatalogNode:
-    def __init__(self, catalog: Catalog, catalog_path: str, parent: Self | None) -> None:
-        self.catalog = catalog
-        self.catalog_path = catalog_path
-        self.parent = parent
-        self.hidden = (catalog.root_dir / catalog_path / 'hidden').exists()
-        self._module = None
-
-    @property
-    def subdatasets(self) -> dict[str, Self]:
-        root = self.catalog.root_dir
-        return {
-            d.name: self.__class__(self.catalog, str(d.relative_to(root)), self)
-            for d in (root / self.catalog_path).iterdir()
-            if d.is_dir() and d.name != '__pycache__'
-        }
-
-    @property
-    def variables(self) -> dict[str, Opener]:
-        if self.module is None or not hasattr(self.module, 'list_vars'):
-            return {}
-
-        var_names: Iterable[str]
-
-        if hasattr(self.module, 'list_vars'):
-            var_names = self.module.list_vars()
-        else:
-            var_names = []
-
-        return {
-            var: functools.partial(self.open_var, var)
-            for var in var_names
-        }
-
-    @functools.cached_property
-    def module(self):
-        index_path = self.catalog.root_dir / self.catalog_path / 'index.py'
-        if not index_path.exists():
-            return None
-        return load_index(index_path)
-
-    def open_var(self, varname: str) -> xr.Dataset:
-        if self.module is None or not hasattr(self.module, 'open'):
-            # This should never happen. We only call _open with names that
-            # come from variables()
-            assert False
-        ds = self.module.open(varname)
-        ds = self.transform(ds)
-        return ds
-    
-    def transform(self, ds: xr.Dataset) -> xr.Dataset:
-        if self.module is not None and hasattr(self.module, 'transform'):
-            ds = self.module.transform(ds)
-        if self.parent is not None:
-            ds = self.parent.transform(ds)
-        return ds
-
-
-def load_index(file_path: Path):
-    spec = importlib.util.spec_from_file_location('catalog', file_path)
-    assert spec is not None  # we already checked that it exists
-    module = importlib.util.module_from_spec(spec)
-    # Pyright says the loader could be None, but I don't see how that
-    # could happen.
-    assert spec.loader
-    spec.loader.exec_module(module)
-    return module
