@@ -31,7 +31,7 @@ class DatasetHandler:
         if not last_component.endswith(('.das', '.dds', '.dods')):
             return HTTPNotFound()
         var_name, _ = last_component.rsplit('.', maxsplit=1)
-        ds = self.catalog.open_dataset(f'{parent_path}/{var_name}')
+        ds = self.catalog.open_variable(f'{parent_path}/{var_name}')
 
         if ds is None:
             return HTTPNotFound()
