@@ -1,5 +1,3 @@
-from typing import Sequence
-
 import jinja2
 import numpy as np
 import webob

@@ -1,10 +1,10 @@
 import functools
 import importlib.util
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
-from typing import Protocol, Self, Sequence, override
+from typing import Protocol, Self, override
 
 import xarray as xr
 

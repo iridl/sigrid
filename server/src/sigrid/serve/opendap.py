@@ -1,5 +1,5 @@
 import warnings
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from typing import cast
 
 import dask.array
@@ -14,18 +14,20 @@ from webob.dec import wsgify
 from webob.exc import HTTPNotFound
 
 from sigrid.harmonize import Coords
+from sigrid.harmonize.catalog import Catalog
 
+type WSGIApp = Callable[[dict, Callable], Iterable[bytes]]
 
 class DatasetHandler:
-    """Uses a harmonize.Catalog to find the harmonize.Dataset corresponding to
+    """Uses a Catalog to find the variable corresponding to
     the request URL, and generates an OPeNDAP response for it.
     """
 
-    def __init__(self, catalog):
+    def __init__(self, catalog: Catalog):
         self.catalog = catalog
 
     @wsgify
-    def __call__(self, request: webob.Request):
+    def __call__(self, request: webob.Request) -> WSGIApp:
         url_path = request.path_info
         parent_path, last_component = url_path.rsplit('/', maxsplit=1)
         if not last_component.endswith(('.das', '.dds', '.dods')):
