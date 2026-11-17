@@ -39,7 +39,7 @@ class DatasetConfig:
     y_increasing: bool | None = None
 
 
-def rename(ds: xr.Dataset, mapping: Mapping[str, str]):
+def rename(ds: xr.Dataset, mapping: Mapping[str, str]) -> xr.Dataset:
     ds = ds.rename({
         provider_name: standard_name
         for provider_name, standard_name in mapping.items()
@@ -50,7 +50,7 @@ def rename(ds: xr.Dataset, mapping: Mapping[str, str]):
     return ds
 
 
-def standardize(ds: xr.Dataset, config: DatasetConfig):
+def standardize(ds: xr.Dataset, config: DatasetConfig) -> xr.Dataset:
     ds = drop_non_std(ds, config.da_attrs, config.bare_dims)
     ds = convert_units(ds, config.da_attrs)
     if 'L' in ds.dims:
@@ -66,7 +66,7 @@ def standardize(ds: xr.Dataset, config: DatasetConfig):
     )
     return ds
 
-def standardize_y(ds: xr.Dataset, want_increasing: bool | None):
+def standardize_y(ds: xr.Dataset, want_increasing: bool | None) -> xr.Dataset:
     '''Invert Y from N-S to S-N if necessary'''
     if want_increasing is not None and len(ds[Coords.Y]) > 1:
         is_increasing = ds[Coords.Y].values[0] < ds[Coords.Y].values[-1]
@@ -74,7 +74,7 @@ def standardize_y(ds: xr.Dataset, want_increasing: bool | None):
             ds = ds.isel({Coords.Y: slice(None, None, -1)})
     return ds
 
-def drop_non_std(ds: xr.Dataset, standard_attrs: Mapping[str, Mapping[str, str]], bare_dims: Iterable[str]):
+def drop_non_std(ds: xr.Dataset, standard_attrs: Mapping[str, Mapping[str, str]], bare_dims: Iterable[str]) -> xr.Dataset:
     original_data_vars = list(ds.data_vars)
     ds = ds.drop_vars([
         name for name in ds.variables
@@ -91,7 +91,7 @@ def drop_non_std(ds: xr.Dataset, standard_attrs: Mapping[str, Mapping[str, str]]
     return ds
 
 
-def convert_units(ds: xr.Dataset, standard_attrs: Mapping[str, Mapping[str, str]]):
+def convert_units(ds: xr.Dataset, standard_attrs: Mapping[str, Mapping[str, str]]) -> xr.Dataset:
     data_vars = {
         name: convert_units_da(da, standard_attrs[name].get('units'))
         for name, da in data_vars_of(ds).items()
@@ -103,11 +103,11 @@ type UnitConverter = Callable[[xr.DataArray], xr.DataArray]
 def linear_converter(offset: float, scale: float) -> UnitConverter:
     """ Builds a converter for any affine transformation. 
      """
-    def converter(da: xr.DataArray):
+    def converter(da: xr.DataArray) -> xr.DataArray:
         return da * scale + offset
     return converter
 
-def null_converter(da: xr.DataArray):
+def null_converter(da: xr.DataArray) -> xr.DataArray:
     """  Used when the source and target units are numerically identical and
      only the *name/spelling* of the unit changes (e.g. 'degrees_north' vs
      'degree_north' -- same physical unit, different string used by
@@ -179,7 +179,7 @@ def standardize_attrs(
     da_attrs: Mapping[str, Mapping[str, str]],
     ds_attrs: Mapping[str, str],
     encodings: Mapping[str, Mapping[str, str]],
-):
+) -> xr.Dataset:
     coords = {
         name: standardize_attrs_da(da, da_attrs, encodings)
         for name, da in coords_of(ds).items()
@@ -208,7 +208,7 @@ def standardize_attrs_da(
         da: xr.DataArray,
         attrs: Mapping[str, Mapping[str, str]],
         encodings: Mapping[str, Mapping[str, str]],
-):
+) -> xr.DataArray:
     assert isinstance(da.name, str)
     # Wipe out provider's attrs and replace with standard ones
     da.attrs = dict(attrs[da.name])
@@ -219,7 +219,7 @@ def standardize_attrs_da(
     return da
 
 
-def add_target(ds: xr.Dataset, step: Literal['M', 'D']):
+def add_target(ds: xr.Dataset, step: Literal['M', 'D']) -> xr.Dataset:
     S = ds[Coords.S]
     # If there's no L coordinate, this returns an array of integer indicess 0..n
     L = ds[Coords.L]
@@ -251,7 +251,7 @@ def add_target(ds: xr.Dataset, step: Literal['M', 'D']):
     return ds
 
 
-def monthly_total(ds: xr.Dataset, vars: Iterable[str]):
+def monthly_total(ds: xr.Dataset, vars: Iterable[str]) -> xr.Dataset:
     new_ds = ds.copy()
     for var in vars:
         if var in ds:
@@ -272,28 +272,28 @@ def monthly_total(ds: xr.Dataset, vars: Iterable[str]):
     return new_ds
 
 
-def coords_of(ds: xr.Dataset | xr.DataArray):
+def coords_of(ds: xr.Dataset | xr.DataArray) -> Mapping[str, xr.DataArray]:
     """A version of the coords attribute with a better type hint"""
     assert all(isinstance(k, str) for k in ds.coords)
     return cast(Mapping[str, xr.DataArray], ds.coords)
 
 
-def vars_of(ds: xr.Dataset):
+def vars_of(ds: xr.Dataset) -> Mapping[str, xr.Variable]:
     assert all(isinstance(k, str) for k in ds.variables)
     return cast(Mapping[str, xr.Variable], ds.variables)
 
 
-def data_vars_of(ds: xr.Dataset):
+def data_vars_of(ds: xr.Dataset) -> Mapping[str, xr.DataArray]:
     assert all(isinstance(k, str) for k in ds.data_vars)
     return cast(Mapping[str, xr.DataArray], ds.data_vars)
 
 
-def sizes_of(ds: xr.Dataset | xr.DataArray):
+def sizes_of(ds: xr.Dataset | xr.DataArray) -> Mapping[str, int]:
     assert all(isinstance(k, str) for k in ds.sizes)
     return cast(Mapping[str, int], ds.sizes)
 
 
-def open_icechunk(rel_path: str, decode_times: bool = True, drop_variables: Iterable[str] = ()):
+def open_icechunk(rel_path: str, decode_times: bool = True, drop_variables: Iterable[str] = ()) -> xr.Dataset:
     abspath = Path(os.environ['ICECHUNK_ROOT']) / rel_path
     storage = icechunk.local_filesystem_storage(str(abspath))
     # Workaround for https://github.com/earth-mover/icechunk/issues/2105
