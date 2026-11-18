@@ -137,10 +137,12 @@ def breadcrumbs(request):
     components = request.path_info.rstrip('/').split('/')
     prefixes = [components[:i] for i in range(1, len(components) + 1)]
     paths = ['/'.join(prefix) for prefix in prefixes]
-    if request.path_info.endswith('/'):
-        # Add trailing slash, except to the first (empty) prefix because that would
-        # make it an absolute path.
-        paths = paths[:1] + [f'{path}/' for path in paths[1:]]
+    # Add trailing slash to directories, except to the first (empty) prefix
+    # because that would make it an absolute path.
+    paths = paths[:1] + [f'{path}/' for path in paths[1:-1]] + [paths[-1]]
+    # Add trailing slash to the final component only if it's a group.
+    if request.path_info[-1] == '/' and len(request.path_info) > 1:
+        paths[-1] = f'{paths[-1]}/'
     breadcrumbs = (
         [
             f'<a href="{request.relative_url(path, to_application=True)}">{prefix[-1] or 'Top'}</a>'
