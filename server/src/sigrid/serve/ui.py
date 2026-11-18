@@ -46,7 +46,7 @@ def group_response(request: webob.Request, group: catalog.Group) -> webob.Respon
     paths = paths[:1] + [f'{path}/' for path in paths[1:]]
     breadcrumbs = (
         [
-            f'<a href="{request.relative_url(path, to_application=True)}">{prefix[-1] or 'top'}</a>'
+            f'<a href="{request.relative_url(path, to_application=True)}">{prefix[-1] or 'Top'}</a>'
             for path, prefix in zip(paths, prefixes)
         ]
     )
@@ -64,7 +64,7 @@ dir_template = jinja2.Template("""
     <!-- OPeNDAP -->
     {{ breadcrumbs }}
     <p>
-    {{ group.description }}
+    {{ group.summary.description }}
     <p>
     {{ group.documentation }}
     {% if group.groups %}
@@ -72,7 +72,7 @@ dir_template = jinja2.Template("""
     <table>
         <tbody>
             {% for x in group.groups %}
-            <tr><td><a href="{{ x.key }}/">{{ x.key }}</a></td></tr>
+            <tr><td><a href="{{ x.name }}/">{{ x.name }}</a></td></tr>
             {% endfor %}
         </tbody>
     </table>
@@ -83,7 +83,7 @@ dir_template = jinja2.Template("""
         <tbody>
             {% for x in group.variables %}
             <tr>
-                <td><a href="{{ x.key }}">{{ x.key }}</a></td>
+                <td><a href="{{ x.name }}">{{ x.name }}</a></td>
                 <td>{{ x.description }}</td>
             </tr>
             {% endfor %}

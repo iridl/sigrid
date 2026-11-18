@@ -10,19 +10,25 @@ import xarray as xr
 
 
 @dataclass
-class Entry:
-    key: str
+class GroupSummary:
+    """Minimal information about a Group for display in a listing"""
+    name: str
+    description: str = ''
+
+
+@dataclass
+class VariableSummary:
+    """Minimal information about a variable for display in a listing"""
+    name: str
     description: str = ''
 
 
 @dataclass
 class Group:
-    description: str
-    """One line appropriate for a parent directory listing"""
+    summary: GroupSummary
     documentation: str
-    """Longer text to be displayed only on the Group's own page"""
-    groups: Sequence[Entry]
-    variables: Sequence[Entry]
+    groups: Sequence[GroupSummary]
+    variables: Sequence[VariableSummary]
 
 
 class Catalog(Protocol):
@@ -64,24 +70,28 @@ class IndexPyCatalog(Catalog):
         if not catalog_path.endswith('/'):
             return None  # Group paths must end in slash.
         node = self.root_node
-        components = catalog_path[1:-1].split('/')
-        if components == ['']:
+        name = 'Top'
+        if catalog_path == '/':
             components = []
+        else:
+            # strip leading and trailing slash, then split on remaining slashes
+            components = catalog_path[1:-1].split('/')
         for component in components:
             sub = node.subnodes.get(component)
             if sub is None:
                 return None
             node = sub
+            name = component
         return Group(
-            node.description,
-            node.documentation,
-            [
-                Entry(name, sub.description)
+            summary=GroupSummary(name=name, **node.summarize()),
+            documentation=node.documentation,
+            groups=[
+                GroupSummary(name=name, **sub.summarize())
                 for name, sub in node.subnodes.items()
                 if not sub.hidden
             ],
-            [
-                Entry(name, node.describe_var(name))
+            variables=[
+                VariableSummary(name=name, **node.describe_var(name))
                 for name in node.list_vars()
             ]
         )
@@ -95,11 +105,10 @@ class IndexPyCatalogNode:
         self.hidden = (catalog.root_dir / catalog_path / 'hidden').exists()
         self._module = None
 
-    @property
-    def description(self) -> str:
-        if self.module and hasattr(self.module, 'description'):
-            return self.module.description
-        return ''
+    def summarize(self) -> dict[str, str]:
+        if self.module and hasattr(self.module, 'summarize'):
+            return self.module.summarize()
+        return {}
 
     @property
     def documentation(self) -> str:
@@ -128,14 +137,16 @@ class IndexPyCatalogNode:
             return self.module.list_vars()
         return []
 
-    def describe_var(self, name: str) -> str:
+    def describe_var(self, name: str) -> dict[str, str]:
         if self.module and hasattr(self.module, 'describe_var'):
-            description = self.module.describe_var(name)
-            if description != '':
-                return description
+            my_attrs = self.module.describe_var(name)
+        else:
+            my_attrs = {}
         if self.parent:
-            return self.parent.describe_var(name)
-        return ''
+            parent_attrs = self.parent.describe_var(name)
+        else:
+            parent_attrs = {}
+        return parent_attrs | my_attrs
 
     def open_var(self, varname: str) -> xr.Dataset | None:
         if self.module is None or not hasattr(self.module, 'open'):
