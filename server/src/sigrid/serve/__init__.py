@@ -14,5 +14,5 @@ class Server:
     def __call__(self, req: webob.Request):
         url_path = req.path_info
         if url_path.endswith(('.das', '.dds', '.dods')):
-            return opendap.DatasetHandler(self.catalog)
+            return opendap.VariableHandler(self.catalog)
         return ui.CatalogBrowser(self.catalog)

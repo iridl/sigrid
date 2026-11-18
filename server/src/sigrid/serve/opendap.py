@@ -18,7 +18,7 @@ from sigrid.harmonize.catalog import Catalog
 
 type WSGIApp = Callable[[dict, Callable], Iterable[bytes]]
 
-class DatasetHandler:
+class VariableHandler:
     """Uses a Catalog to find the variable corresponding to
     the request URL, and generates an OPeNDAP response for it.
     """
