@@ -32,25 +32,13 @@ class CatalogBrowser:
                 if self.catalog.open_group(catalog_path + '/') is not None:
                     return HTTPFound(location=request.path + '/')
                 return HTTPNotFound()
-            return variable_response(ds)
+            return variable_response(request, ds)
 
 
 def group_response(request: webob.Request, group: catalog.Group) -> webob.Response:
     """Generate a directory listing page."""
 
-    components = request.path_info.rstrip('/').split('/')
-    prefixes = [components[:i] for i in range(1, len(components) + 1)]
-    paths = ['/'.join(prefix) for prefix in prefixes]
-    # Add trailing slash, except to the first (empty) prefix because that would
-    # make it an absolute path.
-    paths = paths[:1] + [f'{path}/' for path in paths[1:]]
-    breadcrumbs = (
-        [
-            f'<a href="{request.relative_url(path, to_application=True)}">{prefix[-1] or 'Top'}</a>'
-            for path, prefix in zip(paths, prefixes)
-        ]
-    )
-    trail = ' &rarr; '.join(breadcrumbs)
+    trail = breadcrumbs(request)
     context = {
         'breadcrumbs': trail,
         'group': group,
@@ -93,7 +81,7 @@ dir_template = jinja2.Template("""
 """)
 
 
-def variable_response(ds: xr.Dataset) -> webob.Response:
+def variable_response(request: webob.Request, ds: xr.Dataset) -> webob.Response:
     # Populate data variables' "coordinates" attribute, otherwise variables
     # that xarray considers to be auxiliary vars turn into data vars
     # in the OPeNDAP response. Doing this here so that the attribute is
@@ -114,6 +102,7 @@ def variable_response(ds: xr.Dataset) -> webob.Response:
             coord.attrs['calendar'] = coord.encoding['calendar']
 
     context = {
+        'breadcrumbs': breadcrumbs(request),
         'ds': ds,
     }
     return webob.Response(body=var_template.render(context))
@@ -134,8 +123,30 @@ var_template = jinja2.Template(
                 });
             }
         </script>
-    <button onclick="copyURL()" id="copyButton">Copy OPeNDAP URL</button>
-    {{ds._repr_html_()}}
+        {{ breadcrumbs }}
+        <p>
+        <button onclick="copyURL()" id="copyButton">Copy OPeNDAP URL</button>
+        <p>
+        {{ds._repr_html_()}}
     </body><html>
     """
 )
+
+
+def breadcrumbs(request):
+    components = request.path_info.rstrip('/').split('/')
+    prefixes = [components[:i] for i in range(1, len(components) + 1)]
+    paths = ['/'.join(prefix) for prefix in prefixes]
+    if request.path_info.endswith('/'):
+        # Add trailing slash, except to the first (empty) prefix because that would
+        # make it an absolute path.
+        paths = paths[:1] + [f'{path}/' for path in paths[1:]]
+    breadcrumbs = (
+        [
+            f'<a href="{request.relative_url(path, to_application=True)}">{prefix[-1] or 'Top'}</a>'
+            for path, prefix in zip(paths, prefixes)
+        ]
+    )
+    trail = ' &rarr; '.join(breadcrumbs)
+    return trail
+
