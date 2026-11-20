@@ -2282,7 +2282,7 @@ packages:
 - pypi: ./
   name: sigrid-ingestion
   version: '0'
-  sha256: 09e3e62d262036dbd83d7624b24b52b9d40488c621b0c5873efc64078f18e8ca
+  sha256: 1250c56a315c059e26d018d7ffd9beb0be4191d9465d0cd847304f5b7233abc5
 - conda: https://conda.anaconda.org/conda-forge/noarch/six-1.17.0-pyhe01879c_1.conda
   sha256: 458227f759d5e3fcec5d9b7acce54e10c9e1f4f4b7ec978f3bfd54ce4ee9853d
   md5: 3339e3b65d58accf4ca4fb8748ab16b3
