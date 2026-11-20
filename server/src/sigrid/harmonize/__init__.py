@@ -1,14 +1,12 @@
 # pyright: strict, reportUnknownMemberType=false
 
-import functools
-import importlib.util
 import os
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Literal, Self, cast
+from typing import Any, Literal, cast
 
 import icechunk
 import numpy as np
@@ -39,7 +37,7 @@ class DatasetConfig:
     y_increasing: bool | None = None
 
 
-def rename(ds: xr.Dataset, mapping: Mapping[str, str]):
+def rename(ds: xr.Dataset, mapping: Mapping[str, str]) -> xr.Dataset:
     ds = ds.rename({
         provider_name: standard_name
         for provider_name, standard_name in mapping.items()
@@ -50,7 +48,7 @@ def rename(ds: xr.Dataset, mapping: Mapping[str, str]):
     return ds
 
 
-def standardize(ds: xr.Dataset, config: DatasetConfig):
+def standardize(ds: xr.Dataset, config: DatasetConfig) -> xr.Dataset:
     ds = drop_non_std(ds, config.da_attrs, config.bare_dims)
     ds = convert_units(ds, config.da_attrs)
     if 'L' in ds.dims:
@@ -66,7 +64,7 @@ def standardize(ds: xr.Dataset, config: DatasetConfig):
     )
     return ds
 
-def standardize_y(ds: xr.Dataset, want_increasing: bool | None):
+def standardize_y(ds: xr.Dataset, want_increasing: bool | None) -> xr.Dataset:
     '''Invert Y from N-S to S-N if necessary'''
     if want_increasing is not None and len(ds[Coords.Y]) > 1:
         is_increasing = ds[Coords.Y].values[0] < ds[Coords.Y].values[-1]
@@ -74,7 +72,7 @@ def standardize_y(ds: xr.Dataset, want_increasing: bool | None):
             ds = ds.isel({Coords.Y: slice(None, None, -1)})
     return ds
 
-def drop_non_std(ds: xr.Dataset, standard_attrs: Mapping[str, Mapping[str, str]], bare_dims: Iterable[str]):
+def drop_non_std(ds: xr.Dataset, standard_attrs: Mapping[str, Mapping[str, str]], bare_dims: Iterable[str]) -> xr.Dataset:
     original_data_vars = list(ds.data_vars)
     ds = ds.drop_vars([
         name for name in ds.variables
@@ -91,7 +89,7 @@ def drop_non_std(ds: xr.Dataset, standard_attrs: Mapping[str, Mapping[str, str]]
     return ds
 
 
-def convert_units(ds: xr.Dataset, standard_attrs: Mapping[str, Mapping[str, str]]):
+def convert_units(ds: xr.Dataset, standard_attrs: Mapping[str, Mapping[str, str]]) -> xr.Dataset:
     data_vars = {
         name: convert_units_da(da, standard_attrs[name].get('units'))
         for name, da in data_vars_of(ds).items()
@@ -103,11 +101,11 @@ type UnitConverter = Callable[[xr.DataArray], xr.DataArray]
 def linear_converter(offset: float, scale: float) -> UnitConverter:
     """ Builds a converter for any affine transformation. 
      """
-    def converter(da: xr.DataArray):
+    def converter(da: xr.DataArray) -> xr.DataArray:
         return da * scale + offset
     return converter
 
-def null_converter(da: xr.DataArray):
+def null_converter(da: xr.DataArray) -> xr.DataArray:
     """  Used when the source and target units are numerically identical and
      only the *name/spelling* of the unit changes (e.g. 'degrees_north' vs
      'degree_north' -- same physical unit, different string used by
@@ -179,7 +177,7 @@ def standardize_attrs(
     da_attrs: Mapping[str, Mapping[str, str]],
     ds_attrs: Mapping[str, str],
     encodings: Mapping[str, Mapping[str, str]],
-):
+) -> xr.Dataset:
     coords = {
         name: standardize_attrs_da(da, da_attrs, encodings)
         for name, da in coords_of(ds).items()
@@ -208,7 +206,7 @@ def standardize_attrs_da(
         da: xr.DataArray,
         attrs: Mapping[str, Mapping[str, str]],
         encodings: Mapping[str, Mapping[str, str]],
-):
+) -> xr.DataArray:
     assert isinstance(da.name, str)
     # Wipe out provider's attrs and replace with standard ones
     da.attrs = dict(attrs[da.name])
@@ -219,7 +217,7 @@ def standardize_attrs_da(
     return da
 
 
-def add_target(ds: xr.Dataset, step: Literal['M', 'D']):
+def add_target(ds: xr.Dataset, step: Literal['M', 'D']) -> xr.Dataset:
     S = ds[Coords.S]
     # If there's no L coordinate, this returns an array of integer indicess 0..n
     L = ds[Coords.L]
@@ -251,7 +249,7 @@ def add_target(ds: xr.Dataset, step: Literal['M', 'D']):
     return ds
 
 
-def monthly_total(ds: xr.Dataset, vars: Iterable[str]):
+def monthly_total(ds: xr.Dataset, vars: Iterable[str]) -> xr.Dataset:
     new_ds = ds.copy()
     for var in vars:
         if var in ds:
@@ -272,28 +270,28 @@ def monthly_total(ds: xr.Dataset, vars: Iterable[str]):
     return new_ds
 
 
-def coords_of(ds: xr.Dataset | xr.DataArray):
+def coords_of(ds: xr.Dataset | xr.DataArray) -> Mapping[str, xr.DataArray]:
     """A version of the coords attribute with a better type hint"""
     assert all(isinstance(k, str) for k in ds.coords)
     return cast(Mapping[str, xr.DataArray], ds.coords)
 
 
-def vars_of(ds: xr.Dataset):
+def vars_of(ds: xr.Dataset) -> Mapping[str, xr.Variable]:
     assert all(isinstance(k, str) for k in ds.variables)
     return cast(Mapping[str, xr.Variable], ds.variables)
 
 
-def data_vars_of(ds: xr.Dataset):
+def data_vars_of(ds: xr.Dataset) -> Mapping[str, xr.DataArray]:
     assert all(isinstance(k, str) for k in ds.data_vars)
     return cast(Mapping[str, xr.DataArray], ds.data_vars)
 
 
-def sizes_of(ds: xr.Dataset | xr.DataArray):
+def sizes_of(ds: xr.Dataset | xr.DataArray) -> Mapping[str, int]:
     assert all(isinstance(k, str) for k in ds.sizes)
     return cast(Mapping[str, int], ds.sizes)
 
 
-def open_icechunk(rel_path: str, decode_times: bool = True, drop_variables: Iterable[str] = ()):
+def open_icechunk(rel_path: str, decode_times: bool = True, drop_variables: Iterable[str] = ()) -> xr.Dataset:
     abspath = Path(os.environ['ICECHUNK_ROOT']) / rel_path
     storage = icechunk.local_filesystem_storage(str(abspath))
     # Workaround for https://github.com/earth-mover/icechunk/issues/2105
@@ -312,127 +310,3 @@ def open_icechunk(rel_path: str, decode_times: bool = True, drop_variables: Iter
     except Exception as e:
         e.add_note(f'When trying to open {abspath}')
         raise
-
-
-type Opener = Callable[[], xr.Dataset]
-
-
-@dataclass
-class DisplayDataset:
-    subdatasets: Iterable[str]
-    variables: Iterable[str]
-
-
-class Catalog:
-    def __init__(self, root_dir: Path):
-        self.root_dir = root_dir
-        self.root_node = CatalogNode(self, '', None)
-
-    def open_variable(self, catalog_path: str) -> xr.Dataset | None:
-        if not catalog_path.startswith('/'):
-            raise Exception(f'Absolute catalog path was expected; got relative path {catalog_path}')
-        if catalog_path.endswith('/'):
-            return None  # Variable paths can't end in slash.
-        node = self.root_node
-        components = catalog_path[1:].split('/')
-        for i, component in enumerate(components):
-            sub = node.subdatasets.get(component)
-            if sub is None:
-                if i == len(components) - 1:
-                    opener = node.variables.get(component)
-                    if opener is None:
-                        return None
-                    return opener()
-                else:
-                    return None
-            node = sub
-        # If we reach here, we bottomed out at a Dataset, not a Variable.
-        return None
-
-    def open_dataset(self, catalog_path: str) -> DisplayDataset | None:
-        if not catalog_path.startswith('/'):
-            raise Exception(f'Absolute catalog path was expected; got relative path {catalog_path}')
-        if not catalog_path.endswith('/'):
-            return None  # Dataset paths must end in slash.
-        node = self.root_node
-        components = catalog_path[1:-1].split('/')
-        if components == ['']:
-            components = []
-        for component in components:
-            sub = node.subdatasets.get(component)
-            if sub is None:
-                return None
-            node = sub
-        return DisplayDataset(
-            [name for name, sub in node.subdatasets.items() if not sub.hidden],
-            list(node.variables)
-        )
-
-
-class CatalogNode:
-    def __init__(self, catalog: Catalog, catalog_path: str, parent: Self | None) -> None:
-        self.catalog = catalog
-        self.catalog_path = catalog_path
-        self.parent = parent
-        self.hidden = (catalog.root_dir / catalog_path / 'hidden').exists()
-        self._module = None
-
-    @property
-    def subdatasets(self) -> dict[str, Self]:
-        root = self.catalog.root_dir
-        return {
-            d.name: self.__class__(self.catalog, str(d.relative_to(root)), self)
-            for d in (root / self.catalog_path).iterdir()
-            if d.is_dir() and d.name != '__pycache__'
-        }
-
-    @property
-    def variables(self) -> dict[str, Opener]:
-        if self.module is None or not hasattr(self.module, 'list_vars'):
-            return {}
-
-        var_names: Iterable[str]
-
-        if hasattr(self.module, 'list_vars'):
-            var_names = self.module.list_vars()
-        else:
-            var_names = []
-
-        return {
-            var: functools.partial(self.open_var, var)
-            for var in var_names
-        }
-
-    @functools.cached_property
-    def module(self):
-        index_path = self.catalog.root_dir / self.catalog_path / 'index.py'
-        if not index_path.exists():
-            return None
-        return load_index(index_path)
-
-    def open_var(self, varname: str) -> xr.Dataset:
-        if self.module is None or not hasattr(self.module, 'open'):
-            # This should never happen. We only call _open with names that
-            # come from variables()
-            assert False
-        ds = self.module.open(varname)
-        ds = self.transform(ds)
-        return ds
-    
-    def transform(self, ds: xr.Dataset) -> xr.Dataset:
-        if self.module is not None and hasattr(self.module, 'transform'):
-            ds = self.module.transform(ds)
-        if self.parent is not None:
-            ds = self.parent.transform(ds)
-        return ds
-
-
-def load_index(file_path: Path):
-    spec = importlib.util.spec_from_file_location('catalog', file_path)
-    assert spec is not None  # we already checked that it exists
-    module = importlib.util.module_from_spec(spec)
-    # Pyright says the loader could be None, but I don't see how that
-    # could happen.
-    assert spec.loader
-    spec.loader.exec_module(module)
-    return module
