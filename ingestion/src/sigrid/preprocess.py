@@ -7,13 +7,12 @@ import itertools
 import os
 import re
 import traceback
-import warnings
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from concurrent.futures import Executor, Future
 from dataclasses import dataclass
 from pathlib import Path
 from types import TracebackType
-from typing import Any, NamedTuple, TypeVar, cast
+from typing import Any, NamedTuple, Self, TypeVar, cast
 
 import icechunk
 import icechunk.session
@@ -22,9 +21,7 @@ import tqdm
 import xarray as xr
 import xarray.conventions
 import zarr
-from typing_extensions import Self
-from zarr.errors import GroupNotFoundError, ZarrUserWarning
-
+from zarr.errors import GroupNotFoundError
 
 ALLOWED_ERROR_RATE = .1
 PROGRESS_PERIOD = 1  # How often to print a progress update, in seconds
@@ -500,8 +497,11 @@ def update_session(
     if parallel > 0:
         executor = concurrent.futures.ProcessPoolExecutor(max_workers=parallel)
     else:
-        # for debugging
-        executor = SyncExecutor()
+        # We used to have --parallel=0 for debugging; but having multiple tasks
+        # share the same ForkSession in the same process results in spurious
+        # concurrent write errors, so this is currently disabled.
+        # executor = SyncExecutor()
+        raise Exception('--parallel 0 is currently broken')
     print('Starting writes')
     try:
         futures = [
@@ -525,6 +525,7 @@ def update_session(
         success_count = 0
         failure_count = 0
         not_done = futures
+        modified_chunks = set()
         with tqdm.tqdm(total=total_count) as pbar:
             while not_done:
                 done, not_done = concurrent.futures.wait(not_done, timeout=PROGRESS_PERIOD)
@@ -534,6 +535,15 @@ def update_session(
                         log_exception(e)
                     else:
                         success_count += 1
+                        fork_session = f.result()
+                        diff = fork_session.status()
+                        assert not (diff.deleted_arrays or diff.deleted_groups or diff.new_arrays or diff.new_groups or diff.updated_arrays or diff.updated_groups)
+                        for path, idxs in diff.updated_chunks.items():
+                            for idx in idxs:
+                                chunk = (path, tuple(idx))
+                                if chunk in modified_chunks:
+                                    raise Exception(f'Concurrent writes to the same chunk {chunk}')
+                                modified_chunks.add(chunk)
                         session.merge(f.result())
                 completed_count = success_count + failure_count
                 pbar.update(len(done))
@@ -712,7 +722,7 @@ def initialize(
 
 
 def open_one_file(
-    path: Path, backend_kwargs: dict[str, dict[str, str]] | None = None
+    path: Path, backend_kwargs: dict[str, Any] | None = None
 ) -> xr.Dataset:
 
     # decode_coords doesn't control decoding of coordinate values, it controls
