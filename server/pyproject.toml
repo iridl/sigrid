@@ -44,10 +44,12 @@ default = {features = ["dev"], solve-group = "prod"}
 prod = {features = [], solve-group = "prod"}
 client = {features = ["client"]}
 
+[tool.pixi.activation]
+scripts = ["../env.sh"]
+
 [tool.pixi.tasks]
-python = "env $(sed 's/#.*//' ../.env) python"
 test = "pytest test"
-client-test = {cmd = "env $(sed 's/#.*//' ../.env) pytest client-test", default-environment = "client"}
+client-test = {cmd = ["pytest", "client-test"], default-environment = "client"}
 
 #### pyright
 

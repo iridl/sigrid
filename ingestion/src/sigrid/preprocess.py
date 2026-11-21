@@ -43,17 +43,10 @@ class TopConfig:
         self.raw_catalog_root = Path(raw_catalog_root)
 
 def config_from_env() -> TopConfig:
-    config_vars: dict[str, str] = {}
-    with open('../.env') as f:
-        for line in f:
-            if line.lstrip().startswith('#') or line.strip() == '':
-                continue
-            k, v = line.rstrip().split('=', 1)
-            config_vars[k] = v
     config = TopConfig(
-        config_vars['ORIG_DATA_ROOT'],
-        config_vars['ICECHUNK_ROOT'],
-        config_vars['RAW_CATALOG_ROOT']
+        os.environ['ORIG_DATA_ROOT'],
+        os.environ['ICECHUNK_ROOT'],
+        os.environ['RAW_CATALOG_ROOT']
     )
     return  config
 
