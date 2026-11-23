@@ -93,6 +93,11 @@ def test_one(proxy, server, test_path):
         assert ds1.sizes['S'] >= 58
         ds2 = ds2.sel(S=ds1['S'])
 
+    # FIM forecasts: Ingrid's S is daily from 2017-08-02, with NaNs on the
+    # days that have no forecast; sigrid has only the (mostly weekly) starts.
+    if 'SubC/NOAA-ESRL/FIM1.1/forecast/' in test_path:
+        ds2 = ds2.sel(S=ds1['S'])
+
     # Ingrid CFSv2 zg has only 200 hPa, while I added a couple other levels to
     # sigrid.
     if 'CFSv2' in test_path and 'zg' in test_path:
