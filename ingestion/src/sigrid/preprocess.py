@@ -235,7 +235,7 @@ class _FileOpener:
             # Only cfgrib understands 'indexpath'; avoid it for other engines.
             effective_backend_kwargs.setdefault('indexpath', '')
         try:
-            ds = xr.open_dataset(
+            ds_orig = xr.open_dataset(
                 path,
                 # Pass CF attributes through to icechunk unchanged.
                 mask_and_scale=False,
@@ -246,6 +246,8 @@ class _FileOpener:
         except Exception as e:
             e.add_note(f'While attempting to open {path}')
             raise
+
+        ds = ds_orig
 
         if self.data_vars is not None:
             # cast works around a bug in xarray's type hints: when x is a
@@ -331,7 +333,12 @@ class _FileOpener:
             if ds[varname].dtype == np.dtype('float64'):
                 ds[varname] = ds[varname].astype(np.float32)
 
+        # Without this, there are errors at shutdown after processing TIFF
+        # files, and we probably leak file descriptors for all file types.
+        ds.set_close(ds_orig.close)
+
         return ds
+
 
 class FileSetListing:
     def __init__(self, descriptor: FileSetDescriptor) -> None:
@@ -737,6 +744,12 @@ def initialize(
     encoding['IRIDL_time'].update({'units': units, 'dtype': 'int32'})
 
     t_slice.to_zarr(session.store, consolidated=False, encoding=encoding)
+
+    for m_slice in file_slices_some_missing:
+        for mp_slice in m_slice:
+            for ds in mp_slice:
+                if ds is not None:
+                    ds.close()
 
 
 def get_repo(storage_factory: Callable[[str], icechunk.Storage], dir: Pathy, orig_root: Path | None = None) -> icechunk.Repository:
