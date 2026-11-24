@@ -161,6 +161,7 @@ class FileSetDescriptor:
             drop_vars: str | Sequence[str] = (),  # TODO for backwards compatibility, remove when no longer needed
             expand_coords: str | Sequence[str] = (),
             aux_coords: str | Sequence[str] = (),
+            rename_vars: Mapping[str, str] | None = None,
     ) -> None:
         # TODO constructor args need to be validated
         self.name = name
@@ -184,6 +185,7 @@ class FileSetDescriptor:
             ensure_list(drop_coords),
             ensure_list(expand_coords),
             ensure_list(aux_coords),
+            rename_vars,
         )
 
     def parse_path(self, path: str | Path) -> FileCoords | None:
@@ -207,10 +209,20 @@ class _FileOpener:
     drop_coords: Sequence[str] | None
     expand_coords: Sequence[str]
     aux_coords: Sequence[str]
+    # Old name -> new name, for files whose variables were renamed partway
+    # through a dataset (e.g. CFSv2 zg_200 -> zg). Names absent from a file are
+    # ignored, so files with either name end up in the same store.
+    rename_vars: Mapping[str, str] | None = None
 
     def open(self, path: Path, file_coords: FileCoords) -> xr.Dataset:
         """Use as a context manager or call close() on the dataset when finished with it."""
         ds = open_one_file(path, backend_kwargs=self.backend_kwargs)
+
+        if self.rename_vars:
+            ds = ds.rename({
+                old: new for old, new in self.rename_vars.items()
+                if old in ds.variables
+            })
 
         if self.data_vars is not None:
             # cast works around a bug in xarray's type hints: when x is a
