@@ -155,7 +155,7 @@ class FileSetDescriptor:
             pattern: str,
             original_time_dim: str | None = None,
             parse_match : Callable[[dict[str, str]],FileCoords] | None = None,
-            backend_kwargs: dict[str, dict[str, str]] | None = None,
+            backend_kwargs: dict[str, Any] | None = None,
             data_vars: str | Sequence[str] | None = None,
             drop_coords: str | Sequence[str] = (),
             drop_vars: str | Sequence[str] = (),  # TODO for backwards compatibility, remove when no longer needed
@@ -202,7 +202,7 @@ class FileSetDescriptor:
 @dataclass
 class _FileOpener:
     original_time_dim: str | None
-    backend_kwargs: dict[str, dict[str, str]] | None
+    backend_kwargs: dict[str, Any] | None
     data_vars: Sequence[str] | None
     drop_coords: Sequence[str] | None
     expand_coords: Sequence[str]
@@ -210,7 +210,44 @@ class _FileOpener:
 
     def open(self, path: Path, file_coords: FileCoords) -> xr.Dataset:
         """Use as a context manager or call close() on the dataset when finished with it."""
-        ds = open_one_file(path, backend_kwargs=self.backend_kwargs)
+        # decode_coords doesn't control decoding of coordinate values, it controls
+        # which variables become coordinates as opposed to data variables. That's
+        # important because expand_dims affects data vars only.
+        #
+        # rioxarray only accepts decode_coords='all'. Initially 'all' sounded like
+        # the behavior we wanted for all file types (automatically interpret bounds
+        # variables as coords instead of data vars), but as of xarray 2026.2.0 it's
+        # badly implemented: it removes the `bounds` attribute, so the relationship
+        # between the main coordinate and its bounds coordinate is lost. So now for
+        # every file type except .tif, we use decode_coords=True, and if bounds
+        # variables are present, we use the explicit aux_coords option in the raw
+        # catalog to indicate that they should be turned into coordinates. If we
+        # ever get a .tif file with a bounds variable in it, we're in trouble.
+        if path.suffix == '.tif':
+            decode_coords = 'all'
+        else:
+            decode_coords = True
+
+        # Default: don't persist cfgrib's .idx cache files to disk. Any explicit
+        # 'indexpath' in the catalog's backend_kwargs overrides this default.
+        effective_backend_kwargs = dict(self.backend_kwargs or {})
+        if path.suffix in ('.grb', '.grib'):
+            # Only cfgrib understands 'indexpath'; avoid it for other engines.
+            effective_backend_kwargs.setdefault('indexpath', '')
+        try:
+            ds_orig = xr.open_dataset(
+                path,
+                # Pass CF attributes through to icechunk unchanged.
+                mask_and_scale=False,
+                decode_times=False,
+                decode_coords=decode_coords,
+                backend_kwargs=effective_backend_kwargs,   
+            )
+        except Exception as e:
+            e.add_note(f'While attempting to open {path}')
+            raise
+
+        ds = ds_orig
 
         if self.data_vars is not None:
             # cast works around a bug in xarray's type hints: when x is a
@@ -296,7 +333,12 @@ class _FileOpener:
             if ds[varname].dtype == np.dtype('float64'):
                 ds[varname] = ds[varname].astype(np.float32)
 
+        # Without this, there are errors at shutdown after processing TIFF
+        # files, and we probably leak file descriptors for all file types.
+        ds.set_close(ds_orig.close)
+
         return ds
+
 
 class FileSetListing:
     def __init__(self, descriptor: FileSetDescriptor) -> None:
@@ -703,48 +745,11 @@ def initialize(
 
     t_slice.to_zarr(session.store, consolidated=False, encoding=encoding)
 
-
-def open_one_file(
-    path: Path, backend_kwargs: dict[str, dict[str, str]] | None = None
-) -> xr.Dataset:
-
-    # decode_coords doesn't control decoding of coordinate values, it controls
-    # which variables become coordinates as opposed to data variables. That's
-    # important because expand_dims affects data vars only.
-    #
-    # rioxarray only accepts decode_coords='all'. Initially 'all' sounded like
-    # the behavior we wanted for all file types (automatically interpret bounds
-    # variables as coords instead of data vars), but as of xarray 2026.2.0 it's
-    # badly implemented: it removes the `bounds` attribute, so the relationship
-    # between the main coordinate and its bounds coordinate is lost. So now for
-    # every file type except .tif, we use decode_coords=True, and if bounds
-    # variables are present, we use the explicit aux_coords option in the raw
-    # catalog to indicate that they should be turned into coordinates. If we
-    # ever get a .tif file with a bounds variable in it, we're in trouble.
-    if path.suffix == '.tif':
-        decode_coords = 'all'
-    else:
-        decode_coords = True
-
-    # Default: don't persist cfgrib's .idx cache files to disk. Any explicit
-    # 'indexpath' in the catalog's backend_kwargs overrides this default.
-    effective_backend_kwargs = dict(backend_kwargs or {})
-    if path.suffix in ('.grb', '.grib'):
-        # Only cfgrib understands 'indexpath'; avoid it for other engines.
-        effective_backend_kwargs.setdefault('indexpath', '')
-    try:
-        result = xr.open_dataset(
-            path,
-            # Pass CF attributes through to icechunk unchanged.
-            mask_and_scale=False,
-            decode_times=False,
-            decode_coords=decode_coords,
-            backend_kwargs=effective_backend_kwargs,   
-        )
-        return result
-    except Exception as e:
-        e.add_note(f'While attempting to open {path}')
-        raise
+    for m_slice in file_slices_some_missing:
+        for mp_slice in m_slice:
+            for ds in mp_slice:
+                if ds is not None:
+                    ds.close()
 
 
 def get_repo(storage_factory: Callable[[str], icechunk.Storage], dir: Pathy, orig_root: Path | None = None) -> icechunk.Repository:
