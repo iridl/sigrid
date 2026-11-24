@@ -93,9 +93,16 @@ def test_one(proxy, server, test_path):
         assert ds1.sizes['S'] >= 58
         ds2 = ds2.sel(S=ds1['S'])
 
-    # Ingrid CFSv2 zg has only 200 hPa, while I added a couple other levels to
-    # sigrid.
-    if 'CFSv2' in test_path and 'zg' in test_path:
+    # Ingrid NMME CFSv2 zg has only 200 hPa, while I added a couple other levels
+    # to sigrid. (SubC CFSv2 zg has 500 and 200 hPa on both sides.)
+    if test_path.startswith('NMME/NOAA-NCEP/CFSv2/') and test_path.endswith('/zg'):
         ds1 = ds1.sel(P=[200])
+
+    # SubC CFSv2 forecast zg files name their variable zg_200 / zg_500 before
+    # 2023-05 and zg after. Ingrid can't read the old files (sigrid renames them),
+    # so compare only the starts from 2023-05 on.
+    if test_path == 'SubC/NOAA-NCEP/CFSv2/forecast/zg':
+        ds1 = ds1.sel(S=slice('2023-05-01', None))
+        ds2 = ds2.sel(S=slice('2023-05-01', None))
 
     assert compare.compare_ds(ds1, ds2, time_dim, atol)
