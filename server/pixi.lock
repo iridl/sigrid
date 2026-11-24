@@ -4189,7 +4189,7 @@ packages:
 - pypi: ./
   name: sigrid-server
   version: '0'
-  sha256: 5d17ede195251e20ce84ec4f8ce6d099c444dca2658ce3ffb4f5eed3d79d0d42
+  sha256: 97fc9a9fd8cc445c894c3359ee8682e7abb34331481b8dc4c96c7001a15017d7
 - conda: https://conda.anaconda.org/conda-forge/noarch/six-1.17.0-pyhe01879c_1.conda
   sha256: 458227f759d5e3fcec5d9b7acce54e10c9e1f4f4b7ec978f3bfd54ce4ee9853d
   md5: 3339e3b65d58accf4ca4fb8748ab16b3

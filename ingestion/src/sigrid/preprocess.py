@@ -6,6 +6,7 @@ import importlib.util
 import itertools
 import os
 import re
+import traceback
 import warnings
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from concurrent.futures import Executor, Future
@@ -24,10 +25,6 @@ import zarr
 from typing_extensions import Self
 from zarr.errors import GroupNotFoundError, ZarrUserWarning
 
-# In my opinion, using unsanctioned codecs makes the icechunk store inappropriate to
-# expose publicly, because not all clients will have the libraries required to read it,
-# but it's fine for internal use because we control the client.
-warnings.filterwarnings("ignore", category=ZarrUserWarning, message='.*Numcodecs.*')
 
 ALLOWED_ERROR_RATE = .1
 PROGRESS_PERIOD = 1  # How often to print a progress update, in seconds
@@ -46,17 +43,10 @@ class TopConfig:
         self.raw_catalog_root = Path(raw_catalog_root)
 
 def config_from_env() -> TopConfig:
-    config_vars: dict[str, str] = {}
-    with open('../.env') as f:
-        for line in f:
-            if line.lstrip().startswith('#') or line.strip() == '':
-                continue
-            k, v = line.rstrip().split('=', 1)
-            config_vars[k] = v
     config = TopConfig(
-        config_vars['ORIG_DATA_ROOT'],
-        config_vars['ICECHUNK_ROOT'],
-        config_vars['RAW_CATALOG_ROOT']
+        os.environ['ORIG_DATA_ROOT'],
+        os.environ['ICECHUNK_ROOT'],
+        os.environ['RAW_CATALOG_ROOT']
     )
     return  config
 
@@ -124,8 +114,9 @@ class FileSetCatalog:
         vars = defaults.pop('vars')
         return defaults, vars
 
-    def list_all(self):
-        for index_path in Path(self._raw_catalog_root).rglob('index.py'):
+    def list(self, dir=''):
+        dir_path = self._raw_catalog_root / dir
+        for index_path in dir_path.rglob('index.py'):
             rel_path = index_path.parent.relative_to(self._raw_catalog_root)
             _, vars = self._load_index(index_path)
             for var_name in vars:
@@ -533,7 +524,7 @@ def update_session(
                 for f in done:
                     if e := f.exception():
                         failure_count += 1
-                        print(e)
+                        log_exception(e)
                     else:
                         success_count += 1
                         session.merge(f.result())
@@ -575,21 +566,22 @@ class SyncExecutor(Executor):
 
 
 def write_one_file_slice(session: icechunk.session.ForkSession, opener: _FileOpener, region: Mapping[str, slice], file_coords: FileCoords, path: Path):
-    with opener.open(path, file_coords) as ds:
-        # Working around an xarray bug: when updating an existing zarr store, it
-        # uses the _FillValue, scale_factor, and add_offset it finds in the
-        # store, and doesn't tolerate the ds having one even if it's the same as
-        # the one in the store. So we keep these attributes in initialize, which
-        # creates the store, but drop them here when updating.
-        for v in ds.variables:
-            ds[v].attrs.pop('_FillValue', None)
-            ds[v].attrs.pop('missing_value', None)
-            ds[v].attrs.pop('scale_factor', None)
-            ds[v].attrs.pop('add_offset', None)
-        try:
+    try:
+        with opener.open(path, file_coords) as ds:
+            # Working around an xarray bug: when updating an existing zarr store, it
+            # uses the _FillValue, scale_factor, and add_offset it finds in the
+            # store, and doesn't tolerate the ds having one even if it's the same as
+            # the one in the store. So we keep these attributes in initialize, which
+            # creates the store, but drop them here when updating.
+            for v in ds.variables:
+                ds[v].attrs.pop('_FillValue', None)
+                ds[v].attrs.pop('missing_value', None)
+                ds[v].attrs.pop('scale_factor', None)
+                ds[v].attrs.pop('add_offset', None)
             ds.to_zarr(session.store, region=region, zarr_format=3, consolidated=False)
-        except Exception as e:
-            raise Exception(f'Error writing the contents of {path} to zarr: {e}') from e
+    except Exception as e:
+        e.add_note(f'On path {path}')
+        raise
     return session
 
 
@@ -842,6 +834,8 @@ def summarize_result(x: bool | Exception) -> str:
         message = f'{x.__class__.__name__}: {x}'
     return message
 
+def log_exception(e: BaseException):
+    traceback.print_exception(e)
 
 def main():
     parser = argparse.ArgumentParser()
@@ -857,25 +851,32 @@ def main():
         top_config.raw_catalog_root,
         top_config.orig_root
     )
-    vars = args.vars or raw_cat.list_all()
+    vars_or_dirs = args.vars or ['']
 
     # I wish this worked as a context manager, so we could suppress the warning
     # only when the lock is held.
     icechunk.set_logs_filter('[{message="The LocalFileSystem storage is not safe for concurrent commits}]=off')
 
     results = {}
-    for var in vars:
-        print(var)
-        try:
-            descriptor, icechunk_info = raw_cat.get_entry(var)
-            modified = update(
-                top_config, descriptor, icechunk_info,
-                args.limit, args.first, args.parallel
-            )
-            print(open_icechunk(var))
-            results[var] = modified
-        except Exception as e:  # noqa: BLE001
-            results[var] = e
+    for arg in vars_or_dirs:
+        if arg.endswith('/'):
+            vars = list(raw_cat.list(arg))
+        else:
+            vars = [arg]
+        for var in vars:
+            print(var)
+            try:
+                entry_info = raw_cat.get_entry(var)
+                descriptor, icechunk_info = entry_info
+                modified = update(
+                    top_config, descriptor, icechunk_info,
+                    args.limit, args.first, args.parallel
+                )
+                print(open_icechunk(var))
+                results[var] = modified
+            except Exception as e:  # noqa: BLE001
+                print(f'Failed: {e!r}')
+                results[var] = e
 
     print('\n\nSummary:')
     for k, v in results.items():

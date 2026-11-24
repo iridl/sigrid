@@ -19,6 +19,7 @@ def make_dataset():
         units: str | None = 'mm/day',
         n_s: int = 3,
         n_l: int = 4,
+        l_dtype: str = 'int',
         ys: tuple[float, ...] = (0.0, 1.0),
         xs: tuple[float, ...] = (10.0, 11.0),
     ) -> xr.Dataset:
@@ -31,7 +32,7 @@ def make_dataset():
             {varname: (('S', 'L', 'Y', 'X'), data, attrs)},
             coords={
                 'S': s_vals,
-                'L': np.arange(n_l),
+                'L': np.arange(n_l).astype(l_dtype),
                 'Y': list(ys),
                 'X': list(xs),
             },
@@ -173,7 +174,7 @@ def test_standardize_attrs_applies_encodings(make_dataset):
 
 def test_add_target_monthly(make_dataset):
     ds = make_dataset(varname='prcp', n_s=2, n_l=3)
-    out = harmonize.add_target(ds, lead_is_month=True)
+    out = harmonize.add_target(ds, step='M')
 
     assert out['target_bnds'].dims == ('S', 'L', 'nbound')
     assert np.array_equal(
@@ -184,12 +185,26 @@ def test_add_target_monthly(make_dataset):
         ], dtype=np.datetime64)
     )
 
+def test_add_target_daily(make_dataset):
+    ds = make_dataset(varname='prcp', n_s=2, n_l=3, l_dtype='timedelta64[D]')
+    out = harmonize.add_target(ds, step='D')
+    print(out)
+
+    assert out['target_bnds'].dims == ('S', 'L', 'nbound')
+    assert np.array_equal(
+        out['target_bnds'].values,
+        np.array([
+            [['1980-01-01', '1980-01-02'], ['1980-01-02', '1980-01-03'], ['1980-01-03', '1980-01-04']],
+            [['1980-02-01', '1980-02-02'], ['1980-02-02', '1980-02-03'], ['1980-02-03', '1980-02-04']],
+        ], dtype=np.datetime64)
+    )
+
 
 # --- monthly_total ----------------------------------------------------------
 
 def test_monthly_total_converts_rate(make_dataset):
     ds = make_dataset(varname='prcp', units='mm/day', n_s=2, n_l=2)
-    ds = harmonize.add_target(ds, lead_is_month=True)
+    ds = harmonize.add_target(ds, step='M')
     out = harmonize.monthly_total(ds, ['prcp'])
     assert out['prcp'].attrs['units'] == 'mm'
     xarray.testing.assert_allclose(out['prcp'].isel(S=0, L=0), ds['prcp'].isel(S=0, L=0) * 31)
@@ -200,7 +215,7 @@ def test_monthly_total_converts_rate(make_dataset):
 
 def test_monthly_total_rejects_non_daily_rate(make_dataset):
     ds = make_dataset(varname='prcp', units='mm', n_s=1, n_l=1)
-    ds = harmonize.add_target(ds, lead_is_month=True)
+    ds = harmonize.add_target(ds, step='M')
     with pytest.raises(Exception, match='rate per day'):
         harmonize.monthly_total(ds, ['prcp'])
 

@@ -4,7 +4,7 @@ import numpy as np
 import xarray as xr
 
 
-def compare_ds(ds1, ds2, atol):
+def compare_ds(ds1, ds2, time_dim, atol):
     names = list(ds1.data_vars)
     assert len(names) == 1
     var1 = names[0]
@@ -26,13 +26,17 @@ def compare_ds(ds1, ds2, atol):
     da2 = ds2[var2]
 
     all_same = True
-    all_same &= compare_shape(da1, da2)
+    all_same &= compare_shape(da1, da2, time_dim)
     if all_same:
-        all_same &= compare_coords(da1, da2)
-        all_same &= compare_data(da1, da2, atol)
+        all_same &= compare_coords(da1, da2, time_dim)
+        # Depending on how far off the coords are, comparing data might or might
+        # not make sense. If it's just rounding errors, comparing data is
+        # helpful. If e.g. you have Y in the wrong order, comparing data is
+        # meaningless.
+        all_same &= compare_data(da1, da2, time_dim, atol)
     return all_same
 
-def compare_coords(ds1, ds2):
+def compare_coords(ds1, ds2, time_dim):
     all_same = True
     for cname in sorted(set(ds1.coords) | set(ds2.coords)):
         if cname == 'target':
@@ -45,7 +49,7 @@ def compare_coords(ds1, ds2):
         if c2 is None:
             print(cname, 'present', 'absent')
             return False
-        if cname == 'S':
+        if cname == time_dim:
             # Just check that all sigrid values are also in iridl,
             # not vice versa, because of different handling of
             # missing values. compare_shape limits how many missing
@@ -62,75 +66,86 @@ def compare_coords(ds1, ds2):
             all_same = False
     return all_same
 
-def compare_shape(da1, da2):
+def compare_shape(da1, da2, time_dim):
     dims1 = sorted(
         (name, size) for name, size in da1.sizes.items()
-        if name != 'S'
+        if name != time_dim
     )
     dims2 = sorted(
         (name, size) for name, size in da2.sizes.items()
-        if name != 'S'
+        if name != time_dim
     )
-    s1 = da1.sizes['S']
-    s2 = da2.sizes['S']
+    time1 = da1.sizes[time_dim]
+    time2 = da2.sizes[time_dim]
     if dims1 == dims2:
-        if s1 == s2:
+        if time1 == time2:
             print('same dims')
             return True
-        if (s2 - s1) / s2 < .2:
-            print(f'mostly same dims, S close enough: {s1} vs {s2}')
+        if (time2 - time1) / time2 < .2:
+            print(f'mostly same dims, {time_dim} close enough: {time1} vs {time2}')
             return True
-        print(f'S lengths are too different: {s1} vs {s2}')
+        print(f'{time_dim} lengths are too different: {time1} vs {time2}')
         return False
     else:
         print('different dims')
-        print(dims1, f'S={s1}')
-        print(dims2, f'S={s2}')
+        print(dims1, f'{time_dim}={time1}')
+        print(dims2, f'{time_dim}={time2}')
         return False
 
-def compare_data(da1, da2, atol):
+def compare_data(da1, da2, time_dim, atol):
     # When there are missing S values, sigrid has gaps in S, while ingrid
     # has a regular S grid but some entries are all-NaN. In that case, pick
     # three S slices that are present in both to compare, and pick three
     # S slices that are missing from sigrid and verify that they're all-NaN
     # in ingrid.
-    s_len = da1.sizes['S']
+    time_len = da1.sizes[time_dim]
     all_same = True
-    for i in (0, s_len // 2, s_len - 1):
-        s = da1['S'].isel(S=i).values
-        slice1 = da1.sel(S=s)
-        slice2 = da2.sel(S=s)
+    for i in (0, time_len // 2, time_len - 1):
+        time = da1[time_dim].isel({time_dim: i}).values
+        slice1 = da1.sel({time_dim: time})
+        slice2 = da2.sel({time_dim: time})
         same = compare_slice(slice1, slice2, atol=atol)
         if same:
-            print(f"S={s}: same")
+            print(f"{time_dim}={time}: same")
         else:
-            print(f"S={s}:")
-            print('da1')
+            print(f"{time_dim}={time}:")
             if 'M' in da1.sizes: 
+                print('da1')
                 print(slice1.isel(L=0, M=0).values)
-            else:
+                print('da2')
+                print(slice2.isel(L=0, M=0).values)
+            elif 'L' in da1.sizes:
+                print('da1')
                 print(slice1.isel(L=0).values)
-            print('da2')
-            print(slice2.isel(L=0).values)
+                print('da2')
+                print(slice2.isel(L=0).values)
+            else:
+                print('da1')
+                print(slice1.values)
+                print('da2')
+                print(slice2.values)
         all_same &= same
-    if da1.sizes['S'] < da2.sizes['S']:
-        missing_s = np.setdiff1d(da2['S'].values, da1['S'].values)
-        missing_count = len(missing_s)
+    if da1.sizes[time_dim] < da2.sizes[time_dim]:
+        missing_times = np.setdiff1d(da2[time_dim].values, da1[time_dim].values)
+        missing_count = len(missing_times)
         if missing_count > 3:
-            missing_s = missing_s[[0, missing_count // 2, missing_count - 1]]
-        for s in missing_s:
-            slice2 = da2.sel(S=s)
+            missing_times = missing_times[[0, missing_count // 2, missing_count - 1]]
+        for time in missing_times:
+            slice2 = da2.sel({time_dim: time})
             if not slice2.isnull().all():
-                print(f'S={s} is missing from da1 and non-NaN in da2')
+                print(f'{time_dim}={time} is missing from da1 and non-NaN in da2')
                 all_same = False
     return all_same
 
 def compare_slice(da1, da2, atol):
     start = time.time()
 
-    dim_chunk='L'
     if 'M' in da1.sizes and da1.sizes['M'] > da1.sizes['L']:
-        dim_chunk='M'
+        dim_chunk = 'M'
+    elif 'L' in da1.sizes:
+        dim_chunk = 'L'
+    else:
+        dim_chunk = None
 
     da1 = load_chunked(da1, dim=dim_chunk)
     print(f'da1 took {time.time() - start}s')
@@ -163,7 +178,10 @@ def fetch(url):
         if coord.attrs.get("calendar") == "360":
             coord.attrs["calendar"] = "360_day"
 
-    units = ds['L'].attrs.get('units')
+    if 'L' in ds:
+        units = ds['L'].attrs.get('units')
+    else:
+        units = None
     if units is None or 'months' in units:
         ds = xr.decode_cf(ds)
     else:
@@ -186,10 +204,10 @@ def parse_listfile(filename):
                 url1 = None
     return paths
 
-def load_chunked(da, dim='M', chunk_size=10):
+def load_chunked(da, dim, chunk_size=10):
     """Load a DataArray in chunks along `dim` to avoid oversized single requests
     (e.g. Ingrid's 413 Request Entity Too Large on very large slices)."""
-    if dim not in da.dims or da.sizes[dim] <= chunk_size:
+    if dim is None or da.sizes[dim] <= chunk_size:
         da.load()
         return da
 
