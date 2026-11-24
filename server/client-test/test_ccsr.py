@@ -71,7 +71,7 @@ def test_one(proxy, server, test_path):
     # which every run has. There are no files for 2026-04-11..21 (Ingrid has
     # all-NaN starts): 3 of the 13 starts before the cutoff, over
     # compare_shape's 20% limit, so compare on sigrid's starts, as for SPEAR.
-    if 'SubC/GMAO/GEOS-S2S-3/forecast/' in test_path:
+    if 'SubC/NASA-GMAO/GEOS-S2S-3/forecast/' in test_path:
         ds1 = ds1.isel(L=slice(0, 62))
         ds2 = ds2.isel(L=slice(0, 62))
         ds2 = ds2.sel(S=ds1['S'])
