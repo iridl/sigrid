@@ -76,6 +76,10 @@ def test_one(proxy, server, test_path):
         ds2 = ds2.isel(L=slice(0, 62))
         ds2 = ds2.sel(S=ds1['S'])
 
+    # GEOS-S2S-3 hindcast keeps L91 (92 leads, the longest run); IRIDL stops at 90.5.
+    if 'SubC/NASA-GMAO/GEOS-S2S-3/hindcast/' in test_path:
+        ds1 = ds1.isel(L=slice(0, 91))
+
     # IRIDL uses g2clib for GRIB decoding, while sigrid uses ecCodes. The two
     # libraries use different implementations of the GRIB bit-(un)packing
     # formula that can yield slighly different floating point numbers when
