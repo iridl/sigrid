@@ -7,13 +7,13 @@ import itertools
 import os
 import re
 import traceback
-import warnings
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Generator, Iterable, Iterator, Mapping, Sequence
 from concurrent.futures import Executor, Future
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from types import TracebackType
-from typing import Any, NamedTuple, TypeVar, cast
+from typing import Any, NamedTuple, Self, TypeVar, cast
 
 import icechunk
 import icechunk.session
@@ -22,9 +22,7 @@ import tqdm
 import xarray as xr
 import xarray.conventions
 import zarr
-from typing_extensions import Self
-from zarr.errors import GroupNotFoundError, ZarrUserWarning
-
+from zarr.errors import GroupNotFoundError
 
 ALLOWED_ERROR_RATE = .1
 PROGRESS_PERIOD = 1  # How often to print a progress update, in seconds
@@ -399,27 +397,56 @@ def update(
         first: np.datetime64 | None,
         parallel: int,
 ) -> bool:
-    store_path = top_config.icechunk_root / icechunk_info.relpath
-    lock_path = store_path.with_name(f'{store_path.name}.lock')
-    lock_path.parent.mkdir(exist_ok=True, parents=True)
-    lock_file = lock_path.open(mode='a')
-    session = None
-    try:
-        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
-        repo = get_repo(
-                icechunk.local_filesystem_storage,
-                store_path,
-                top_config.orig_root
-            )
-        session = repo.writable_session('main')
-        modified = update_session(session, descriptor, limit=limit, first=first, parallel=parallel)
+    with open_icechunk_for_write(top_config, icechunk_info.relpath) as session:
+        modified = update_session(
+            session, descriptor, limit=limit, first=first, parallel=parallel
+        )
         if modified:
             snapshot_id = session.commit(f'update from {descriptor.dir}')
             print(f'Committed snapshot: {snapshot_id}')
-        return modified
-    finally:
-        fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
-        lock_file.close()
+    return modified
+
+
+@contextmanager
+def open_icechunk_for_write(
+        config: TopConfig,
+        relpath: str,
+        autocommit: bool = True,
+) -> Generator[icechunk.Session, Any, None]:
+    store_path = config.icechunk_root / relpath
+    lock_path = store_path.with_name(f'{store_path.name}.lock')
+    with lockfile(lock_path, wait=True):
+        repo = get_repo(
+            icechunk.local_filesystem_storage,
+            store_path,
+            config.orig_root
+        )
+        session = repo.writable_session('main')
+
+        yield session
+
+        if autocommit:
+            if session.has_uncommitted_changes:
+                snapshot_id = session.commit('autocommit')
+                print(f'Committed snapshot: {snapshot_id}')
+        else: # not autocommit
+            if session.has_uncommitted_changes:
+                print('Warning: discarding uncommitted changes')
+                session.discard_changes()
+
+
+@contextmanager
+def lockfile(lock_path, wait=False) -> Generator[None, Any, None]:
+    lock_path.parent.mkdir(exist_ok=True, parents=True)
+    lock_file = lock_path.open(mode='a')
+    nbflag = 0 if wait else fcntl.LOCK_NB
+    fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | nbflag)
+
+    yield
+
+    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+    lock_file.close()
+
 
 def update_session(
         session: icechunk.session.Session,
