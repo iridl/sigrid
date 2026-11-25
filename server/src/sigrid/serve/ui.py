@@ -38,9 +38,7 @@ class CatalogBrowser:
 def group_response(request: webob.Request, group: catalog.Group) -> webob.Response:
     """Generate a directory listing page."""
 
-    trail = breadcrumbs(request)
     context = {
-        'breadcrumbs': trail,
         'group': group,
     }
 
@@ -50,8 +48,6 @@ def group_response(request: webob.Request, group: catalog.Group) -> webob.Respon
 
 dir_template = jinja2.Template("""
     <!-- OPeNDAP -->
-    {{ breadcrumbs }}
-    <p>
     {{ group.summary.description }}
     <p>
     {{ group.documentation }}
@@ -102,7 +98,6 @@ def variable_response(request: webob.Request, ds: xr.Dataset) -> webob.Response:
             coord.attrs['calendar'] = coord.encoding['calendar']
 
     context = {
-        'breadcrumbs': breadcrumbs(request),
         'ds': ds,
     }
     return webob.Response(body=var_template.render(context))
@@ -123,7 +118,6 @@ var_template = jinja2.Template(
                 });
             }
         </script>
-        {{ breadcrumbs }}
         <p>
         <button onclick="copyURL()" id="copyButton">Copy OPeNDAP URL</button>
         <p>
@@ -131,24 +125,3 @@ var_template = jinja2.Template(
     </body><html>
     """
 )
-
-
-def breadcrumbs(request):
-    components = request.path_info.rstrip('/').split('/')
-    prefixes = [components[:i] for i in range(1, len(components) + 1)]
-    paths = ['/'.join(prefix) for prefix in prefixes]
-    # Add trailing slash to directories, except to the first (empty) prefix
-    # because that would make it an absolute path.
-    paths = paths[:1] + [f'{path}/' for path in paths[1:-1]] + [paths[-1]]
-    # Add trailing slash to the final component only if it's a group.
-    if request.path_info[-1] == '/' and len(request.path_info) > 1:
-        paths[-1] = f'{paths[-1]}/'
-    breadcrumbs = (
-        [
-            f'<a href="{request.relative_url(path, to_application=True)}">{prefix[-1] or 'Top'}</a>'
-            for path, prefix in zip(paths, prefixes)
-        ]
-    )
-    trail = ' &rarr; '.join(breadcrumbs)
-    return trail
-
