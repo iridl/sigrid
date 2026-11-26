@@ -65,6 +65,20 @@ def test_one(proxy, server, test_path):
         ds1 = ds1.sel({time_dim: slice(None, '2026-05-01')})
         ds2 = ds2.sel({time_dim: slice(None, '2026-05-01')})
 
+    # GEOS-S2S-3 forecasts. Each run ends on a fixed date, so a file holds 62
+    # to 92 daily records. Ingrid reads 91 and, past a file's last record,
+    # wraps around to record 0; sigrid has NaN there. Compare leads 0..61,
+    # which every run has. There are no files for 2026-04-11..21 (Ingrid has
+    # all-NaN starts): 3 of the 13 starts before the cutoff, over
+    # compare_shape's 20% limit, so compare on sigrid's starts, as for SPEAR.
+    if 'SubC/NASA-GMAO/GEOS-S2S-3/forecast/' in test_path:
+        ds1 = ds1.isel(L=slice(0, 62))
+        ds2 = ds2.isel(L=slice(0, 62))
+        ds2 = ds2.sel(S=ds1['S'])
+
+    # GEOS-S2S-3 hindcast keeps L91 (92 leads, the longest run); IRIDL stops at 90.5.
+    if 'SubC/NASA-GMAO/GEOS-S2S-3/hindcast/' in test_path:
+        ds1 = ds1.isel(L=slice(0, 91))
 
     # IRIDL uses g2clib for GRIB decoding, while sigrid uses ecCodes. The two
     # libraries use different implementations of the GRIB bit-(un)packing
